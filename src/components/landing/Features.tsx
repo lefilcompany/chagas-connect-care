@@ -1,4 +1,4 @@
-import { Apple, Pill, HeartPulse, UserCircle, MessageCircle, ShieldCheck } from "lucide-react";
+import { Apple, Pill, HeartPulse, UserCircle, MessageCircle, Plug } from "lucide-react";
 
 const features = [
   { icon: Apple, title: "Guia Alimentar Personalizado", desc: "Dicas e orientações nutricionais adaptadas para quem convive com a doença de Chagas, considerando o estágio clínico e o perfil de cada paciente." },
@@ -6,7 +6,7 @@ const features = [
   { icon: HeartPulse, title: "Cuidados com a Saúde", desc: "Orientações sobre qualidade do sono, atividade física e hábitos diários que complementam o tratamento e melhoram a qualidade de vida." },
   { icon: UserCircle, title: "Comunicação por Perfil de Paciente", desc: "Mensagens adaptadas a diferentes personas — do jovem que suspeita de infecção ao paciente crônico com baixa adesão — garantindo relevância e empatia em cada contato." },
   { icon: MessageCircle, title: "WhatsApp Integrado", desc: "Envio 1:1 ou em massa de mensagens automáticas, com templates personalizáveis por perfil de paciente." },
-  { icon: ShieldCheck, title: "Conformidade LGPD", desc: "Dados protegidos, criptografados e em conformidade com a legislação brasileira." },
+  { icon: Plug, title: "Integração com CRMs", desc: "Conecte a plataforma ao CRM que sua equipe já utiliza e mantenha todos os dados dos pacientes sincronizados em um só lugar, sem retrabalho." },
 ];
 
 export const Features = () => (
