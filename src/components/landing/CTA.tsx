@@ -19,7 +19,7 @@ export const CTA = () => (
               Cadastre-se Agora
               <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
-            <Button variant="outlineLight" size="lg">Solicitar uma Demo</Button>
+            <Button size="lg" className="bg-primary text-brand hover:bg-primary/90 shadow-card">Solicitar uma Demo</Button>
           </div>
         </div>
       </div>
