@@ -4,19 +4,19 @@ const logos = ["Hospital Vida", "Clínica Coração", "InstitutoSaúde+", "MedCa
 
 const testimonials = [
   {
-    quote: "Reduzimos as faltas às consultas em mais de 35% no primeiro trimestre. A integração com WhatsApp mudou nossa rotina.",
-    name: "Dra. Marina Lopes",
-    role: "Cardiologista, Hospital Vida",
+    quote: "Os lembretes de medicação via WhatsApp fizeram uma diferença enorme. Meus pacientes chegam às consultas relatando que não esqueceram mais de tomar o benznidazol.",
+    name: "Dr. Henrique Matos",
+    role: "Infectologista, Hospital das Clínicas de Pernambuco",
   },
   {
-    quote: "Finalmente uma plataforma pensada para o cuidado contínuo. A priorização clínica nos ajuda a focar em quem mais precisa.",
-    name: "Dr. Rafael Souza",
-    role: "Coordenador, Instituto Saúde+",
+    quote: "A comunicação personalizada por perfil mudou como nos relacionamos com os pacientes. Uma senhora de 68 anos no estágio crônico recebe orientações completamente diferentes de um jovem recém-diagnosticado — e isso faz toda a diferença na adesão.",
+    name: "Dra. Fernanda Queiroz",
+    role: "Coordenadora de Cardiologia, Instituto do Coração do Nordeste",
   },
   {
-    quote: "A linha do tempo do paciente é incrível. Tenho todo o histórico em segundos antes da consulta.",
-    name: "Enfª Camila Reis",
-    role: "Enfermeira-chefe, MedCare",
+    quote: "Finalmente uma ferramenta que trata o paciente de Chagas com a atenção que ele merece. As dicas de alimentação e os cuidados com o sono chegam no momento certo e na linguagem certa para cada pessoa.",
+    name: "Enfª Patrícia Drummond",
+    role: "Enfermeira de Referência em Doenças Negligenciadas, Fiocruz",
   },
 ];
 
