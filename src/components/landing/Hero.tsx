@@ -22,10 +22,10 @@ export const Hero = () => {
           </p>
           <div className="flex flex-wrap gap-4">
             <Button variant="hero" size="lg" className="group">
-              Cadastre-se Agora
+              Cadastre-se agora
               <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
-            <Button variant="outlineBrand" size="lg">Solicitar uma Demo</Button>
+            <Button variant="outlineBrand" size="lg">Solicitar uma demo</Button>
           </div>
           <div className="flex items-center gap-6 pt-4 text-sm text-muted-foreground">
             <div><span className="font-bold text-brand">+10mil</span> pacientes acompanhados</div>
