@@ -8,35 +8,45 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    /* Brand: Chagas Cuidado Digital */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 0 0% 23%; /* #3B3B3B */
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 23%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 0 0% 23%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --brand: 174 35% 18%; /* #1E3E3B verde escuro */
+    --brand-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --primary: 168 45% 84%; /* #C5E4DC verde claro */
+    --primary-foreground: 174 35% 18%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --secondary: 168 45% 96%;
+    --secondary-foreground: 174 35% 18%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --muted: 168 30% 97%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 168 45% 84%;
+    --accent-foreground: 174 35% 18%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 168 25% 90%;
+    --input: 168 25% 90%;
+    --ring: 174 35% 18%;
 
-    --radius: 0.5rem;
+    --radius: 0.875rem;
+
+    --gradient-soft: linear-gradient(180deg, hsl(168 60% 97%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-brand: linear-gradient(135deg, hsl(174 35% 18%) 0%, hsl(174 35% 26%) 100%);
+    --shadow-soft: 0 10px 30px -12px hsl(174 35% 18% / 0.15);
+    --shadow-card: 0 4px 20px -8px hsl(174 35% 18% / 0.10);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     --sidebar-background: 0 0% 98%;
 
