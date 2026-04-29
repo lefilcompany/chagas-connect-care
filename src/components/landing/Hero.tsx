@@ -12,10 +12,10 @@ export const Hero = () => {
             Cuidado contínuo e personalizado
           </span>
           <h1 className="font-display text-3xl font-extrabold leading-[1.1] tracking-tight text-brand md:text-4xl lg:text-5xl">
-            Cuidado contínuo e digital para pacientes com <span className="relative inline-block">
+            Acompanhamento <span className="relative inline-block">
               <span className="absolute inset-x-0 bottom-2 -z-10 h-3 bg-primary" />
-              Doença de Chagas
-            </span>
+              inteligente
+            </span> e humanizado
           </h1>
           <p className="max-w-xl text-lg leading-relaxed text-muted-foreground">
             Acompanhe seus pacientes de forma contínua e personalizada. Facilitamos o monitoramento das consultas e a comunicação entre você e seus pacientes.
