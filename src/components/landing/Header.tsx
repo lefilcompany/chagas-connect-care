@@ -31,7 +31,7 @@ export const Header = () => {
         </nav>
         <div className="hidden items-center gap-3 md:flex">
           <Button variant="ghost" className="text-brand hover:bg-primary/40">Saiba mais</Button>
-          <Button variant="hero">Cadastre-se Agora</Button>
+          <Button variant="hero">Cadastre-se agora</Button>
         </div>
         <button className="md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
           <Menu className="h-6 w-6 text-brand" />
@@ -43,7 +43,7 @@ export const Header = () => {
             {nav.map((n) => (
               <a key={n.href} href={n.href} className="py-2 text-sm font-medium text-foreground/80">{n.label}</a>
             ))}
-            <Button variant="hero" className="w-full">Cadastre-se Agora</Button>
+            <Button variant="hero" className="w-full">Cadastre-se agora</Button>
           </div>
         </div>
       )}
