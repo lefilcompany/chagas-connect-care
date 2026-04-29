@@ -9,7 +9,7 @@ export const Hero = () => {
         <div className="space-y-7">
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/60 bg-primary/30 px-4 py-1.5 text-xs font-semibold text-brand">
             <Sparkles className="h-3.5 w-3.5" />
-            Cuidado contínuo e personalizado
+            Atendimento inteligente e humanizado
           </span>
           <h1 className="font-display text-3xl font-extrabold leading-[1.1] tracking-tight text-brand md:text-4xl lg:text-5xl">
             Cuidado contínuo e digital para pacientes com <span className="relative inline-block">
