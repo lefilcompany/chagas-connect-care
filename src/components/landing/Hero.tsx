@@ -18,7 +18,7 @@ export const Hero = () => {
             </span>
           </h1>
           <p className="max-w-xl text-lg leading-relaxed text-muted-foreground">
-            Acompanhe seus pacientes de forma contínua e personalizada. Facilitamos o monitoramento das consultas e a comunicação entre você e seus pacientes.
+            Uma plataforma que conecta equipes de saúde aos seus pacientes com comunicação educativa, lembretes de medicação e orientações adaptadas a cada perfil — do diagnóstico ao tratamento crônico.
           </p>
           <div className="flex flex-wrap gap-4">
             <Button variant="hero" size="lg" className="group">
