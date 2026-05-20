@@ -1,12 +1,12 @@
-import { Apple, Pill, HeartPulse, UserCircle, MessageCircle, Plug } from "lucide-react";
+import { Apple, Pill, HeartPulse, Users, MessageCircle, Plug } from "lucide-react";
 
 const features = [
-  { icon: Apple, title: "Guia Alimentar Personalizado", desc: "Dicas e orientações nutricionais adaptadas para quem convive com a doença de Chagas, considerando o estágio clínico e o perfil de cada paciente." },
-  { icon: Pill, title: "Lembretes de Medicação", desc: "Notificações automáticas que reforçam a importância de tomar o medicamento no horário certo e de manter a regularidade do tratamento." },
-  { icon: HeartPulse, title: "Cuidados com a Saúde", desc: "Orientações sobre qualidade do sono, atividade física e hábitos diários que complementam o tratamento e melhoram a qualidade de vida." },
-  { icon: UserCircle, title: "Comunicação por Perfil de Paciente", desc: "Mensagens adaptadas a diferentes personas — do jovem que suspeita de infecção ao paciente crônico com baixa adesão — garantindo relevância e empatia em cada contato." },
-  { icon: MessageCircle, title: "WhatsApp Integrado", desc: "Envio 1:1 ou em massa de mensagens automáticas, com templates personalizáveis por perfil de paciente." },
-  { icon: Plug, title: "Integração com CRMs", desc: "Conecte a plataforma ao CRM que sua equipe já utiliza e mantenha todos os dados dos pacientes sincronizados em um só lugar, sem retrabalho." },
+  { icon: Users, title: "Cuidado em Rede", desc: "Inclua paciente, familiares e cuidadores na mesma jornada, com mensagens direcionadas para cada papel no cuidado." },
+  { icon: Pill, title: "Lembretes de Medicação", desc: "Notificações via WhatsApp ou SMS para o paciente e para o responsável, reforçando horários e regularidade do tratamento." },
+  { icon: Apple, title: "Guia Alimentar e Hábitos", desc: "Orientações nutricionais, sono e atividade física adaptadas ao estágio clínico, com dicas práticas também para quem cuida em casa." },
+  { icon: HeartPulse, title: "Acompanhamento da Jornada", desc: "Do diagnóstico ao cuidado crônico: conteúdos e check-ins evoluem com o paciente e mantêm a família informada em cada etapa." },
+  { icon: MessageCircle, title: "WhatsApp e SMS Integrados", desc: "Comunicação 1:1 ou em massa com pacientes, famílias e cuidadores — com fallback automático para SMS quando o WhatsApp não está disponível." },
+  { icon: Plug, title: "Integração com CRMs", desc: "Conecte a plataforma ao CRM que sua equipe já utiliza e mantenha dados de pacientes e responsáveis sincronizados em um só lugar." },
 ];
 
 export const Features = () => (
@@ -15,10 +15,10 @@ export const Features = () => (
       <div className="mx-auto mb-16 max-w-2xl text-center">
         <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-brand/70">Funcionalidades</p>
         <h2 className="font-display text-3xl font-bold text-brand md:text-4xl lg:text-5xl">
-          Ferramentas poderosas para engajar pacientes de Chagas
+          Ferramentas para apoiar pacientes, famílias e cuidadores
         </h2>
         <p className="mt-4 text-lg text-muted-foreground">
-          Tudo o que sua equipe precisa para entregar educação, suporte e cuidado contínuo a cada perfil de paciente.
+          Tudo o que sua equipe precisa para acompanhar toda a jornada do cuidado — com mensagens via WhatsApp ou SMS que chegam a cada pessoa envolvida.
         </p>
       </div>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
