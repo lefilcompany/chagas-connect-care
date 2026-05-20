@@ -9,10 +9,10 @@ export const CTA = () => (
         <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
         <div className="relative mx-auto max-w-2xl">
           <h2 className="font-display text-3xl font-bold text-brand-foreground md:text-4xl lg:text-5xl">
-            Pronto para transformar o acompanhamento dos seus pacientes?
+            Pronto para cuidar do paciente e da família na mesma jornada?
           </h2>
           <p className="mt-5 text-lg text-brand-foreground/80">
-            Comece hoje mesmo e veja a diferença em poucas semanas.
+            Comece hoje a engajar pacientes, cuidadores e responsáveis por WhatsApp e SMS.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Button variant="hero" size="lg" className="group">

@@ -4,17 +4,17 @@ const logos = ["Hospital Vida", "Clínica Coração", "InstitutoSaúde+", "MedCa
 
 const testimonials = [
   {
-    quote: "Os lembretes de medicação via WhatsApp fizeram uma diferença enorme. Meus pacientes chegam às consultas relatando que não esqueceram mais de tomar o benznidazol.",
+    quote: "Os lembretes via WhatsApp chegam ao paciente e ao filho que cuida dele. Essa rede de apoio fez o esquecimento do benznidazol praticamente desaparecer no meu ambulatório.",
     name: "Dr. Henrique Matos",
     role: "Infectologista, Hospital das Clínicas de Pernambuco",
   },
   {
-    quote: "A comunicação personalizada por perfil mudou como nos relacionamos com os pacientes. Uma senhora de 68 anos no estágio crônico recebe orientações completamente diferentes de um jovem recém-diagnosticado — e isso faz toda a diferença na adesão.",
+    quote: "Conseguimos falar com o paciente crônico por SMS e, ao mesmo tempo, orientar a filha cuidadora pelo WhatsApp. Cada um recebe a mensagem certa para o seu papel no cuidado.",
     name: "Dra. Fernanda Queiroz",
     role: "Coordenadora de Cardiologia, Instituto do Coração do Nordeste",
   },
   {
-    quote: "Finalmente uma ferramenta que trata o paciente de Chagas com a atenção que ele merece. As dicas de alimentação e os cuidados com o sono chegam no momento certo e na linguagem certa para cada pessoa.",
+    quote: "Finalmente uma ferramenta que cuida do paciente de Chagas e da família junto. As orientações de alimentação e sono chegam para o paciente e para quem cuida dele, na linguagem certa.",
     name: "Enfª Patrícia Drummond",
     role: "Enfermeira de Referência em Doenças Negligenciadas, Fiocruz",
   },
@@ -25,7 +25,7 @@ export const SocialProof = () => (
     <div className="container">
       <p className="text-center text-sm font-semibold uppercase tracking-wider text-brand/70">Marcas de confiança</p>
       <h2 className="mx-auto mt-3 max-w-2xl text-center font-display text-3xl font-bold text-brand md:text-4xl">
-        Equipes de saúde que já confiam na plataforma
+        Equipes que cuidam de pacientes e famílias com a nossa plataforma
       </h2>
 
       <div className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">

@@ -1,10 +1,10 @@
-import { MessageSquareText, UserCheck, MessageCircleHeart, Repeat, Check } from "lucide-react";
+import { MessageSquareText, Users, MessageCircleHeart, Repeat, Check } from "lucide-react";
 
 const benefits = [
-  { icon: MessageSquareText, title: "Comunicação Eficiente", desc: "Integração direta via WhatsApp para falar com pacientes onde eles já estão." },
-  { icon: UserCheck, title: "Comunicação por Perfil", desc: "Mensagens adaptadas à realidade de cada paciente — do jovem recém-diagnosticado à paciente crônica com baixa adesão ao plano alimentar." },
-  { icon: MessageCircleHeart, title: "Orientações com Empatia", desc: "Conteúdos educativos sobre alimentação, sono, atividade física e medicação entregues com linguagem acessível e humanizada." },
-  { icon: Repeat, title: "Automação de Processos", desc: "Reengajamento automático e atualização de status sem trabalho manual." },
+  { icon: MessageSquareText, title: "WhatsApp e SMS", desc: "Fale com pacientes, famílias e cuidadores nos canais que eles já usam todos os dias." },
+  { icon: Users, title: "Família no Cuidado", desc: "Envolva responsáveis e cuidadores na rotina do paciente, com mensagens específicas para cada papel." },
+  { icon: MessageCircleHeart, title: "Orientações com Empatia", desc: "Conteúdos sobre alimentação, sono, atividade física e medicação em linguagem acessível para o paciente e quem cuida dele." },
+  { icon: Repeat, title: "Acompanhamento Contínuo", desc: "Reengajamento automático e atualização de status ao longo de toda a jornada, sem trabalho manual." },
 ];
 
 export const Benefits = () => (
@@ -13,13 +13,13 @@ export const Benefits = () => (
       <div>
         <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-brand/70">Benefícios</p>
         <h2 className="font-display text-3xl font-bold leading-tight text-brand md:text-4xl lg:text-5xl">
-          Para seus pacientes de Chagas, cada mensagem importa.
+          Cuidar de Chagas é cuidar de toda a rede ao redor do paciente.
         </h2>
         <p className="mt-5 text-lg text-muted-foreground">
-          Eduque, engaje e apoie cada paciente com a comunicação certa, no momento certo e no tom adequado ao seu perfil.
+          Eduque, engaje e apoie pacientes, famílias e cuidadores com a comunicação certa, no momento certo e no canal que eles já usam — WhatsApp ou SMS.
         </p>
         <ul className="mt-8 space-y-3">
-          {["Maior adesão à medicação e ao tratamento", "Orientações educativas adaptadas a cada perfil de paciente", "Redução do abandono do acompanhamento clínico"].map((t) => (
+          {["Maior adesão à medicação com apoio da família", "Orientações educativas para paciente, cuidadores e responsáveis", "Redução do abandono do acompanhamento clínico"].map((t) => (
             <li key={t} className="flex items-center gap-3 text-foreground">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-brand">
                 <Check className="h-4 w-4" strokeWidth={3} />
