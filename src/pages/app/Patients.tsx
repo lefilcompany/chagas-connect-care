@@ -48,7 +48,11 @@ export default function Patients() {
     const parsed = schema.safeParse(fd);
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
     const { error } = await supabase.from("patients").insert({
-      ...parsed.data,
+      full_name: parsed.data.full_name,
+      phone: parsed.data.phone,
+      stage: parsed.data.stage,
+      channel_pref: parsed.data.channel_pref,
+      notes: parsed.data.notes ?? "",
       institution: parsed.data.institution || institution,
       owner_id: user!.id,
     });
