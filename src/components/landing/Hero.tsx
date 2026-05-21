@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import heroImg from "@/assets/hero-platform.jpg";
+import { Link } from "react-router-dom";
 
 export const Hero = () => {
   return (
@@ -21,11 +22,15 @@ export const Hero = () => {
             Conectamos equipes de saúde a pacientes, familiares e cuidadores via WhatsApp ou SMS — com educação, lembretes e orientações que acompanham cada etapa do cuidado, do diagnóstico ao acompanhamento crônico.
           </p>
           <div className="flex flex-wrap gap-4">
-            <Button variant="hero" size="lg" className="group">
-              Cadastre-se agora
-              <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            <Button variant="hero" size="lg" className="group" asChild>
+              <Link to="/auth">
+                Cadastre-se agora
+                <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
             </Button>
-            <Button variant="outlineBrand" size="lg">Solicitar uma demo</Button>
+            <Button variant="outlineBrand" size="lg" asChild>
+              <Link to="/auth">Entrar</Link>
+            </Button>
           </div>
           <div className="flex items-center gap-6 pt-4 text-sm text-muted-foreground">
             <div><span className="font-bold text-brand">+10mil</span> pacientes acompanhados</div>
