@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export const CTA = () => (
   <section id="contato" className="py-24">
@@ -15,11 +16,15 @@ export const CTA = () => (
             Comece hoje a engajar pacientes, cuidadores e responsáveis por WhatsApp e SMS.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Button variant="hero" size="lg" className="group">
-              Cadastre-se agora
-              <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            <Button variant="hero" size="lg" className="group" asChild>
+              <Link to="/auth">
+                Cadastre-se agora
+                <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
             </Button>
-            <Button size="lg" className="bg-primary text-brand hover:bg-primary/90 shadow-card">Solicitar uma demo</Button>
+            <Button size="lg" className="bg-primary text-brand hover:bg-primary/90 shadow-card" asChild>
+              <Link to="/auth">Entrar</Link>
+            </Button>
           </div>
         </div>
       </div>
