@@ -14,16 +14,356 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      adherence_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          medication_id: string | null
+          occurred_at: string
+          patient_id: string
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          medication_id?: string | null
+          occurred_at?: string
+          patient_id: string
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          medication_id?: string | null
+          occurred_at?: string
+          patient_id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adherence_events_medication_id_fkey"
+            columns: ["medication_id"]
+            isOneToOne: false
+            referencedRelation: "medications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "adherence_events_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          channel_pref: Database["public"]["Enums"]["message_channel"]
+          created_at: string
+          full_name: string
+          id: string
+          patient_id: string
+          phone: string
+          receives_reminders: boolean
+          relation: string
+        }
+        Insert: {
+          channel_pref?: Database["public"]["Enums"]["message_channel"]
+          created_at?: string
+          full_name: string
+          id?: string
+          patient_id: string
+          phone?: string
+          receives_reminders?: boolean
+          relation?: string
+        }
+        Update: {
+          channel_pref?: Database["public"]["Enums"]["message_channel"]
+          created_at?: string
+          full_name?: string
+          id?: string
+          patient_id?: string
+          phone?: string
+          receives_reminders?: boolean
+          relation?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_library: {
+        Row: {
+          audience: string
+          body: string
+          category: string
+          created_at: string
+          id: string
+          title: string
+        }
+        Insert: {
+          audience?: string
+          body: string
+          category?: string
+          created_at?: string
+          id?: string
+          title: string
+        }
+        Update: {
+          audience?: string
+          body?: string
+          category?: string
+          created_at?: string
+          id?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      crm_sync_log: {
+        Row: {
+          created_at: string
+          crm_name: string
+          id: string
+          payload: Json
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          crm_name: string
+          id?: string
+          payload?: Json
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          crm_name?: string
+          id?: string
+          payload?: Json
+          status?: string
+        }
+        Relationships: []
+      }
+      medications: {
+        Row: {
+          created_at: string
+          dose: string
+          end_date: string | null
+          id: string
+          name: string
+          patient_id: string
+          schedule: string
+          start_date: string | null
+        }
+        Insert: {
+          created_at?: string
+          dose?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          patient_id: string
+          schedule?: string
+          start_date?: string | null
+        }
+        Update: {
+          created_at?: string
+          dose?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          patient_id?: string
+          schedule?: string
+          start_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medications_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          body: string
+          channel: Database["public"]["Enums"]["message_channel"]
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          direction: string
+          id: string
+          patient_id: string
+          scheduled_for: string | null
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          body: string
+          channel?: Database["public"]["Enums"]["message_channel"]
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          id?: string
+          patient_id: string
+          scheduled_for?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          body?: string
+          channel?: Database["public"]["Enums"]["message_channel"]
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          id?: string
+          patient_id?: string
+          scheduled_for?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patients: {
+        Row: {
+          birth_date: string | null
+          channel_pref: Database["public"]["Enums"]["message_channel"]
+          created_at: string
+          full_name: string
+          id: string
+          institution: string
+          notes: string | null
+          owner_id: string | null
+          phone: string
+          stage: Database["public"]["Enums"]["patient_stage"]
+          updated_at: string
+        }
+        Insert: {
+          birth_date?: string | null
+          channel_pref?: Database["public"]["Enums"]["message_channel"]
+          created_at?: string
+          full_name: string
+          id?: string
+          institution?: string
+          notes?: string | null
+          owner_id?: string | null
+          phone?: string
+          stage?: Database["public"]["Enums"]["patient_stage"]
+          updated_at?: string
+        }
+        Update: {
+          birth_date?: string | null
+          channel_pref?: Database["public"]["Enums"]["message_channel"]
+          created_at?: string
+          full_name?: string
+          id?: string
+          institution?: string
+          notes?: string | null
+          owner_id?: string | null
+          phone?: string
+          stage?: Database["public"]["Enums"]["patient_stage"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          institution: string
+          professional_registry: string
+          role_label: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string
+          id: string
+          institution?: string
+          professional_registry?: string
+          role_label?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          institution?: string
+          professional_registry?: string
+          role_label?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      can_access_patient: {
+        Args: { _patient_id: string; _user_id: string }
+        Returns: boolean
+      }
+      get_user_institution: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "equipe"
+      message_channel: "whatsapp" | "sms"
+      patient_stage: "diagnostico" | "agudo" | "cronico"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +490,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "equipe"],
+      message_channel: ["whatsapp", "sms"],
+      patient_stage: ["diagnostico", "agudo", "cronico"],
+    },
   },
 } as const
