@@ -3,7 +3,7 @@ import { Apple, Pill, HeartPulse, Users, MessageCircle, Plug } from "lucide-reac
 const features = [
   { icon: Users, title: "Cuidado em Rede", desc: "Inclua paciente, familiares e cuidadores na mesma jornada, com mensagens direcionadas para cada papel no cuidado." },
   { icon: Pill, title: "Lembretes de Medicação", desc: "Notificações via WhatsApp ou SMS para o paciente e para o responsável, reforçando horários e regularidade do tratamento." },
-  { icon: Apple, title: "Guia Alimentar e Hábitos", desc: "Orientações nutricionais, sono e atividade física adaptadas ao estágio clínico, com dicas práticas também para quem cuida em casa." },
+  { icon: Apple, title: "Guia Alimentar e Hábitos", desc: "Pacientes com Doença de Chagas têm risco aumentado de morte súbita sem controle adequado da dieta. Orientações nutricionais, sono e atividade física adaptadas ao estágio clínico ajudam familiares a gerenciar a dieta com segurança e reduzir riscos de arritmias potencialmente letais." },
   { icon: HeartPulse, title: "Acompanhamento da Jornada", desc: "Do diagnóstico ao cuidado crônico: conteúdos e check-ins evoluem com o paciente e mantêm a família informada em cada etapa." },
   { icon: MessageCircle, title: "WhatsApp e SMS Integrados", desc: "Comunicação 1:1 ou em massa com pacientes, famílias e cuidadores — com fallback automático para SMS quando o WhatsApp não está disponível." },
   { icon: Plug, title: "Integração com CRMs", desc: "Conecte a plataforma ao CRM que sua equipe já utiliza e mantenha dados de pacientes e responsáveis sincronizados em um só lugar." },
