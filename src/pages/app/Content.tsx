@@ -27,7 +27,8 @@ const CATEGORIES = [
 const AUDIENCES = [
   { value: "paciente", label: "Paciente" },
   { value: "familia", label: "Família" },
-  { value: "ambos", label: "Ambos" },
+  { value: "cuidador", label: "Cuidadores" },
+  { value: "ambos", label: "Todos" },
 ];
 
 const contentSchema = z.object({
