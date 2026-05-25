@@ -425,8 +425,27 @@ export default function PatientDetail() {
             {messages.length === 0 ? <div className="p-8 text-center text-muted-foreground">Nenhuma mensagem ainda.</div> : (
               <ul className="divide-y divide-border">{messages.map((m) => (
                 <li key={m.id} className="p-4">
-                  <div className="flex justify-between text-xs text-muted-foreground"><span className="uppercase font-semibold text-brand">{m.channel}</span><span>{new Date(m.sent_at).toLocaleString("pt-BR")}</span></div>
+                  <div className="flex justify-between items-center text-xs text-muted-foreground gap-2">
+                    <span className="uppercase font-semibold text-brand">{m.channel}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{new Date(m.sent_at).toLocaleString("pt-BR")}</span>
+                      <button
+                        type="button"
+                        onClick={() => deleteMsg(m.id)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        aria-label="Apagar mensagem"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
                   <div className="mt-1 text-sm">{m.body}</div>
+                  <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                    {m.status === "enviado" && <><Check className="h-3 w-3" /> Enviado</>}
+                    {m.status === "entregue" && <><CheckCheck className="h-3 w-3" /> Entregue</>}
+                    {m.status === "lido" && <><CheckCheck className="h-3 w-3 text-sky-500" /> <span className="text-sky-500">Lido</span></>}
+                    {!["enviado", "entregue", "lido"].includes(m.status) && <><Clock className="h-3 w-3" /> {m.status}</>}
+                  </div>
                 </li>
               ))}</ul>
             )}
