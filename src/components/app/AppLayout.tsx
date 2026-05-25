@@ -54,8 +54,8 @@ export const AppLayout = () => {
     <div className="min-h-screen bg-muted/40 flex">
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border flex flex-col transition-transform md:translate-x-0",
-        open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border flex flex-col transition-transform lg:translate-x-0",
+        open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
       )}>
         <div className="h-16 flex items-center justify-between px-5 border-b border-border">
           <NavLink to="/app" className="flex items-center gap-2">
@@ -64,7 +64,7 @@ export const AppLayout = () => {
             </span>
             <span className="font-display font-bold text-brand">Cuidado Digital</span>
           </NavLink>
-          <button className="md:hidden" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
+          <button className="lg:hidden" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {nav.map((n) => (
@@ -97,8 +97,12 @@ export const AppLayout = () => {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 md:ml-64 flex flex-col min-w-0">
-        <header className="h-16 bg-card border-b border-border flex items-center px-4 md:px-8 md:hidden">
+      {open && (
+        <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />
+      )}
+
+      <div className="flex-1 lg:ml-64 flex flex-col min-w-0">
+        <header className="h-16 bg-card border-b border-border flex items-center px-4 md:px-8 lg:hidden">
           <button onClick={() => setOpen(true)}><Menu className="h-6 w-6 text-brand" /></button>
         </header>
         <main className="flex-1 p-4 md:p-8">
