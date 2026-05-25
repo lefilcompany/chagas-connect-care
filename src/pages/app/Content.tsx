@@ -80,39 +80,42 @@ export default function Content() {
         </Button>
       </header>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-card">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por título ou conteúdo"
-            className="pl-9"
-          />
-        </div>
-        <div className="w-48">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_220px_200px_auto] lg:items-center">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar por título ou conteúdo"
+              className="pl-9 w-full"
+            />
+          </div>
           <Select value={catFilter} onValueChange={setCatFilter}>
-            <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Categoria" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todas as categorias</SelectItem>
               {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
-        <div className="w-40">
           <Select value={audFilter} onValueChange={setAudFilter}>
-            <SelectTrigger><SelectValue placeholder="Público" /></SelectTrigger>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Público" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os públicos</SelectItem>
               {AUDIENCES.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
             </SelectContent>
           </Select>
+          {hasFilters ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-self-start sm:justify-self-end"
+              onClick={() => { setQ(""); setCatFilter("todos"); setAudFilter("todos"); }}
+            >
+              <X className="h-4 w-4" /> Limpar
+            </Button>
+          ) : <div className="hidden lg:block" />}
         </div>
-        {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={() => { setQ(""); setCatFilter("todos"); setAudFilter("todos"); }}>
-            <X className="h-4 w-4" /> Limpar
-          </Button>
-        )}
       </div>
 
       {filtered.length === 0 ? (
