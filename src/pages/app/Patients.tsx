@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
   Plus, Search, Pill, Users, Stethoscope, LayoutGrid, List,
-  Phone, ArrowRight,
+  Phone, ArrowRight, Trash2,
 } from "lucide-react";
 import { z } from "zod";
 
@@ -91,7 +91,8 @@ export default function Patients() {
     if (error) return toast.error(error.message);
     toast.success(`Medicação adicionada para ${medOpen.full_name}`);
     setMedDoseUnit("mg");
-    setMedOpen(null);
+    (e.currentTarget as HTMLFormElement).reset();
+    queryClient.invalidateQueries({ queryKey: ["medications", medOpen.id] });
   };
 
   const addContact = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -105,7 +106,8 @@ export default function Patients() {
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
-    setContactOpen(null);
+    (e.currentTarget as HTMLFormElement).reset();
+    queryClient.invalidateQueries({ queryKey: ["contacts", contactOpen.p.id, contactOpen.relation] });
   };
 
   const stageLabels: Record<string, string> = {
