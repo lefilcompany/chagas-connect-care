@@ -304,13 +304,20 @@ function SendContentDialog({
   onSent: () => void;
 }) {
   const open = !!item;
-  const [mode, setMode] = useState<"bulk" | "single">("bulk");
+  const [mode, setMode] = useState<"bulk" | "single" | "segment">("bulk");
   const [patientId, setPatientId] = useState<string>("");
   const [channel, setChannel] = useState<"whatsapp" | "sms">("whatsapp");
   const [sendToPatient, setSendToPatient] = useState(true);
   const [selectedContacts, setSelectedContacts] = useState<Record<string, boolean>>({});
   const [bulkGroups, setBulkGroups] = useState<Record<string, boolean>>({});
   const [sending, setSending] = useState(false);
+  // Segment mode
+  const [segMode, setSegMode] = useState<"saved" | "adhoc">("saved");
+  const [savedSegmentId, setSavedSegmentId] = useState<string>("");
+  const [adhocAudiences, setAdhocAudiences] = useState<AudienceType[]>(["paciente"]);
+  const [adhocFilters, setAdhocFilters] = useState<SegmentFilters>(emptyFilters());
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [channelOverride, setChannelOverride] = useState<"auto" | "whatsapp" | "sms">("auto");
 
   useEffect(() => {
     if (open) {
@@ -326,6 +333,12 @@ function SendContentDialog({
         cuidador: aud === "cuidador" || aud === "ambos",
         medico: false,
       });
+      setSegMode("saved");
+      setSavedSegmentId("");
+      setAdhocAudiences(["paciente"]);
+      setAdhocFilters(emptyFilters());
+      setChannelOverride("auto");
+      setSelectedKeys(new Set());
     }
   }, [open, item]);
 
@@ -359,6 +372,28 @@ function SendContentDialog({
     },
   });
 
+  const { data: savedSegments = [] } = useQuery<SegmentDef[]>({
+    queryKey: qk.segments,
+    queryFn: fetchers.segments as () => Promise<SegmentDef[]>,
+    enabled: open && mode === "segment",
+  });
+
+  const activeSegment = mode === "segment" && segMode === "saved"
+    ? (savedSegments as SegmentDef[]).find((s) => s.id === savedSegmentId) ?? null
+    : null;
+  const activeAudiences = mode === "segment"
+    ? (segMode === "saved" ? (activeSegment?.audience_types ?? []) : adhocAudiences)
+    : [];
+  const activeFilters = mode === "segment"
+    ? (segMode === "saved" ? (activeSegment?.filters ?? emptyFilters()) : adhocFilters)
+    : emptyFilters();
+
+  const { data: segmentRecipients = [], isLoading: segLoading } = useQuery<Recipient[]>({
+    queryKey: ["segment-resolve-send", activeAudiences, activeFilters],
+    queryFn: () => resolveRecipients(activeAudiences, activeFilters),
+    enabled: open && mode === "segment" && activeAudiences.length > 0,
+  });
+
   const selectedContactIds = Object.entries(selectedContacts).filter(([, v]) => v).map(([k]) => k);
 
   const bulkPreview = useMemo(() => {
@@ -371,7 +406,9 @@ function SendContentDialog({
 
   const canSend = mode === "single"
     ? !!patientId && (sendToPatient || selectedContactIds.length > 0)
-    : bulkPreview.total > 0;
+    : mode === "segment"
+      ? selectedKeys.size > 0
+      : bulkPreview.total > 0;
 
   const send = async () => {
     if (!item || !canSend) return;
@@ -387,7 +424,7 @@ function SendContentDialog({
       for (const cid of selectedContactIds) {
         rows.push({ patient_id: patientId, contact_id: cid, channel, direction: "outbound", body, status: "sent", sent_at: now });
       }
-    } else {
+    } else if (mode === "bulk") {
       if (bulkGroups.paciente) {
         for (const p of patients as any[]) {
           rows.push({ patient_id: p.id, channel, direction: "outbound", body, status: "sent", sent_at: now });
@@ -398,6 +435,20 @@ function SendContentDialog({
         if (relations.includes(c.relation)) {
           rows.push({ patient_id: c.patient_id, contact_id: c.id, channel, direction: "outbound", body, status: "sent", sent_at: now });
         }
+      }
+    } else {
+      // segment mode
+      for (const r of segmentRecipients) {
+        if (!selectedKeys.has(r.key)) continue;
+        rows.push({
+          patient_id: r.patient_id,
+          contact_id: r.contact_id ?? null,
+          channel: channelOverride === "auto" ? r.channel : channelOverride,
+          direction: "outbound",
+          body,
+          status: "sent",
+          sent_at: now,
+        });
       }
     }
 
