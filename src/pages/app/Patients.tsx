@@ -469,12 +469,12 @@ export default function Patients() {
           <form onSubmit={addMedication} className="space-y-4 pt-2 border-t border-border">
             <div className="space-y-1.5">
               <Label htmlFor="med_name_dlg">Medicamento</Label>
-              <Input id="med_name_dlg" name="name" placeholder="Ex: Benznidazol" required />
+              <Input id="med_name_dlg" value={medForm.name} onChange={(e) => setMedForm((s) => ({ ...s, name: e.target.value }))} placeholder="Ex: Benznidazol" required />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="med_dose_value_dlg">Dose</Label>
-                <Input id="med_dose_value_dlg" name="dose_value" type="number" min="0" step="any" placeholder="Ex: 100" />
+                <Input id="med_dose_value_dlg" value={medForm.dose_value} onChange={(e) => setMedForm((s) => ({ ...s, dose_value: e.target.value }))} type="number" min="0" step="any" placeholder="Ex: 100" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="med_dose_unit_dlg">Unidade</Label>
@@ -494,10 +494,10 @@ export default function Patients() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="med_schedule_dlg">Horários</Label>
-                <Input id="med_schedule_dlg" name="schedule" placeholder="Ex: 8h, 14h, 20h" />
+                <Input id="med_schedule_dlg" value={medForm.schedule} onChange={(e) => setMedForm((s) => ({ ...s, schedule: e.target.value }))} placeholder="Ex: 8h, 14h, 20h" />
               </div>
             </div>
-            <Button type="submit" variant="hero" className="w-full">Adicionar medicação</Button>
+            <Button type="submit" variant="hero" className="w-full" disabled={!medicationSchema.safeParse(medForm).success}>Adicionar medicação</Button>
           </form>
         </DialogContent>
       </Dialog>
