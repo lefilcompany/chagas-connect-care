@@ -125,11 +125,11 @@ export default function PatientDetail() {
     const fd = new FormData(e.currentTarget);
     const body = String(fd.get("body") ?? "").trim();
     const channel = String(fd.get("channel") ?? "whatsapp");
-    const contactId = String(fd.get("contact_id") ?? "");
+    const contactId = String(fd.get("contact_id") ?? "").trim();
     if (!body) return toast.error("Mensagem vazia");
     const { error } = await supabase.from("messages").insert({
       patient_id: id,
-      contact_id: contactId || null,
+      contact_id: contactId && contactId !== "patient" ? contactId : null,
       channel,
       body,
       status: "sent",
@@ -387,10 +387,10 @@ export default function PatientDetail() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="whatsapp">WhatsApp</SelectItem><SelectItem value="sms">SMS</SelectItem></SelectContent>
                 </Select>
-                <Select name="contact_id" defaultValue="">
+                <Select name="contact_id" defaultValue="patient">
                   <SelectTrigger><SelectValue placeholder="Destinatário (paciente ou contato)" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value=" ">Paciente</SelectItem>
+                    <SelectItem value="patient">Paciente</SelectItem>
                     {contacts.map((c) => <SelectItem key={c.id} value={c.id}>{c.full_name} ({c.relation})</SelectItem>)}
                   </SelectContent>
                 </Select>
