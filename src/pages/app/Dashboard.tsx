@@ -116,55 +116,61 @@ export default function Dashboard() {
 
       <section>
         <h2 className="font-display text-lg font-bold text-brand">Próximos passos</h2>
-        <p className="text-sm text-muted-foreground mt-1">Siga a jornada na ordem para preparar o cuidado conectado.</p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 relative">
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Siga a jornada na ordem.</p>
+        <ol className="mt-4 grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((s, i) => {
             const isDone = s.done;
             const isActive = !isDone && i === currentStepIndex;
             const isLocked = !isDone && !isActive;
             const isLast = i === steps.length - 1;
-            const prevDone = i > 0 && steps[i - 1].done;
             return (
-              <div
+              <li
                 key={s.title}
                 className={cn(
-                  "relative rounded-2xl border p-5 shadow-card flex flex-col gap-4 transition-smooth",
+                  "relative rounded-2xl border p-4 shadow-card flex flex-col gap-3 transition-smooth",
                   isDone && "border-brand/30 bg-primary/30",
                   isActive && "border-brand bg-card ring-2 ring-brand/20",
                   isLocked && "border-border bg-muted/60 opacity-70",
                 )}
               >
                 {!isLast && (
-                  <div
+                  <span
                     aria-hidden
                     className={cn(
-                      "hidden lg:block absolute top-10 -right-4 h-0.5 w-8 z-10",
+                      "pointer-events-none absolute z-0",
+                      // mobile (1 col): vertical line below card
+                      "left-1/2 -translate-x-1/2 bottom-[-12px] h-3 w-0.5",
+                      // tablet (2 cols): only between col 1->2 (even index, i.e. i=0,2)
+                      "sm:left-auto sm:translate-x-0 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:right-[-16px] sm:h-0.5 sm:w-4",
+                      i % 2 === 1 && "sm:hidden lg:block",
+                      // desktop (4 cols): horizontal between every card
+                      "lg:right-[-16px] lg:top-1/2 lg:-translate-y-1/2 lg:h-0.5 lg:w-4",
                       isDone ? "bg-brand" : "bg-border",
                     )}
                   />
                 )}
                 <div className="flex items-center gap-3">
-                <div className={cn(
-                  "h-11 w-11 shrink-0 rounded-xl flex items-center justify-center",
-                  isDone ? "bg-brand text-brand-foreground" : isActive ? "bg-primary text-brand" : "bg-muted text-muted-foreground",
-                )}>
-                  {isDone ? <Check className="h-5 w-5" /> : isLocked ? <Lock className="h-5 w-5" /> : <s.icon className="h-5 w-5" />}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Passo {i + 1}</span>
-                  {isDone && <span className="text-xs font-semibold text-brand">Concluído</span>}
-                  {isActive && <span className="text-xs font-semibold text-brand">Em andamento</span>}
-                  {isLocked && <span className="text-xs font-semibold text-muted-foreground">Bloqueado</span>}
-                </div>
+                  <div className={cn(
+                    "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center",
+                    isDone ? "bg-brand text-brand-foreground" : isActive ? "bg-primary text-brand" : "bg-muted text-muted-foreground",
+                  )}>
+                    {isDone ? <Check className="h-4 w-4" /> : isLocked ? <Lock className="h-4 w-4" /> : <s.icon className="h-4 w-4" />}
+                  </div>
+                  <div className="flex flex-col leading-tight">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Passo {i + 1}</span>
+                    {isDone && <span className="text-[11px] font-semibold text-brand">Concluído</span>}
+                    {isActive && <span className="text-[11px] font-semibold text-brand">Em andamento</span>}
+                    {isLocked && <span className="text-[11px] font-semibold text-muted-foreground">Bloqueado</span>}
+                  </div>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-display text-base font-bold text-brand">{s.title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{s.description}</p>
+                  <h3 className="font-display text-sm font-bold text-brand">{s.title}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-3">{s.description}</p>
                 </div>
                 <div className="mt-auto">
                   {isLocked ? (
                     <Button variant="outline" size="sm" disabled className="w-full gap-2">
-                      <Lock className="h-4 w-4" /> Bloqueado
+                      <Lock className="h-3.5 w-3.5" /> Bloqueado
                     </Button>
                   ) : isDone ? (
                     <Button asChild variant="outline" size="sm" className="w-full gap-2">
@@ -172,14 +178,14 @@ export default function Dashboard() {
                     </Button>
                   ) : (
                     <Button asChild size="sm" className="w-full gap-2 bg-brand text-brand-foreground hover:bg-brand/90">
-                      <Link to={s.to}>{s.cta} <ArrowRight className="h-4 w-4" /></Link>
+                      <Link to={s.to}>{s.cta} <ArrowRight className="h-3.5 w-3.5" /></Link>
                     </Button>
                   )}
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
       </section>
     </div>
   );
