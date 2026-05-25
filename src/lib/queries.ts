@@ -44,8 +44,12 @@ export const fetchers = {
     return data ?? [];
   },
   messages: async () => {
-    const { data } = await supabase.from("messages").select("*, patients(full_name)").order("sent_at", { ascending: false }).limit(100);
-    return data ?? [];
+    const [msgs, contacts] = await Promise.all([
+      supabase.from("messages").select("*, patients(full_name, phone)").order("sent_at", { ascending: false }).limit(200),
+      supabase.from("contacts").select("id, full_name, phone, relation"),
+    ]);
+    const cmap = new Map((contacts.data ?? []).map((c: any) => [c.id, c]));
+    return (msgs.data ?? []).map((m: any) => ({ ...m, contact: m.contact_id ? cmap.get(m.contact_id) ?? null : null }));
   },
   content: async () => {
     const { data } = await supabase.from("content_library").select("*").order("created_at", { ascending: false });
