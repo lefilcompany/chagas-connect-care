@@ -59,6 +59,13 @@ export default function PatientDetail() {
       phone: p.data.phone ?? "",
       institution: p.data.institution ?? "",
       notes: p.data.notes ?? "",
+      email: p.data.email ?? "",
+      birth_date: p.data.birth_date ?? "",
+      cpf: p.data.cpf ?? "",
+      address: p.data.address ?? "",
+      city: p.data.city ?? "",
+      state: p.data.state ?? "",
+      status: p.data.status ?? "ativo",
     });
     setContacts(c.data ?? []);
     setMeds(m.data ?? []);
@@ -75,6 +82,13 @@ export default function PatientDetail() {
     channel_pref: z.enum(["whatsapp", "sms"]),
     institution: z.string().trim().max(160),
     notes: z.string().max(2000).optional(),
+    email: z.string().trim().email("Email inválido").max(160).or(z.literal("")).optional(),
+    birth_date: z.string().optional(),
+    cpf: z.string().trim().max(20).optional(),
+    address: z.string().trim().max(240).optional(),
+    city: z.string().trim().max(120).optional(),
+    state: z.string().trim().max(2).optional(),
+    status: z.enum(["ativo", "inativo"]).optional(),
   });
 
   const hasChanges = useMemo(() => {
@@ -85,7 +99,14 @@ export default function PatientDetail() {
       (patient.channel_pref ?? "whatsapp") !== (form.channel_pref ?? "whatsapp") ||
       (patient.phone ?? "") !== (form.phone ?? "") ||
       (patient.institution ?? "") !== (form.institution ?? "") ||
-      (patient.notes ?? "") !== (form.notes ?? "")
+      (patient.notes ?? "") !== (form.notes ?? "") ||
+      (patient.email ?? "") !== (form.email ?? "") ||
+      ((patient.birth_date ?? "") !== (form.birth_date ?? "")) ||
+      (patient.cpf ?? "") !== (form.cpf ?? "") ||
+      (patient.address ?? "") !== (form.address ?? "") ||
+      (patient.city ?? "") !== (form.city ?? "") ||
+      (patient.state ?? "") !== (form.state ?? "") ||
+      (patient.status ?? "ativo") !== (form.status ?? "ativo")
     );
   }, [patient, form]);
 
@@ -93,7 +114,9 @@ export default function PatientDetail() {
     const parsed = patientSchema.safeParse(form);
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
     setSaving(true);
-    const { error } = await supabase.from("patients").update(parsed.data).eq("id", id!);
+    const payload: any = { ...parsed.data, state: (parsed.data.state ?? "").toUpperCase() };
+    if (!payload.birth_date) payload.birth_date = null;
+    const { error } = await supabase.from("patients").update(payload).eq("id", id!);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Paciente atualizado");
@@ -103,7 +126,9 @@ export default function PatientDetail() {
   const addContact = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.currentTarget));
-    const payload = { patient_id: id, ...fd, phone: contactPhone } as any;
+    const payload: any = { patient_id: id, ...fd, phone: contactPhone };
+    if (!payload.birth_date) payload.birth_date = null;
+    if (payload.state) payload.state = String(payload.state).toUpperCase();
     const { error } = await supabase.from("contacts").insert(payload);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
@@ -226,6 +251,30 @@ export default function PatientDetail() {
             <Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} maxLength={20} />
           </div>
           <div className="space-y-1.5">
+            <Label>Email</Label>
+            <Input type="email" value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@exemplo.com" maxLength={160} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Data de nascimento</Label>
+            <Input type="date" value={form.birth_date ?? ""} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>CPF</Label>
+            <Input value={form.cpf ?? ""} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" maxLength={14} />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Endereço</Label>
+            <Input value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua, número, complemento" maxLength={240} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Cidade</Label>
+            <Input value={form.city ?? ""} onChange={(e) => setForm({ ...form, city: e.target.value })} maxLength={120} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Estado</Label>
+            <Input value={form.state ?? ""} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} placeholder="SP" maxLength={2} className="uppercase" />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
             <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Instituição</Label>
             <Input value={form.institution ?? ""} onChange={(e) => setForm({ ...form, institution: e.target.value })} maxLength={160} />
           </div>
@@ -247,6 +296,16 @@ export default function PatientDetail() {
               <SelectContent>
                 <SelectItem value="whatsapp">WhatsApp</SelectItem>
                 <SelectItem value="sms">SMS</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Status</Label>
+            <Select value={form.status ?? "ativo"} onValueChange={(v) => setForm({ ...form, status: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ativo">Ativo</SelectItem>
+                <SelectItem value="inativo">Inativo</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -307,6 +366,30 @@ export default function PatientDetail() {
                   />
                 </div>
                 <div className="space-y-1.5">
+                  <Label htmlFor="contact_email">Email</Label>
+                  <Input id="contact_email" name="email" type="email" placeholder="email@exemplo.com" maxLength={160} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact_birth">Data de nascimento</Label>
+                  <Input id="contact_birth" name="birth_date" type="date" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact_cpf">CPF</Label>
+                  <Input id="contact_cpf" name="cpf" placeholder="000.000.000-00" maxLength={14} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="contact_address">Endereço</Label>
+                  <Input id="contact_address" name="address" placeholder="Rua, número, complemento" maxLength={240} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact_city">Cidade</Label>
+                  <Input id="contact_city" name="city" placeholder="Ex: Recife" maxLength={120} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact_state">Estado</Label>
+                  <Input id="contact_state" name="state" placeholder="SP" maxLength={2} className="uppercase" />
+                </div>
+                <div className="space-y-1.5">
                   <Label>Relação com o paciente</Label>
                   <Select name="relation" defaultValue="familiar">
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -317,13 +400,23 @@ export default function PatientDetail() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
+                <div className="space-y-1.5">
                   <Label>Canal preferido para mensagens</Label>
                   <Select name="channel_pref" defaultValue="whatsapp">
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="whatsapp">WhatsApp</SelectItem>
                       <SelectItem value="sms">SMS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Status</Label>
+                  <Select name="status" defaultValue="ativo">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="inativo">Inativo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

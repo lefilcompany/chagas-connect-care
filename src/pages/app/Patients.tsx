@@ -29,12 +29,26 @@ const schema = z.object({
   channel_pref: z.enum(["whatsapp", "sms"]),
   institution: z.string().trim().max(160),
   notes: z.string().max(2000).optional(),
+  email: z.string().trim().email("Email inválido").max(160).or(z.literal("")).optional(),
+  birth_date: z.string().optional(),
+  cpf: z.string().trim().max(20).optional(),
+  address: z.string().trim().max(240).optional(),
+  city: z.string().trim().max(120).optional(),
+  state: z.string().trim().max(2).optional(),
+  status: z.enum(["ativo", "inativo"]).optional(),
 });
 
 const contactSchema = z.object({
   full_name: z.string().trim().min(2).max(160),
   phone: z.string().trim().regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, "Telefone deve ter 10 ou 11 dígitos"),
   channel_pref: z.enum(["whatsapp", "sms"]),
+  email: z.string().trim().email("Email inválido").max(160).or(z.literal("")).optional(),
+  birth_date: z.string().optional(),
+  cpf: z.string().trim().max(20).optional(),
+  address: z.string().trim().max(240).optional(),
+  city: z.string().trim().max(120).optional(),
+  state: z.string().trim().max(2).optional(),
+  status: z.enum(["ativo", "inativo"]).optional(),
 });
 
 const medicationSchema = z.object({
@@ -68,7 +82,10 @@ export default function Patients() {
   const [contactDir, setContactDir] = useState<1 | -1>(1);
   const [medDir, setMedDir] = useState<1 | -1>(1);
 
-  const [contactForm, setContactForm] = useState({ full_name: "", phone: "", channel_pref: "whatsapp" });
+  const [contactForm, setContactForm] = useState({
+    full_name: "", phone: "", channel_pref: "whatsapp",
+    email: "", birth_date: "", cpf: "", address: "", city: "", state: "", status: "ativo",
+  });
   const [medForm, setMedForm] = useState({ name: "", dose_value: "", schedule: "" });
 
   const { data: medList = [] } = useQuery({
@@ -141,7 +158,10 @@ export default function Patients() {
   }, [medOpen]);
 
   useEffect(() => {
-    if (contactOpen) setContactForm({ full_name: "", phone: "", channel_pref: "whatsapp" });
+    if (contactOpen) setContactForm({
+      full_name: "", phone: "", channel_pref: "whatsapp",
+      email: "", birth_date: "", cpf: "", address: "", city: "", state: "", status: "ativo",
+    });
   }, [contactOpen]);
 
   const onCreate = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -157,6 +177,13 @@ export default function Patients() {
       notes: parsed.data.notes ?? "",
       institution: parsed.data.institution || institution,
       owner_id: user!.id,
+      email: parsed.data.email ?? "",
+      birth_date: parsed.data.birth_date || null,
+      cpf: parsed.data.cpf ?? "",
+      address: parsed.data.address ?? "",
+      city: parsed.data.city ?? "",
+      state: (parsed.data.state ?? "").toUpperCase(),
+      status: parsed.data.status ?? "ativo",
     });
     if (error) return toast.error(error.message);
     toast.success("Paciente cadastrado");
@@ -200,10 +227,20 @@ export default function Patients() {
       full_name: parsed.data.full_name,
       phone: parsed.data.phone,
       channel_pref: parsed.data.channel_pref,
+      email: parsed.data.email ?? "",
+      birth_date: parsed.data.birth_date || null,
+      cpf: parsed.data.cpf ?? "",
+      address: parsed.data.address ?? "",
+      city: parsed.data.city ?? "",
+      state: (parsed.data.state ?? "").toUpperCase(),
+      status: parsed.data.status ?? "ativo",
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
-    setContactForm({ full_name: "", phone: "", channel_pref: "whatsapp" });
+    setContactForm({
+      full_name: "", phone: "", channel_pref: "whatsapp",
+      email: "", birth_date: "", cpf: "", address: "", city: "", state: "", status: "ativo",
+    });
     await queryClient.invalidateQueries({ queryKey: ["contacts", contactOpen.p.id, contactOpen.relation] });
   };
 
@@ -257,12 +294,24 @@ export default function Patients() {
           <DialogTrigger asChild>
             <Button variant="hero"><Plus className="h-4 w-4" /> Novo paciente</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Cadastrar paciente</DialogTitle></DialogHeader>
             <form onSubmit={onCreate} className="space-y-4">
-              <div className="space-y-2"><Label>Nome completo</Label><Input name="full_name" placeholder="Ex: Maria da Silva" required /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Telefone</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
+              <div className="space-y-2"><Label>Nome completo *</Label><Input name="full_name" placeholder="Ex: Maria da Silva" required /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>Telefone *</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
+                <div className="space-y-2"><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>Data de nascimento</Label><Input name="birth_date" type="date" /></div>
+                <div className="space-y-2"><Label>CPF</Label><Input name="cpf" placeholder="000.000.000-00" maxLength={14} /></div>
+              </div>
+              <div className="space-y-2"><Label>Endereço</Label><Input name="address" placeholder="Rua, número, complemento" /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3">
+                <div className="space-y-2"><Label>Cidade</Label><Input name="city" placeholder="Ex: Recife" /></div>
+                <div className="space-y-2"><Label>Estado</Label><Input name="state" placeholder="SP" maxLength={2} className="uppercase" /></div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Etapa</Label>
                   <Select name="stage" defaultValue="diagnostico">
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -273,8 +322,6 @@ export default function Patients() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Canal preferido</Label>
                   <Select name="channel_pref" defaultValue="whatsapp">
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -284,8 +331,17 @@ export default function Patients() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2"><Label>Instituição</Label><Input name="institution" defaultValue={institution} placeholder="Ex: Hospital das Clínicas" /></div>
+                <div className="space-y-2"><Label>Status</Label>
+                  <Select name="status" defaultValue="ativo">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="inativo">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+              <div className="space-y-2"><Label>Instituição</Label><Input name="institution" defaultValue={institution} placeholder="Ex: Hospital das Clínicas" /></div>
               <div className="space-y-2"><Label>Observações</Label><Input name="notes" placeholder="Ex: Alergia a penicilina" /></div>
               <Button type="submit" variant="hero" className="w-full">Cadastrar</Button>
             </form>
@@ -497,7 +553,7 @@ export default function Patients() {
 
       {/* Contact dialog */}
       <Dialog open={!!contactOpen} onOpenChange={(o) => !o && setContactOpen(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {contactOpen?.relation === "familiar" && "Familiares"}
@@ -566,15 +622,36 @@ export default function Patients() {
             )}
           </div>
           <form onSubmit={addContact} className="space-y-3 pt-2 border-t border-border">
-            <div className="space-y-2"><Label>Nome</Label><Input value={contactForm.full_name} onChange={(e) => setContactForm((s) => ({ ...s, full_name: e.target.value }))} placeholder="Ex: João da Silva" required /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Telefone</Label><Input value={contactForm.phone} onChange={(e) => setContactForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} type="tel" placeholder="(81) 99999-9999" required maxLength={15} /></div>
+            <div className="space-y-2"><Label>Nome completo *</Label><Input value={contactForm.full_name} onChange={(e) => setContactForm((s) => ({ ...s, full_name: e.target.value }))} placeholder="Ex: João da Silva" required /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Telefone *</Label><Input value={contactForm.phone} onChange={(e) => setContactForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} type="tel" placeholder="(81) 99999-9999" required maxLength={15} /></div>
+              <div className="space-y-2"><Label>Email</Label><Input value={contactForm.email} onChange={(e) => setContactForm((s) => ({ ...s, email: e.target.value }))} type="email" placeholder="email@exemplo.com" /></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Data de nascimento</Label><Input value={contactForm.birth_date} onChange={(e) => setContactForm((s) => ({ ...s, birth_date: e.target.value }))} type="date" /></div>
+              <div className="space-y-2"><Label>CPF</Label><Input value={contactForm.cpf} onChange={(e) => setContactForm((s) => ({ ...s, cpf: e.target.value }))} placeholder="000.000.000-00" maxLength={14} /></div>
+            </div>
+            <div className="space-y-2"><Label>Endereço</Label><Input value={contactForm.address} onChange={(e) => setContactForm((s) => ({ ...s, address: e.target.value }))} placeholder="Rua, número, complemento" /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3">
+              <div className="space-y-2"><Label>Cidade</Label><Input value={contactForm.city} onChange={(e) => setContactForm((s) => ({ ...s, city: e.target.value }))} placeholder="Ex: Recife" /></div>
+              <div className="space-y-2"><Label>Estado</Label><Input value={contactForm.state} onChange={(e) => setContactForm((s) => ({ ...s, state: e.target.value.toUpperCase() }))} placeholder="SP" maxLength={2} className="uppercase" /></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2"><Label>Canal</Label>
                 <Select value={contactForm.channel_pref} onValueChange={(v) => setContactForm((s) => ({ ...s, channel_pref: v as "whatsapp" | "sms" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="whatsapp">WhatsApp</SelectItem>
                     <SelectItem value="sms">SMS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>Status</Label>
+                <Select value={contactForm.status} onValueChange={(v) => setContactForm((s) => ({ ...s, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="inativo">Inativo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
