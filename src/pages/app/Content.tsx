@@ -85,6 +85,10 @@ function describeTargeting(c: ContentRow, segments: SegmentDef[]): string {
 export default function Content() {
   const queryClient = useQueryClient();
   const { data: items = [] } = useQuery({ queryKey: qk.content, queryFn: fetchers.content });
+  const { data: segments = [] } = useQuery<SegmentDef[]>({
+    queryKey: qk.segments,
+    queryFn: fetchers.segments as () => Promise<SegmentDef[]>,
+  });
 
   const [q, setQ] = useState("");
   const [catFilter, setCatFilter] = useState<string>("todos");
@@ -169,7 +173,9 @@ export default function Content() {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary">{labelOf(CATEGORIES, c.category)}</Badge>
-                <Badge variant="outline">{labelOf(AUDIENCES, c.audience)}</Badge>
+                <Badge variant="outline" className="max-w-full truncate">
+                  {describeTargeting(c, segments as SegmentDef[])}
+                </Badge>
               </div>
               <h3 className="mt-3 font-display text-lg font-bold text-brand line-clamp-2">{c.title}</h3>
               <p className="mt-2 text-sm text-muted-foreground line-clamp-3 flex-1">{c.body}</p>
