@@ -79,10 +79,17 @@ export default function Patients() {
   const addMedication = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!medOpen) return;
-    const fd = Object.fromEntries(new FormData(e.currentTarget));
-    const { error } = await supabase.from("medications").insert({ patient_id: medOpen.id, ...fd } as any);
+    const fd = new FormData(e.currentTarget);
+    const name = String(fd.get("name") || "").trim();
+    const doseValue = String(fd.get("dose_value") || "").trim();
+    const schedule = String(fd.get("schedule") || "").trim();
+    const dose = doseValue ? `${doseValue} ${medDoseUnit}` : "";
+    const { error } = await supabase
+      .from("medications")
+      .insert({ patient_id: medOpen.id, name, dose, schedule } as any);
     if (error) return toast.error(error.message);
     toast.success(`Medicação adicionada para ${medOpen.full_name}`);
+    setMedDoseUnit("mg");
     setMedOpen(null);
   };
 
