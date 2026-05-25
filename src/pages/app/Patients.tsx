@@ -136,6 +136,14 @@ export default function Patients() {
     if (medIndex >= medList.length) setMedIndex(Math.max(0, medList.length - 1));
   }, [medList.length, medIndex]);
 
+  useEffect(() => {
+    if (medOpen) setMedForm({ name: "", dose_value: "", schedule: "" });
+  }, [medOpen]);
+
+  useEffect(() => {
+    if (contactOpen) setContactForm({ full_name: "", phone: "", channel_pref: "whatsapp" });
+  }, [contactOpen]);
+
   const onCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.currentTarget));
