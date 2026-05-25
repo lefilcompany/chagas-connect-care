@@ -24,12 +24,20 @@ type Patient = {
 
 const schema = z.object({
   full_name: z.string().trim().min(2).max(160),
-  phone: z.string().trim().min(8).max(20),
+  phone: z.string().trim().regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, "Telefone deve ter 10 ou 11 dígitos"),
   stage: z.enum(["diagnostico", "agudo", "cronico"]),
   channel_pref: z.enum(["whatsapp", "sms"]),
   institution: z.string().trim().max(160),
   notes: z.string().max(2000).optional(),
 });
+
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+}
 
 export default function Patients() {
   const { user } = useAuth();
@@ -151,10 +159,16 @@ export default function Patients() {
     if (!contactOpen) return;
     const form = e.currentTarget;
     const fd = Object.fromEntries(new FormData(form));
+    const phone = String(fd.phone || "").trim();
+    if (!/^\(\d{2}\) \d{4,5}-\d{4}$/.test(phone)) {
+      return toast.error("Telefone deve ter 10 ou 11 dígitos");
+    }
     const { error } = await supabase.from("contacts").insert({
       patient_id: contactOpen.p.id,
       relation: contactOpen.relation,
-      ...fd,
+      full_name: String(fd.full_name || "").trim(),
+      phone,
+      channel_pref: String(fd.channel_pref || "whatsapp"),
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
@@ -217,7 +231,7 @@ export default function Patients() {
             <form onSubmit={onCreate} className="space-y-4">
               <div className="space-y-2"><Label>Nome completo</Label><Input name="full_name" required /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Telefone</Label><Input name="phone" placeholder="(81) 9..." required /></div>
+                <div className="space-y-2"><Label>Telefone</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
                 <div className="space-y-2"><Label>Etapa</Label>
                   <Select name="stage" defaultValue="diagnostico">
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -505,7 +519,7 @@ export default function Patients() {
           <form onSubmit={addContact} className="space-y-3 pt-2 border-t border-border">
             <div className="space-y-2"><Label>Nome</Label><Input name="full_name" required /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Telefone</Label><Input name="phone" required /></div>
+              <div className="space-y-2"><Label>Telefone</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
               <div className="space-y-2"><Label>Canal</Label>
                 <Select name="channel_pref" defaultValue="whatsapp">
                   <SelectTrigger><SelectValue /></SelectTrigger>
