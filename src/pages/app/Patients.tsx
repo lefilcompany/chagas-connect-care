@@ -58,7 +58,7 @@ export default function Patients() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [institution, setInstitution] = useState("");
-  const [view, setView] = useState<"table" | "cards">("cards");
+  const [view, setView] = useState<"table" | "cards">("table");
   const [stageFilter, setStageFilter] = useState<"todos" | "diagnostico" | "agudo" | "cronico">("todos");
   const [medOpen, setMedOpen] = useState<Patient | null>(null);
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
@@ -309,8 +309,8 @@ export default function Patients() {
         </Select>
         <div className="ml-auto inline-flex rounded-full border border-border bg-card p-1">
           {[
-            { v: "cards", icon: LayoutGrid, label: "Cards" },
             { v: "table", icon: List, label: "Tabela" },
+            { v: "cards", icon: LayoutGrid, label: "Cards" },
           ].map(({ v, icon: Icon, label }) => (
             <button
               key={v}
