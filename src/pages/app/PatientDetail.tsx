@@ -110,9 +110,12 @@ export default function PatientDetail() {
   const addMed = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.currentTarget));
-    const { error } = await supabase.from("medications").insert({ patient_id: id, ...fd } as any);
+    const dose = medDoseValue ? `${medDoseValue} ${medDoseUnit}` : "";
+    const { error } = await supabase.from("medications").insert({ patient_id: id, ...fd, dose } as any);
     if (error) return toast.error(error.message);
     toast.success("Medicação adicionada");
+    setMedDoseValue("");
+    setMedDoseUnit("mg");
     (e.target as HTMLFormElement).reset();
     loadAll();
   };
