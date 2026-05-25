@@ -192,22 +192,18 @@ export default function Patients() {
   const addContact = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!contactOpen) return;
-    const form = e.currentTarget;
-    const fd = Object.fromEntries(new FormData(form));
-    const phone = String(fd.phone || "").trim();
-    if (!/^\(\d{2}\) \d{4,5}-\d{4}$/.test(phone)) {
-      return toast.error("Telefone deve ter 10 ou 11 dígitos");
-    }
+    const parsed = contactSchema.safeParse(contactForm);
+    if (!parsed.success) return toast.error(parsed.error.issues[0].message);
     const { error } = await supabase.from("contacts").insert({
       patient_id: contactOpen.p.id,
       relation: contactOpen.relation,
-      full_name: String(fd.full_name || "").trim(),
-      phone,
-      channel_pref: String(fd.channel_pref || "whatsapp"),
+      full_name: parsed.data.full_name,
+      phone: parsed.data.phone,
+      channel_pref: parsed.data.channel_pref,
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
-    form.reset();
+    setContactForm({ full_name: "", phone: "", channel_pref: "whatsapp" });
     await queryClient.invalidateQueries({ queryKey: ["contacts", contactOpen.p.id, contactOpen.relation] });
   };
 
