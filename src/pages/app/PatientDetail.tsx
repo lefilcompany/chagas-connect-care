@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Plus, CheckCircle2, XCircle,
   Users, Pill, MessageSquare, Activity, Phone, Building2,
-  Save,
+  Save, Trash2, Check, CheckCheck, Clock,
 } from "lucide-react";
 import { z } from "zod";
 
