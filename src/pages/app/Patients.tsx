@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchers, qk } from "@/lib/queries";
@@ -10,7 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import {
+  Plus, Search, Pill, Users, Stethoscope, LayoutGrid, List, Columns,
+  Phone, ArrowRight,
+} from "lucide-react";
 import { z } from "zod";
 
 type Patient = {
@@ -34,6 +37,11 @@ export default function Patients() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [institution, setInstitution] = useState("");
+  const [view, setView] = useState<"table" | "cards" | "kanban">("cards");
+  const [stageFilter, setStageFilter] = useState<"todos" | "diagnostico" | "agudo" | "cronico">("todos");
+  const [medOpen, setMedOpen] = useState<Patient | null>(null);
+  const [contactOpen, setContactOpen] = useState<{ p: Patient; relation: "familiar" | "cuidador" | "medico" } | null>(null);
+
   useEffect(() => {
     if (user) supabase.from("profiles").select("institution").eq("id", user.id).maybeSingle().then(({ data }) => setInstitution(data?.institution ?? ""));
   }, [user]);
@@ -59,7 +67,65 @@ export default function Patients() {
     queryClient.invalidateQueries({ queryKey: qk.dashboard });
   };
 
-  const filtered = items.filter((p) => p.full_name.toLowerCase().includes(q.toLowerCase()));
+  const filtered = useMemo(
+    () => items.filter((p) =>
+      p.full_name.toLowerCase().includes(q.toLowerCase()) &&
+      (stageFilter === "todos" || p.stage === stageFilter)
+    ),
+    [items, q, stageFilter],
+  );
+
+  const addMedication = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!medOpen) return;
+    const fd = Object.fromEntries(new FormData(e.currentTarget));
+    const { error } = await supabase.from("medications").insert({ patient_id: medOpen.id, ...fd } as any);
+    if (error) return toast.error(error.message);
+    toast.success(`Medicação adicionada para ${medOpen.full_name}`);
+    setMedOpen(null);
+  };
+
+  const addContact = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!contactOpen) return;
+    const fd = Object.fromEntries(new FormData(e.currentTarget));
+    const { error } = await supabase.from("contacts").insert({
+      patient_id: contactOpen.p.id,
+      relation: contactOpen.relation,
+      ...fd,
+    } as any);
+    if (error) return toast.error(error.message);
+    toast.success("Contato adicionado");
+    setContactOpen(null);
+  };
+
+  const stageLabels: Record<string, string> = {
+    diagnostico: "Diagnóstico",
+    agudo: "Agudo",
+    cronico: "Crônico",
+  };
+  const stageColors: Record<string, string> = {
+    diagnostico: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
+    agudo: "bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/20",
+    cronico: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  };
+
+  const QuickActions = ({ p }: { p: Patient }) => (
+    <div className="flex flex-wrap gap-1.5">
+      <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setMedOpen(p)}>
+        <Pill className="h-3.5 w-3.5" /> Medicação
+      </Button>
+      <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setContactOpen({ p, relation: "familiar" })}>
+        <Users className="h-3.5 w-3.5" /> Familiar
+      </Button>
+      <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setContactOpen({ p, relation: "cuidador" })}>
+        <Users className="h-3.5 w-3.5" /> Cuidador
+      </Button>
+      <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setContactOpen({ p, relation: "medico" })}>
+        <Stethoscope className="h-3.5 w-3.5" /> Médico
+      </Button>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -108,33 +174,180 @@ export default function Patients() {
         </Dialog>
       </header>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input className="pl-9" placeholder="Buscar paciente..." value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Buscar paciente..." value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <Select value={stageFilter} onValueChange={(v) => setStageFilter(v as typeof stageFilter)}>
+          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todas as etapas</SelectItem>
+            <SelectItem value="diagnostico">Diagnóstico</SelectItem>
+            <SelectItem value="agudo">Agudo</SelectItem>
+            <SelectItem value="cronico">Crônico</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="ml-auto inline-flex rounded-full border border-border bg-card p-1">
+          {[
+            { v: "cards", icon: LayoutGrid, label: "Cards" },
+            { v: "table", icon: List, label: "Tabela" },
+            { v: "kanban", icon: Columns, label: "Kanban" },
+          ].map(({ v, icon: Icon, label }) => (
+            <button
+              key={v}
+              onClick={() => setView(v as typeof view)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+              aria-label={label}
+            >
+              <Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="p-12 text-center text-muted-foreground">Nenhum paciente cadastrado ainda.</div>
-        ) : (
-          <table className="w-full text-sm">
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-card p-12 text-center text-muted-foreground shadow-card">
+          Nenhum paciente encontrado.
+        </div>
+      ) : view === "table" ? (
+        <div className="rounded-2xl border border-border bg-card shadow-card overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
-              <tr><th className="p-4">Nome</th><th className="p-4">Etapa</th><th className="p-4">Canal</th><th className="p-4">Telefone</th><th className="p-4">Instituição</th></tr>
+              <tr>
+                <th className="p-4">Nome</th>
+                <th className="p-4">Etapa</th>
+                <th className="p-4">Canal</th>
+                <th className="p-4">Telefone</th>
+                <th className="p-4">Atalhos</th>
+              </tr>
             </thead>
             <tbody>
               {filtered.map((p) => (
                 <tr key={p.id} className="border-t border-border hover:bg-muted/30">
-                  <td className="p-4"><Link to={`/app/pacientes/${p.id}`} className="font-medium text-brand hover:underline">{p.full_name}</Link></td>
-                  <td className="p-4 capitalize">{p.stage}</td>
-                  <td className="p-4 uppercase">{p.channel_pref}</td>
-                  <td className="p-4">{p.phone}</td>
-                  <td className="p-4">{p.institution}</td>
+                  <td className="p-4">
+                    <Link to={`/app/pacientes/${p.id}`} className="font-medium text-brand hover:underline">{p.full_name}</Link>
+                    <div className="text-xs text-muted-foreground">{p.institution}</div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${stageColors[p.stage] ?? ""}`}>
+                      {stageLabels[p.stage] ?? p.stage}
+                    </span>
+                  </td>
+                  <td className="p-4 uppercase text-xs">{p.channel_pref}</td>
+                  <td className="p-4 text-xs">{p.phone}</td>
+                  <td className="p-4"><QuickActions p={p} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      ) : view === "cards" ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((p) => (
+            <article key={p.id} className="rounded-2xl border border-border bg-card p-5 shadow-card flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <Link to={`/app/pacientes/${p.id}`} className="font-display font-bold text-brand hover:underline truncate block">
+                    {p.full_name}
+                  </Link>
+                  <div className="text-xs text-muted-foreground truncate">{p.institution || "—"}</div>
+                </div>
+                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${stageColors[p.stage] ?? ""}`}>
+                  {stageLabels[p.stage] ?? p.stage}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Phone className="h-3.5 w-3.5" /> {p.phone || "—"}
+                <span className="uppercase ml-auto">{p.channel_pref}</span>
+              </div>
+              <QuickActions p={p} />
+              <Link
+                to={`/app/pacientes/${p.id}`}
+                className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+              >
+                Ver detalhes <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-3">
+          {(["diagnostico", "agudo", "cronico"] as const).map((stage) => {
+            const list = filtered.filter((p) => p.stage === stage);
+            return (
+              <div key={stage} className="rounded-2xl border border-border bg-muted/30 p-3">
+                <div className="flex items-center justify-between px-1 pb-3">
+                  <h3 className="font-display font-bold text-brand text-sm">{stageLabels[stage]}</h3>
+                  <span className="text-xs text-muted-foreground">{list.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {list.length === 0 ? (
+                    <div className="text-xs text-muted-foreground text-center py-6">Vazio</div>
+                  ) : list.map((p) => (
+                    <div key={p.id} className="rounded-xl bg-card border border-border p-3 space-y-2">
+                      <Link to={`/app/pacientes/${p.id}`} className="font-medium text-sm text-brand hover:underline block truncate">
+                        {p.full_name}
+                      </Link>
+                      <div className="text-[11px] text-muted-foreground truncate">{p.phone}</div>
+                      <QuickActions p={p} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Medication dialog */}
+      <Dialog open={!!medOpen} onOpenChange={(o) => !o && setMedOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova medicação {medOpen ? `— ${medOpen.full_name}` : ""}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={addMedication} className="space-y-3">
+            <div className="space-y-2"><Label>Medicamento</Label><Input name="name" placeholder="Ex: Benznidazol" required /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Dose</Label><Input name="dose" placeholder="Ex: 100mg" /></div>
+              <div className="space-y-2"><Label>Horários</Label><Input name="schedule" placeholder="8h, 14h, 20h" /></div>
+            </div>
+            <Button type="submit" variant="hero" className="w-full">Adicionar medicação</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Contact dialog */}
+      <Dialog open={!!contactOpen} onOpenChange={(o) => !o && setContactOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {contactOpen?.relation === "familiar" && "Adicionar familiar"}
+              {contactOpen?.relation === "cuidador" && "Adicionar cuidador"}
+              {contactOpen?.relation === "medico" && "Adicionar médico"}
+              {contactOpen ? ` — ${contactOpen.p.full_name}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={addContact} className="space-y-3">
+            <div className="space-y-2"><Label>Nome</Label><Input name="full_name" required /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Telefone</Label><Input name="phone" required /></div>
+              <div className="space-y-2"><Label>Canal</Label>
+                <Select name="channel_pref" defaultValue="whatsapp">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="sms">SMS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button type="submit" variant="hero" className="w-full">Adicionar</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
