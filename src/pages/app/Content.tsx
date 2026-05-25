@@ -510,22 +510,50 @@ function SendContentDialog({
 
   useEffect(() => {
     if (open) {
+      const tmode = (item?.targeting_mode ?? "all") as TargetingMode;
       const aud = item?.audience ?? "ambos";
-      setMode("bulk");
+      // Decide initial dialog mode based on content's targeting
+      const initialMode: "bulk" | "single" | "segment" =
+        tmode === "segment" || tmode === "filters" ? "segment" : "bulk";
+      setMode(initialMode);
       setPatientId("");
       setChannel("whatsapp");
       setSendToPatient(true);
       setSelectedContacts({});
-      setBulkGroups({
-        paciente: aud === "paciente" || aud === "ambos",
-        familiar: aud === "familia" || aud === "ambos",
-        cuidador: aud === "cuidador" || aud === "ambos",
-        medico: false,
-      });
-      setSegMode("saved");
-      setSavedSegmentId("");
-      setAdhocAudiences(["paciente"]);
-      setAdhocFilters(emptyFilters());
+      // Bulk groups: from audience_types when present, else legacy audience
+      const at = (item?.audience_types ?? []) as AudienceType[];
+      if (tmode === "audiences" && at.length) {
+        setBulkGroups({
+          paciente: at.includes("paciente"),
+          familiar: at.includes("familiar"),
+          cuidador: at.includes("cuidador"),
+          medico: at.includes("medico"),
+        });
+      } else {
+        setBulkGroups({
+          paciente: aud === "paciente" || aud === "ambos",
+          familiar: aud === "familia" || aud === "ambos",
+          cuidador: aud === "cuidador" || aud === "ambos",
+          medico: false,
+        });
+      }
+      // Segment mode pre-load
+      if (tmode === "segment" && item?.segment_id) {
+        setSegMode("saved");
+        setSavedSegmentId(item.segment_id);
+        setAdhocAudiences(["paciente"]);
+        setAdhocFilters(emptyFilters());
+      } else if (tmode === "filters") {
+        setSegMode("adhoc");
+        setSavedSegmentId("");
+        setAdhocAudiences((item?.audience_types ?? ["paciente"]) as AudienceType[]);
+        setAdhocFilters({ ...emptyFilters(), ...(item?.filters ?? {}) });
+      } else {
+        setSegMode("saved");
+        setSavedSegmentId("");
+        setAdhocAudiences(["paciente"]);
+        setAdhocFilters(emptyFilters());
+      }
       setChannelOverride("auto");
       setSelectedKeys(new Set());
     }
