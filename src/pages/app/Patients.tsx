@@ -553,7 +553,7 @@ export default function Patients() {
 
       {/* Contact dialog */}
       <Dialog open={!!contactOpen} onOpenChange={(o) => !o && setContactOpen(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {contactOpen?.relation === "familiar" && "Familiares"}
@@ -622,15 +622,36 @@ export default function Patients() {
             )}
           </div>
           <form onSubmit={addContact} className="space-y-3 pt-2 border-t border-border">
-            <div className="space-y-2"><Label>Nome</Label><Input value={contactForm.full_name} onChange={(e) => setContactForm((s) => ({ ...s, full_name: e.target.value }))} placeholder="Ex: João da Silva" required /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Telefone</Label><Input value={contactForm.phone} onChange={(e) => setContactForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} type="tel" placeholder="(81) 99999-9999" required maxLength={15} /></div>
+            <div className="space-y-2"><Label>Nome completo *</Label><Input value={contactForm.full_name} onChange={(e) => setContactForm((s) => ({ ...s, full_name: e.target.value }))} placeholder="Ex: João da Silva" required /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Telefone *</Label><Input value={contactForm.phone} onChange={(e) => setContactForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} type="tel" placeholder="(81) 99999-9999" required maxLength={15} /></div>
+              <div className="space-y-2"><Label>Email</Label><Input value={contactForm.email} onChange={(e) => setContactForm((s) => ({ ...s, email: e.target.value }))} type="email" placeholder="email@exemplo.com" /></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Data de nascimento</Label><Input value={contactForm.birth_date} onChange={(e) => setContactForm((s) => ({ ...s, birth_date: e.target.value }))} type="date" /></div>
+              <div className="space-y-2"><Label>CPF</Label><Input value={contactForm.cpf} onChange={(e) => setContactForm((s) => ({ ...s, cpf: e.target.value }))} placeholder="000.000.000-00" maxLength={14} /></div>
+            </div>
+            <div className="space-y-2"><Label>Endereço</Label><Input value={contactForm.address} onChange={(e) => setContactForm((s) => ({ ...s, address: e.target.value }))} placeholder="Rua, número, complemento" /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3">
+              <div className="space-y-2"><Label>Cidade</Label><Input value={contactForm.city} onChange={(e) => setContactForm((s) => ({ ...s, city: e.target.value }))} placeholder="Ex: Recife" /></div>
+              <div className="space-y-2"><Label>Estado</Label><Input value={contactForm.state} onChange={(e) => setContactForm((s) => ({ ...s, state: e.target.value.toUpperCase() }))} placeholder="SP" maxLength={2} className="uppercase" /></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2"><Label>Canal</Label>
                 <Select value={contactForm.channel_pref} onValueChange={(v) => setContactForm((s) => ({ ...s, channel_pref: v as "whatsapp" | "sms" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="whatsapp">WhatsApp</SelectItem>
                     <SelectItem value="sms">SMS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2"><Label>Status</Label>
+                <Select value={contactForm.status} onValueChange={(v) => setContactForm((s) => ({ ...s, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="inativo">Inativo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
