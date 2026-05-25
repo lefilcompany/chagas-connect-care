@@ -243,7 +243,7 @@ export default function Patients() {
             </tbody>
           </table>
         </div>
-      ) : view === "cards" ? (
+      ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p) => (
             <article key={p.id} className="rounded-2xl border border-border bg-card p-5 shadow-card flex flex-col gap-3">
