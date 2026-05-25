@@ -10,7 +10,9 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Plus, CheckCircle2, XCircle,
   Users, Pill, MessageSquare, Activity, Phone, Building2,
+  Pencil, Save, X,
 } from "lucide-react";
+import { z } from "zod";
 
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +23,9 @@ export default function PatientDetail() {
   const [messages, setMessages] = useState<any[]>([]);
   const [adherence, setAdherence] = useState<any[]>([]);
   const [tab, setTab] = useState<"familia" | "medicacao" | "mensagens" | "adesao">("familia");
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<any>({});
+  const [saving, setSaving] = useState(false);
 
   const loadAll = async () => {
     if (!id) return;
@@ -32,6 +37,14 @@ export default function PatientDetail() {
       supabase.from("adherence_events").select("*").eq("patient_id", id).order("occurred_at", { ascending: false }).limit(20),
     ]);
     setPatient(p.data);
+    if (p.data) setForm({
+      full_name: p.data.full_name ?? "",
+      stage: p.data.stage ?? "diagnostico",
+      channel_pref: p.data.channel_pref ?? "whatsapp",
+      phone: p.data.phone ?? "",
+      institution: p.data.institution ?? "",
+      notes: p.data.notes ?? "",
+    });
     setContacts(c.data ?? []);
     setMeds(m.data ?? []);
     setMessages(msg.data ?? []);
@@ -39,6 +52,39 @@ export default function PatientDetail() {
   };
 
   useEffect(() => { loadAll(); }, [id]);
+
+  const patientSchema = z.object({
+    full_name: z.string().trim().min(2, "Nome muito curto").max(160),
+    phone: z.string().trim().min(8, "Telefone inválido").max(20),
+    stage: z.enum(["diagnostico", "agudo", "cronico"]),
+    channel_pref: z.enum(["whatsapp", "sms"]),
+    institution: z.string().trim().max(160),
+    notes: z.string().max(2000).optional(),
+  });
+
+  const savePatient = async () => {
+    const parsed = patientSchema.safeParse(form);
+    if (!parsed.success) return toast.error(parsed.error.issues[0].message);
+    setSaving(true);
+    const { error } = await supabase.from("patients").update(parsed.data).eq("id", id!);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Paciente atualizado");
+    setEditing(false);
+    loadAll();
+  };
+
+  const cancelEdit = () => {
+    if (patient) setForm({
+      full_name: patient.full_name ?? "",
+      stage: patient.stage ?? "diagnostico",
+      channel_pref: patient.channel_pref ?? "whatsapp",
+      phone: patient.phone ?? "",
+      institution: patient.institution ?? "",
+      notes: patient.notes ?? "",
+    });
+    setEditing(false);
+  };
 
   const addContact = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
