@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import {
   Send, Search, Plus, UserPlus, RefreshCw, Check, CheckCheck, Clock, ArrowRight,
 } from "lucide-react";
+import { User, Phone, MessageSquare } from "lucide-react";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
@@ -180,6 +181,17 @@ export default function Messages() {
     m.contact ? `${m.contact.full_name} (${m.contact.relation})` : m.patients?.full_name ?? "—";
 
   const recipientPhone = (m: any) => m.contact?.phone ?? m.patients?.phone ?? "—";
+
+  const selectedPatient = patients.find((p) => p.id === sendPatientId);
+  const selectedContact = patientContacts.find((c) => c.id === sendRecipient);
+  const recipientName = sendRecipient === "patient"
+    ? selectedPatient?.full_name ?? ""
+    : selectedContact?.full_name ?? "";
+  const recipientPhoneSend = sendRecipient === "patient"
+    ? selectedPatient?.phone ?? ""
+    : selectedContact?.phone ?? "";
+  const recipientRelation = sendRecipient === "patient" ? "Paciente" : selectedContact?.relation ?? "";
+  const canSend = !!sendPatientId && !!sendBody.trim() && !!recipientPhoneSend && !sending;
 
   return (
     <div className="space-y-6">
