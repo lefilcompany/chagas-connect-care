@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import {
   Send, Search, Plus, UserPlus, RefreshCw, Check, CheckCheck, Clock, ArrowRight,
 } from "lucide-react";
+import { User, Phone, MessageSquare } from "lucide-react";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
@@ -181,6 +182,17 @@ export default function Messages() {
 
   const recipientPhone = (m: any) => m.contact?.phone ?? m.patients?.phone ?? "—";
 
+  const selectedPatient = patients.find((p) => p.id === sendPatientId);
+  const selectedContact = patientContacts.find((c) => c.id === sendRecipient);
+  const recipientName = sendRecipient === "patient"
+    ? selectedPatient?.full_name ?? ""
+    : selectedContact?.full_name ?? "";
+  const recipientPhoneSend = sendRecipient === "patient"
+    ? selectedPatient?.phone ?? ""
+    : selectedContact?.phone ?? "";
+  const recipientRelation = sendRecipient === "patient" ? "Paciente" : selectedContact?.relation ?? "";
+  const canSend = !!sendPatientId && !!sendBody.trim() && !!recipientPhoneSend && !sending;
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between gap-4 flex-wrap">
@@ -340,11 +352,42 @@ export default function Messages() {
                 rows={4}
                 maxLength={1000}
               />
+              <div className="text-[11px] text-muted-foreground text-right">{sendBody.length}/1000</div>
             </div>
+
+            {sendPatientId && (
+              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                  Destinatário do envio
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-brand" />
+                  <span className="font-medium">{recipientName || "—"}</span>
+                  {recipientRelation && (
+                    <span className="text-xs text-muted-foreground">({recipientRelation})</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-brand" />
+                  <span className={recipientPhoneSend ? "" : "text-destructive"}>
+                    {recipientPhoneSend || "Telefone não cadastrado"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <MessageSquare className="h-4 w-4 text-brand" />
+                  <span className="capitalize">{sendChannel}</span>
+                  {selectedPatient && (
+                    <span className="text-xs text-muted-foreground">
+                      · Paciente: {selectedPatient.full_name}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSendOpen(false)}>Cancelar</Button>
-            <Button variant="hero" onClick={sendMessage} disabled={sending}>
+            <Button variant="hero" onClick={sendMessage} disabled={!canSend}>
               <Send className="h-4 w-4" /> {sending ? "Enviando..." : "Enviar (simulado)"}
             </Button>
           </DialogFooter>
