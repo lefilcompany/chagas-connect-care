@@ -61,34 +61,55 @@ export type Database = {
       }
       contacts: {
         Row: {
+          address: string
+          birth_date: string | null
           channel_pref: Database["public"]["Enums"]["message_channel"]
+          city: string
+          cpf: string
           created_at: string
+          email: string
           full_name: string
           id: string
           patient_id: string
           phone: string
           receives_reminders: boolean
           relation: string
+          state: string
+          status: string
         }
         Insert: {
+          address?: string
+          birth_date?: string | null
           channel_pref?: Database["public"]["Enums"]["message_channel"]
+          city?: string
+          cpf?: string
           created_at?: string
+          email?: string
           full_name: string
           id?: string
           patient_id: string
           phone?: string
           receives_reminders?: boolean
           relation?: string
+          state?: string
+          status?: string
         }
         Update: {
+          address?: string
+          birth_date?: string | null
           channel_pref?: Database["public"]["Enums"]["message_channel"]
+          city?: string
+          cpf?: string
           created_at?: string
+          email?: string
           full_name?: string
           id?: string
           patient_id?: string
           phone?: string
           receives_reminders?: boolean
           relation?: string
+          state?: string
+          status?: string
         }
         Relationships: [
           {
@@ -251,9 +272,13 @@ export type Database = {
       }
       patients: {
         Row: {
+          address: string
           birth_date: string | null
           channel_pref: Database["public"]["Enums"]["message_channel"]
+          city: string
+          cpf: string
           created_at: string
+          email: string
           full_name: string
           id: string
           institution: string
@@ -261,12 +286,18 @@ export type Database = {
           owner_id: string | null
           phone: string
           stage: Database["public"]["Enums"]["patient_stage"]
+          state: string
+          status: string
           updated_at: string
         }
         Insert: {
+          address?: string
           birth_date?: string | null
           channel_pref?: Database["public"]["Enums"]["message_channel"]
+          city?: string
+          cpf?: string
           created_at?: string
+          email?: string
           full_name: string
           id?: string
           institution?: string
@@ -274,12 +305,18 @@ export type Database = {
           owner_id?: string | null
           phone?: string
           stage?: Database["public"]["Enums"]["patient_stage"]
+          state?: string
+          status?: string
           updated_at?: string
         }
         Update: {
+          address?: string
           birth_date?: string | null
           channel_pref?: Database["public"]["Enums"]["message_channel"]
+          city?: string
+          cpf?: string
           created_at?: string
+          email?: string
           full_name?: string
           id?: string
           institution?: string
@@ -287,6 +324,8 @@ export type Database = {
           owner_id?: string | null
           phone?: string
           stage?: Database["public"]["Enums"]["patient_stage"]
+          state?: string
+          status?: string
           updated_at?: string
         }
         Relationships: []
