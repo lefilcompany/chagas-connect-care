@@ -1,28 +1,41 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, MessageCircle, Activity, Pill } from "lucide-react";
+import {
+  Users, MessageCircle, Activity, Pill,
+  AlertTriangle, UserPlus, Bell, Send, BarChart3,
+  Check, Lock, ArrowRight,
+} from "lucide-react";
 import { Link } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-type Stats = { patients: number; messagesToday: number; adherence30: number; meds: number };
+type Stats = { patients: number; messagesToday: number; adherence30: number; meds: number; messagesTotal: number; adherenceEvents: number };
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<Stats>({ patients: 0, messagesToday: 0, adherence30: 0, meds: 0 });
+  const [stats, setStats] = useState<Stats>({ patients: 0, messagesToday: 0, adherence30: 0, meds: 0, messagesTotal: 0, adherenceEvents: 0 });
 
   useEffect(() => {
     (async () => {
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const thirty = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-      const [p, m, mt, ad] = await Promise.all([
+      const [p, m, mt, ad, mTotal] = await Promise.all([
         supabase.from("patients").select("id", { count: "exact", head: true }),
         supabase.from("medications").select("id", { count: "exact", head: true }),
         supabase.from("messages").select("id", { count: "exact", head: true }).gte("sent_at", today.toISOString()),
         supabase.from("adherence_events").select("event_type").gte("occurred_at", thirty),
+        supabase.from("messages").select("id", { count: "exact", head: true }),
       ]);
       const events = ad.data ?? [];
       const ok = events.filter((e) => e.event_type === "confirmado").length;
       const adh = events.length ? Math.round((ok / events.length) * 100) : 0;
-      setStats({ patients: p.count ?? 0, messagesToday: mt.count ?? 0, adherence30: adh, meds: m.count ?? 0 });
+      setStats({
+        patients: p.count ?? 0,
+        messagesToday: mt.count ?? 0,
+        adherence30: adh,
+        meds: m.count ?? 0,
+        messagesTotal: mTotal.count ?? 0,
+        adherenceEvents: events.length,
+      });
     })();
   }, []);
 
@@ -32,6 +45,43 @@ export default function Dashboard() {
     { label: "Adesão 30 dias", value: `${stats.adherence30}%`, icon: Activity, to: "/app/relatorios" },
     { label: "Medicações ativas", value: stats.meds, icon: Pill, to: "/app/pacientes" },
   ];
+
+  const steps = [
+    {
+      title: "Cadastre seus pacientes",
+      description: "Adicione o paciente junto com a família ou cuidador responsável pelo cuidado diário.",
+      icon: UserPlus,
+      cta: "Cadastrar paciente",
+      to: "/app/pacientes",
+      done: stats.patients > 0,
+    },
+    {
+      title: "Registre as medicações",
+      description: "Cadastre os remédios de cada paciente e configure os horários dos lembretes.",
+      icon: Bell,
+      cta: "Adicionar medicação",
+      to: "/app/pacientes",
+      done: stats.meds > 0,
+    },
+    {
+      title: "Envie a primeira mensagem",
+      description: "Compartilhe uma orientação educativa via WhatsApp ou SMS com paciente e família.",
+      icon: Send,
+      cta: "Enviar mensagem",
+      to: "/app/mensagens",
+      done: stats.messagesTotal > 0,
+    },
+    {
+      title: "Acompanhe a adesão",
+      description: "Veja relatórios de confirmação e identifique pacientes que precisam de reforço.",
+      icon: BarChart3,
+      cta: "Ver relatórios",
+      to: "/app/relatorios",
+      done: stats.adherenceEvents > 0,
+    },
+  ];
+
+  const currentStepIndex = steps.findIndex((s) => !s.done);
 
   return (
     <div className="space-y-8">
@@ -64,17 +114,60 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid gap-4">
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h2 className="font-display text-lg font-bold text-brand">Próximos passos</h2>
-          <ul className="mt-3 space-y-2 text-sm text-muted-foreground list-disc pl-5">
-            <li>Cadastre seus pacientes e a família/cuidador responsável.</li>
-            <li>Registre as medicações e configure os lembretes.</li>
-            <li>Envie a primeira mensagem educativa via WhatsApp ou SMS.</li>
-            <li>Acompanhe a adesão nos relatórios.</li>
-          </ul>
+      <section>
+        <h2 className="font-display text-lg font-bold text-brand">Próximos passos</h2>
+        <p className="text-sm text-muted-foreground mt-1">Siga a jornada na ordem para preparar o cuidado conectado.</p>
+        <div className="mt-4 flex flex-col gap-4">
+          {steps.map((s, i) => {
+            const isDone = s.done;
+            const isActive = !isDone && i === currentStepIndex;
+            const isLocked = !isDone && !isActive;
+            return (
+              <div
+                key={s.title}
+                className={cn(
+                  "rounded-2xl border p-5 shadow-card flex items-start gap-4 transition-smooth",
+                  isDone && "border-brand/30 bg-primary/30",
+                  isActive && "border-brand bg-card ring-2 ring-brand/20",
+                  isLocked && "border-border bg-muted/60 opacity-70",
+                )}
+              >
+                <div className={cn(
+                  "h-11 w-11 shrink-0 rounded-xl flex items-center justify-center",
+                  isDone ? "bg-brand text-brand-foreground" : isActive ? "bg-primary text-brand" : "bg-muted text-muted-foreground",
+                )}>
+                  {isDone ? <Check className="h-5 w-5" /> : isLocked ? <Lock className="h-5 w-5" /> : <s.icon className="h-5 w-5" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Passo {i + 1}</span>
+                    {isDone && <span className="text-xs font-semibold text-brand">Concluído</span>}
+                    {isActive && <span className="text-xs font-semibold text-brand">Em andamento</span>}
+                    {isLocked && <span className="text-xs font-semibold text-muted-foreground">Bloqueado</span>}
+                  </div>
+                  <h3 className="mt-1 font-display text-base font-bold text-brand">{s.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{s.description}</p>
+                </div>
+                <div className="shrink-0">
+                  {isLocked ? (
+                    <Button variant="outline" size="sm" disabled className="gap-2">
+                      <Lock className="h-4 w-4" /> Bloqueado
+                    </Button>
+                  ) : isDone ? (
+                    <Button asChild variant="outline" size="sm" className="gap-2">
+                      <Link to={s.to}>Revisar</Link>
+                    </Button>
+                  ) : (
+                    <Button asChild size="sm" className="gap-2 bg-brand text-brand-foreground hover:bg-brand/90">
+                      <Link to={s.to}>{s.cta} <ArrowRight className="h-4 w-4" /></Link>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
