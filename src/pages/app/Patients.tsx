@@ -159,10 +159,16 @@ export default function Patients() {
     if (!contactOpen) return;
     const form = e.currentTarget;
     const fd = Object.fromEntries(new FormData(form));
+    const phone = String(fd.phone || "").trim();
+    if (!/^\(\d{2}\) \d{4,5}-\d{4}$/.test(phone)) {
+      return toast.error("Telefone deve ter 10 ou 11 dígitos");
+    }
     const { error } = await supabase.from("contacts").insert({
       patient_id: contactOpen.p.id,
       relation: contactOpen.relation,
-      ...fd,
+      full_name: String(fd.full_name || "").trim(),
+      phone,
+      channel_pref: String(fd.channel_pref || "whatsapp"),
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
