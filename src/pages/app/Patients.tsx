@@ -44,6 +44,51 @@ export default function Patients() {
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
   const [contactOpen, setContactOpen] = useState<{ p: Patient; relation: "familiar" | "cuidador" | "medico" } | null>(null);
 
+  const { data: medList = [] } = useQuery({
+    queryKey: ["medications", medOpen?.id],
+    enabled: !!medOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("medications")
+        .select("id, name, dose, schedule, created_at")
+        .eq("patient_id", medOpen!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: contactList = [] } = useQuery({
+    queryKey: ["contacts", contactOpen?.p.id, contactOpen?.relation],
+    enabled: !!contactOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("id, full_name, phone, channel_pref, created_at")
+        .eq("patient_id", contactOpen!.p.id)
+        .eq("relation", contactOpen!.relation)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const removeMedication = async (id: string) => {
+    if (!medOpen) return;
+    const { error } = await supabase.from("medications").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Medicação removida");
+    queryClient.invalidateQueries({ queryKey: ["medications", medOpen.id] });
+  };
+
+  const removeContact = async (id: string) => {
+    if (!contactOpen) return;
+    const { error } = await supabase.from("contacts").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Contato removido");
+    queryClient.invalidateQueries({ queryKey: ["contacts", contactOpen.p.id, contactOpen.relation] });
+  };
+
   useEffect(() => {
     if (user) supabase.from("profiles").select("institution").eq("id", user.id).maybeSingle().then(({ data }) => setInstitution(data?.institution ?? ""));
   }, [user]);
