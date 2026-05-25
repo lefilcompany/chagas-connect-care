@@ -352,11 +352,42 @@ export default function Messages() {
                 rows={4}
                 maxLength={1000}
               />
+              <div className="text-[11px] text-muted-foreground text-right">{sendBody.length}/1000</div>
             </div>
+
+            {sendPatientId && (
+              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                  Destinatário do envio
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-brand" />
+                  <span className="font-medium">{recipientName || "—"}</span>
+                  {recipientRelation && (
+                    <span className="text-xs text-muted-foreground">({recipientRelation})</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-brand" />
+                  <span className={recipientPhoneSend ? "" : "text-destructive"}>
+                    {recipientPhoneSend || "Telefone não cadastrado"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <MessageSquare className="h-4 w-4 text-brand" />
+                  <span className="capitalize">{sendChannel}</span>
+                  {selectedPatient && (
+                    <span className="text-xs text-muted-foreground">
+                      · Paciente: {selectedPatient.full_name}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSendOpen(false)}>Cancelar</Button>
-            <Button variant="hero" onClick={sendMessage} disabled={sending}>
+            <Button variant="hero" onClick={sendMessage} disabled={!canSend}>
               <Send className="h-4 w-4" /> {sending ? "Enviando..." : "Enviar (simulado)"}
             </Button>
           </DialogFooter>
