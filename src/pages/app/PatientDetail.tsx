@@ -96,9 +96,11 @@ export default function PatientDetail() {
   const addContact = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.currentTarget));
-    const { error } = await supabase.from("contacts").insert({ patient_id: id, ...fd } as any);
+    const payload = { patient_id: id, ...fd, phone: contactPhone } as any;
+    const { error } = await supabase.from("contacts").insert(payload);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
+    setContactPhone("");
     (e.target as HTMLFormElement).reset();
     loadAll();
   };
