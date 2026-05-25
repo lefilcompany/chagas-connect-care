@@ -160,26 +160,38 @@ export type Database = {
       content_library: {
         Row: {
           audience: string
+          audience_types: string[]
           body: string
           category: string
           created_at: string
+          filters: Json
           id: string
+          segment_id: string | null
+          targeting_mode: string
           title: string
         }
         Insert: {
           audience?: string
+          audience_types?: string[]
           body: string
           category?: string
           created_at?: string
+          filters?: Json
           id?: string
+          segment_id?: string | null
+          targeting_mode?: string
           title: string
         }
         Update: {
           audience?: string
+          audience_types?: string[]
           body?: string
           category?: string
           created_at?: string
+          filters?: Json
           id?: string
+          segment_id?: string | null
+          targeting_mode?: string
           title?: string
         }
         Relationships: []

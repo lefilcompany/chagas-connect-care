@@ -10,11 +10,13 @@ export function RecipientPreview({
   loading,
   selectedKeys,
   onChange,
+  readOnly,
 }: {
   recipients: Recipient[];
   loading?: boolean;
   selectedKeys: Set<string>;
   onChange: (keys: Set<string>) => void;
+  readOnly?: boolean;
 }) {
   const [q, setQ] = useState("");
 
@@ -49,14 +51,18 @@ export function RecipientPreview({
   const setAll = (on: boolean) => onChange(on ? new Set(filtered.map((r) => r.key)) : new Set());
 
   const total = recipients.length;
-  const selected = selectedKeys.size;
+  const selected = readOnly ? total : selectedKeys.size;
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium">
           <Users className="h-3.5 w-3.5 text-brand" />
-          Enviando para <span className="tabular-nums text-brand">{selected}</span> de <span className="tabular-nums">{total}</span>
+          {readOnly ? (
+            <>Atingindo <span className="tabular-nums text-brand">{total}</span> {total === 1 ? "destinatário" : "destinatários"}</>
+          ) : (
+            <>Enviando para <span className="tabular-nums text-brand">{selected}</span> de <span className="tabular-nums">{total}</span></>
+          )}
         </div>
         {(Object.keys(AUDIENCE_LABELS) as AudienceType[]).map((a) =>
           breakdown[a] ? (
@@ -67,7 +73,7 @@ export function RecipientPreview({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      {!readOnly && <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -91,7 +97,7 @@ export function RecipientPreview({
         >
           Desmarcar
         </button>
-      </div>
+      </div>}
 
       <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
         {loading ? (
@@ -104,10 +110,12 @@ export function RecipientPreview({
           <ul className="divide-y divide-border">
             {filtered.map((r) => (
               <li key={r.key} className="flex items-center gap-3 p-3 text-sm">
-                <Checkbox
-                  checked={selectedKeys.has(r.key)}
-                  onCheckedChange={(v) => toggle(r.key, !!v)}
-                />
+                {!readOnly && (
+                  <Checkbox
+                    checked={selectedKeys.has(r.key)}
+                    onCheckedChange={(v) => toggle(r.key, !!v)}
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium truncate">{r.name}</span>

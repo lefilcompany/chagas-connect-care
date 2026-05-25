@@ -19,7 +19,8 @@ import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
 import { RecipientPreview } from "@/components/app/RecipientPreview";
 import {
   AudienceType, Recipient, SegmentDef, SegmentFilters,
-  emptyFilters, resolveRecipients,
+  emptyFilters, resolveRecipients, resolveContentTargeting, TargetingMode,
+  AUDIENCE_LABELS, ALL_AUDIENCES,
 } from "@/lib/segments";
 
 const CATEGORIES = [
@@ -42,18 +43,52 @@ const contentSchema = z.object({
   category: z.string().min(1),
   audience: z.string().min(1),
   body: z.string().trim().min(5).max(5000),
+  targeting_mode: z.enum(["all", "audiences", "segment", "filters"]),
+  audience_types: z.array(z.enum(["paciente", "familiar", "cuidador", "medico"])).default([]),
+  segment_id: z.string().nullable().optional(),
+  filters: z.any().optional(),
+}).superRefine((v, ctx) => {
+  if ((v.targeting_mode === "audiences" || v.targeting_mode === "filters") && v.audience_types.length === 0) {
+    ctx.addIssue({ code: "custom", path: ["audience_types"], message: "Selecione ao menos um tipo de público" });
+  }
+  if (v.targeting_mode === "segment" && !v.segment_id) {
+    ctx.addIssue({ code: "custom", path: ["segment_id"], message: "Selecione um segmento" });
+  }
 });
 
 type ContentRow = {
   id: string; title: string; category: string; audience: string; body: string;
+  targeting_mode?: TargetingMode | null;
+  audience_types?: AudienceType[] | null;
+  segment_id?: string | null;
+  filters?: SegmentFilters | null;
 };
 
 const labelOf = (arr: { value: string; label: string }[], v: string) =>
   arr.find((x) => x.value === v)?.label ?? v;
 
+function describeTargeting(c: ContentRow, segments: SegmentDef[]): string {
+  const mode = c.targeting_mode ?? "all";
+  if (mode === "all") return "Todos os públicos";
+  if (mode === "audiences") {
+    const list = (c.audience_types ?? []).map((a) => AUDIENCE_LABELS[a]);
+    return list.length ? list.join(" + ") : "Tipos de público";
+  }
+  if (mode === "segment") {
+    const seg = segments.find((s) => s.id === c.segment_id);
+    return seg ? `Segmento: ${seg.name}` : "Segmento removido";
+  }
+  const aud = (c.audience_types ?? []).map((a) => AUDIENCE_LABELS[a]).join("+") || "público";
+  return `Filtros personalizados (${aud})`;
+}
+
 export default function Content() {
   const queryClient = useQueryClient();
   const { data: items = [] } = useQuery({ queryKey: qk.content, queryFn: fetchers.content });
+  const { data: segments = [] } = useQuery<SegmentDef[]>({
+    queryKey: qk.segments,
+    queryFn: fetchers.segments as () => Promise<SegmentDef[]>,
+  });
 
   const [q, setQ] = useState("");
   const [catFilter, setCatFilter] = useState<string>("todos");
@@ -138,7 +173,9 @@ export default function Content() {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary">{labelOf(CATEGORIES, c.category)}</Badge>
-                <Badge variant="outline">{labelOf(AUDIENCES, c.audience)}</Badge>
+                <Badge variant="outline" className="max-w-full truncate">
+                  {describeTargeting(c, segments as SegmentDef[])}
+                </Badge>
               </div>
               <h3 className="mt-3 font-display text-lg font-bold text-brand line-clamp-2">{c.title}</h3>
               <p className="mt-2 text-sm text-muted-foreground line-clamp-3 flex-1">{c.body}</p>
@@ -194,9 +231,23 @@ function ContentFormDialog({
 }) {
   const isEdit = !!initial;
   const [form, setForm] = useState({
-    title: "", category: "medicacao", audience: "ambos", body: "",
+    title: "",
+    category: "medicacao",
+    audience: "ambos",
+    body: "",
+    targeting_mode: "all" as TargetingMode,
+    audience_types: [] as AudienceType[],
+    segment_id: null as string | null,
+    filters: emptyFilters(),
   });
   const [saving, setSaving] = useState(false);
+  const [previewKeys, setPreviewKeys] = useState<Set<string>>(new Set());
+
+  const { data: segments = [] } = useQuery<SegmentDef[]>({
+    queryKey: qk.segments,
+    queryFn: fetchers.segments as () => Promise<SegmentDef[]>,
+    enabled: open,
+  });
 
   useEffect(() => {
     if (open) {
@@ -205,19 +256,65 @@ function ContentFormDialog({
         category: initial?.category ?? "medicacao",
         audience: initial?.audience ?? "ambos",
         body: initial?.body ?? "",
+        targeting_mode: (initial?.targeting_mode ?? "all") as TargetingMode,
+        audience_types: (initial?.audience_types ?? []) as AudienceType[],
+        segment_id: initial?.segment_id ?? null,
+        filters: { ...emptyFilters(), ...(initial?.filters ?? {}) },
       });
+      setPreviewKeys(new Set());
     }
   }, [open, initial]);
 
-  const valid = contentSchema.safeParse(form).success;
+  const parsed = contentSchema.safeParse(form);
+  const valid = parsed.success;
+
+  // Live recipient preview
+  const previewAudiences = useMemo<AudienceType[]>(() => {
+    if (form.targeting_mode === "all") return ALL_AUDIENCES;
+    if (form.targeting_mode === "audiences" || form.targeting_mode === "filters") return form.audience_types;
+    if (form.targeting_mode === "segment") {
+      const s = (segments as SegmentDef[]).find((x) => x.id === form.segment_id);
+      return (s?.audience_types ?? []) as AudienceType[];
+    }
+    return [];
+  }, [form, segments]);
+  const previewFilters = useMemo<SegmentFilters>(() => {
+    if (form.targeting_mode === "filters") return form.filters;
+    if (form.targeting_mode === "segment") {
+      const s = (segments as SegmentDef[]).find((x) => x.id === form.segment_id);
+      return (s?.filters ?? emptyFilters()) as SegmentFilters;
+    }
+    return emptyFilters();
+  }, [form, segments]);
+
+  const { data: previewRecipients = [], isLoading: previewLoading } = useQuery<Recipient[]>({
+    queryKey: ["content-targeting-preview", previewAudiences, previewFilters],
+    queryFn: () => resolveRecipients(previewAudiences, previewFilters),
+    enabled: open && previewAudiences.length > 0,
+  });
 
   const save = async () => {
-    const parsed = contentSchema.safeParse(form);
-    if (!parsed.success) return toast.error("Verifique os campos");
+    if (!parsed.success) return toast.error(parsed.error.issues[0]?.message ?? "Verifique os campos");
     setSaving(true);
+    // Derive legacy `audience` for back-compat
+    const aud = form.targeting_mode === "all"
+      ? "ambos"
+      : form.audience_types.length === 1
+        ? (form.audience_types[0] === "familiar" ? "familia" : form.audience_types[0])
+        : "ambos";
+    const payload = {
+      title: form.title.trim(),
+      category: form.category,
+      audience: aud,
+      body: form.body.trim(),
+      targeting_mode: form.targeting_mode,
+      audience_types: form.targeting_mode === "all" ? [] : form.audience_types,
+      segment_id: form.targeting_mode === "segment" ? form.segment_id : null,
+      filters: form.targeting_mode === "filters" ? form.filters : {},
+    };
     const { error } = isEdit
-      ? await supabase.from("content_library").update(parsed.data).eq("id", initial!.id)
-      : await supabase.from("content_library").insert(parsed.data as any);
+      ? await supabase.from("content_library").update(payload as any).eq("id", initial!.id)
+      : await supabase.from("content_library").insert(payload as any);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success(isEdit ? "Conteúdo atualizado" : "Conteúdo adicionado");
@@ -237,7 +334,7 @@ function ContentFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar conteúdo" : "Adicionar conteúdo"}</DialogTitle>
         </DialogHeader>
@@ -250,25 +347,14 @@ function ContentFormDialog({
               placeholder="Ex: Como tomar o medicamento corretamente"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Público</Label>
-              <Select value={form.audience} onValueChange={(v) => setForm({ ...form, audience: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {AUDIENCES.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Categoria</Label>
+            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>Conteúdo</Label>
@@ -278,6 +364,109 @@ function ContentFormDialog({
               onChange={(e) => setForm({ ...form, body: e.target.value })}
               placeholder="Escreva a orientação completa..."
             />
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+            <div className="space-y-1">
+              <Label className="text-sm font-semibold text-brand">Segmentação</Label>
+              <p className="text-xs text-muted-foreground">Direcione este conteúdo para o público certo.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { v: "all", label: "Todos" },
+                { v: "audiences", label: "Tipos de público" },
+                { v: "segment", label: "Segmento salvo" },
+                { v: "filters", label: "Filtros personalizados" },
+              ].map((opt) => (
+                <button
+                  key={opt.v}
+                  type="button"
+                  onClick={() => setForm({ ...form, targeting_mode: opt.v as TargetingMode })}
+                  className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+                    form.targeting_mode === opt.v
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {form.targeting_mode === "audiences" && (
+              <div className="space-y-2">
+                <Label>Tipos de público</Label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(Object.keys(AUDIENCE_LABELS) as AudienceType[]).map((a) => (
+                    <label key={a} className="flex items-center gap-2 rounded-lg border border-border bg-card p-2 text-sm cursor-pointer hover:bg-muted/50">
+                      <Checkbox
+                        checked={form.audience_types.includes(a)}
+                        onCheckedChange={(v) =>
+                          setForm({
+                            ...form,
+                            audience_types: v
+                              ? Array.from(new Set([...form.audience_types, a]))
+                              : form.audience_types.filter((x) => x !== a),
+                          })
+                        }
+                      />
+                      <span>{AUDIENCE_LABELS[a]}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {form.targeting_mode === "segment" && (
+              <div className="space-y-2">
+                <Label>Segmento</Label>
+                <Select
+                  value={form.segment_id ?? ""}
+                  onValueChange={(v) => setForm({ ...form, segment_id: v || null })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione um segmento" /></SelectTrigger>
+                  <SelectContent>
+                    {(segments as SegmentDef[]).length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        Nenhum segmento salvo. Crie em Segmentos.
+                      </div>
+                    ) : (
+                      (segments as SegmentDef[]).map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <a
+                  href="/app/segmentos"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block text-xs text-brand hover:underline"
+                >
+                  Criar novo segmento →
+                </a>
+              </div>
+            )}
+
+            {form.targeting_mode === "filters" && (
+              <SegmentFiltersForm
+                audienceTypes={form.audience_types}
+                onAudienceChange={(v) => setForm({ ...form, audience_types: v })}
+                filters={form.filters}
+                onFiltersChange={(f) => setForm({ ...form, filters: f })}
+              />
+            )}
+
+            {form.targeting_mode !== "all" && previewAudiences.length > 0 && (
+              <RecipientPreview
+                recipients={previewRecipients}
+                loading={previewLoading}
+                selectedKeys={previewKeys}
+                onChange={setPreviewKeys}
+                readOnly
+              />
+            )}
           </div>
         </div>
         <DialogFooter className="gap-2">
@@ -321,22 +510,50 @@ function SendContentDialog({
 
   useEffect(() => {
     if (open) {
+      const tmode = (item?.targeting_mode ?? "all") as TargetingMode;
       const aud = item?.audience ?? "ambos";
-      setMode("bulk");
+      // Decide initial dialog mode based on content's targeting
+      const initialMode: "bulk" | "single" | "segment" =
+        tmode === "segment" || tmode === "filters" ? "segment" : "bulk";
+      setMode(initialMode);
       setPatientId("");
       setChannel("whatsapp");
       setSendToPatient(true);
       setSelectedContacts({});
-      setBulkGroups({
-        paciente: aud === "paciente" || aud === "ambos",
-        familiar: aud === "familia" || aud === "ambos",
-        cuidador: aud === "cuidador" || aud === "ambos",
-        medico: false,
-      });
-      setSegMode("saved");
-      setSavedSegmentId("");
-      setAdhocAudiences(["paciente"]);
-      setAdhocFilters(emptyFilters());
+      // Bulk groups: from audience_types when present, else legacy audience
+      const at = (item?.audience_types ?? []) as AudienceType[];
+      if (tmode === "audiences" && at.length) {
+        setBulkGroups({
+          paciente: at.includes("paciente"),
+          familiar: at.includes("familiar"),
+          cuidador: at.includes("cuidador"),
+          medico: at.includes("medico"),
+        });
+      } else {
+        setBulkGroups({
+          paciente: aud === "paciente" || aud === "ambos",
+          familiar: aud === "familia" || aud === "ambos",
+          cuidador: aud === "cuidador" || aud === "ambos",
+          medico: false,
+        });
+      }
+      // Segment mode pre-load
+      if (tmode === "segment" && item?.segment_id) {
+        setSegMode("saved");
+        setSavedSegmentId(item.segment_id);
+        setAdhocAudiences(["paciente"]);
+        setAdhocFilters(emptyFilters());
+      } else if (tmode === "filters") {
+        setSegMode("adhoc");
+        setSavedSegmentId("");
+        setAdhocAudiences((item?.audience_types ?? ["paciente"]) as AudienceType[]);
+        setAdhocFilters({ ...emptyFilters(), ...(item?.filters ?? {}) });
+      } else {
+        setSegMode("saved");
+        setSavedSegmentId("");
+        setAdhocAudiences(["paciente"]);
+        setAdhocFilters(emptyFilters());
+      }
       setChannelOverride("auto");
       setSelectedKeys(new Set());
     }
