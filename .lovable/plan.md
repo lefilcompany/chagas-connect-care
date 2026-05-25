@@ -1,84 +1,86 @@
-## Segmentação de pacientes, familiares e cuidadores
+## Aplicar segmentação na criação de conteúdo
 
-Vamos permitir que conteúdos sejam enviados para públicos segmentados usando os dados já cadastrados (etapa, cidade/estado, idade, status, canal, instituição, relação).
+Hoje o segmento só aparece na hora de enviar. Vamos trazer a segmentação para dentro do cadastro/edição do conteúdo, garantindo que cada peça já nasça direcionada ao público certo — e que o envio respeite isso por padrão, sem erros.
 
-### 1. Segmentos salvos (audiências reutilizáveis)
+### 1. O que muda no cadastro de conteúdo
 
-Nova tela **Segmentos** (rota `/app/segmentos`, item no menu lateral) onde a equipe cria audiências nomeadas tipo "Crônicos do Recife" ou "Cuidadores ativos via WhatsApp".
+No modal "Adicionar / Editar conteúdo" o campo único "Público" vira uma seção **Segmentação**, com 3 opções (rádio):
 
-Cada segmento tem:
-- Nome + descrição curta.
-- **Tipo de público:** Pacientes / Familiares / Cuidadores / Médicos (multi-seleção).
-- **Filtros** (todos opcionais, combinados por E lógico):
-  - Etapa do paciente (diagnóstico, agudo, crônico) — aplica ao paciente ou ao paciente do contato.
-  - Cidade (texto livre, busca contém).
-  - Estado (UF, 2 letras).
-  - Faixa etária: idade mínima / máxima (calculada a partir de `birth_date`).
-  - Status: ativo / inativo / todos.
-  - Canal: WhatsApp / SMS / todos.
-  - Instituição (texto livre, busca contém).
-- Contador em tempo real: "X destinatários correspondem agora".
-- Lista os nomes que entram no segmento, com paginação.
+- **Todos os públicos** (comportamento atual padrão).
+- **Tipos de público** — multi-seleção: Pacientes / Familiares / Cuidadores / Médicos (substitui o atual "paciente/familia/cuidador/ambos" com algo mais preciso).
+- **Segmento salvo** — select com os segmentos criados em `/app/segmentos`. Mostra nome + contador atual de destinatários. Botão "Criar novo segmento" abre a tela de segmentos em nova aba.
+- **Filtros personalizados** — mesmos campos do `SegmentFiltersForm` (etapa, cidade/UF, idade, status, canal, instituição) + escolha dos tipos de público. Útil quando o conteúdo é específico (ex.: "Cuidadores de crônicos em Recife") mas não justifica salvar como segmento.
 
-Botões: **Salvar**, **Excluir**, **Duplicar**.
+Abaixo da seleção aparece uma **prévia compacta**: "X destinatários correspondem agora" + lista colapsável (reaproveita `RecipientPreview` em modo somente-leitura, sem checkboxes). Isso valida visualmente o direcionamento antes de salvar.
 
-### 2. Filtros ad-hoc no envio de conteúdo
+Validação: se o autor escolher "Filtros personalizados" sem nenhum tipo de público marcado, o salvar fica desabilitado com mensagem clara.
 
-No modal **Enviar conteúdo** (já existente em `/app/conteudos`), uma terceira aba além de "Em massa" e "Paciente específico":
+### 2. O que muda no envio
 
-**Aba "Segmentado"** com dois modos:
-- **Usar segmento salvo:** select com os segmentos criados; mostra o nome e o total atual.
-- **Montar filtros agora:** mesmos campos do segmento salvo, sem salvar.
+O `SendContentDialog` passa a **pré-carregar** a segmentação do conteúdo:
 
-Em ambos os casos, antes de confirmar o envio aparece a **prévia completa**: lista de cada destinatário (nome, grupo, telefone, canal) com checkbox para desmarcar individualmente, e o contador "Enviando para N de M".
+- Se o conteúdo tem segmento salvo vinculado → abre direto na aba "Segmentado" / "Usar segmento salvo" com ele selecionado.
+- Se o conteúdo tem filtros personalizados → abre na aba "Segmentado" / "Montar filtros agora" com os filtros preenchidos.
+- Se o conteúdo tem só tipos de público (sem filtros) → abre na aba "Em massa" com esses grupos marcados.
+- Se é "Todos" → comportamento atual.
 
-### 3. Como a segmentação é resolvida
+O usuário ainda pode alternar a aba se quiser sobrescrever no envio. A prévia com checkboxes individuais e o "Enviando para N de M" continuam iguais — nada de regressão.
 
-Para cada combinação de filtros, o sistema:
-1. Busca pacientes ativos na instituição (RLS já cobre).
-2. Para públicos "paciente": aplica os filtros direto na tabela `patients`.
-3. Para públicos "familiar/cuidador/médico": junta `contacts` com `patients` e aplica os filtros (etapa vem do paciente; cidade/estado/idade/status/canal podem vir do contato).
-4. Resultado é a lista de destinatários da prévia.
+### 3. Lista de conteúdos
 
-Idade é calculada como `date_part('year', age(birth_date))`.
+Cada card de conteúdo passa a mostrar um chip extra indicando a segmentação aplicada:
 
-### 4. Envio
+- "Todos" (igual hoje), ou
+- Lista dos tipos de público (ex.: "Pacientes + Cuidadores"), ou
+- "Segmento: Crônicos do Recife", ou
+- "Filtros personalizados (N destinatários)".
 
-Botão "Enviar agora" insere uma linha em `messages` por destinatário (mesmo padrão atual): `body` = corpo do conteúdo, `patient_id`, `contact_id` (quando aplicável), `channel` = canal do destinatário (ou override escolhido), `direction='outbound'`, `status='sent'`, `sent_at=now()`.
+O filtro de público no topo da página passa a aceitar também "Com segmento salvo" e "Com filtros personalizados" para encontrar rapidamente conteúdos direcionados.
 
-Toast de sucesso mostra "Enviado para N destinatários".
+### 4. Banco de dados
 
-### 5. Detalhes técnicos
+Adicionar à tabela `content_library`:
 
-**Schema novo (migração):**
-- Tabela `audience_segments`: `id`, `name`, `description`, `audience_types text[]` (paciente/familiar/cuidador/medico), `filters jsonb` (estrutura: `{stages, city, state, age_min, age_max, status, channel, institution}`), `owner_id`, `institution`, `created_at`, `updated_at`.
-- RLS: leitura/escrita pela instituição do usuário (mesmo padrão de `patients`); exclusão pelo dono ou admin.
-- Trigger `set_updated_at`.
+- `targeting_mode text not null default 'all'` — valores: `all`, `audiences`, `segment`, `filters`.
+- `audience_types text[] not null default '{}'` — usado quando `targeting_mode` é `audiences` ou `filters`.
+- `segment_id uuid` — FK lógica para `audience_segments(id)` (sem FK rígida, igual ao padrão atual do projeto); usado quando `targeting_mode = 'segment'`.
+- `filters jsonb not null default '{}'` — usado quando `targeting_mode = 'filters'`.
 
-**Frontend:**
-- Novo arquivo `src/pages/app/Segments.tsx` (lista + form lateral/modal).
-- Componente compartilhado `src/components/app/SegmentFilters.tsx` (campos de filtro + preview) reusado em Segments.tsx e no modal de envio em `Content.tsx`.
-- Componente `src/components/app/RecipientPreview.tsx` (lista com checkboxes, total, busca).
-- Query helper `resolveSegment(filters, audienceTypes)` em `src/lib/segments.ts` que retorna `Array<{ kind: 'patient'|'contact', id, patient_id, contact_id?, name, phone, channel, relation? }>`.
-- Adicionar `qk.segments` em `src/lib/queries.ts` e fetcher correspondente; prefetch na rota.
-- Rota nova em `src/App.tsx` e item no menu (`src/components/app/AppLayout.tsx`).
-- Atualizar `SendContentDialog` em `src/pages/app/Content.tsx` com aba "Segmentado" usando os dois componentes acima.
+O campo legado `audience text` é mantido e populado por compatibilidade (ex.: "paciente", "familia", "cuidador", "ambos") — derivado a partir de `audience_types` quando aplicável — para não quebrar telas/relatórios que ainda leem ele.
 
-**UX:**
-- Filtros vazios = sem filtro (não restringe).
-- Estado/UF normalizado em maiúsculas.
-- Contador de prévia com debounce de 300ms.
-- Tokens semânticos (sem cores hardcoded).
-- Validação Zod nos nomes de segmento (min 2, max 80).
+RLS existente em `content_library` permanece (qualquer autenticado lê; admin gerencia; autenticado insere). Sem mudança de política.
 
-### Arquivos alterados / criados
+### 5. Resolução de destinatários
 
-- novo: `src/pages/app/Segments.tsx`
-- novo: `src/components/app/SegmentFilters.tsx`
-- novo: `src/components/app/RecipientPreview.tsx`
-- novo: `src/lib/segments.ts`
-- editado: `src/pages/app/Content.tsx` (nova aba no modal de envio)
-- editado: `src/App.tsx` (rota)
-- editado: `src/components/app/AppLayout.tsx` (item de menu)
-- editado: `src/lib/queries.ts` (qk + fetcher + prefetch)
-- migração: criar tabela `audience_segments` + RLS + trigger
+Reusamos `resolveRecipients(audience_types, filters)` de `src/lib/segments.ts`. Helper novo `resolveContentTargeting(content)` em `src/lib/segments.ts`:
+
+- `targeting_mode = 'all'` → resolve com `['paciente','familiar','cuidador','medico']` e `emptyFilters()`.
+- `audiences` → usa `audience_types` + `emptyFilters()`.
+- `segment` → busca o segmento por id e usa seus `audience_types`/`filters`. Se o segmento foi excluído, mostra aviso "Segmento original removido" e cai para "Todos".
+- `filters` → usa `audience_types` + `filters` do próprio conteúdo.
+
+### 6. Detalhes técnicos
+
+**Arquivos editados:**
+- `supabase/migrations/<novo>.sql` — alter `content_library`.
+- `src/lib/segments.ts` — adicionar `resolveContentTargeting`, tipo `ContentTargeting`.
+- `src/lib/queries.ts` — fetcher de `content` passa a selecionar as novas colunas; reusa `qk.segments`.
+- `src/pages/app/Content.tsx`:
+  - `ContentFormDialog` ganha a seção de segmentação com `SegmentFiltersForm` e prévia.
+  - `SendContentDialog` lê a segmentação do `item` e pré-configura abas/campos.
+  - Cards mostram chip de segmentação; filtro de público amplia opções.
+- `src/components/app/RecipientPreview.tsx` — aceitar prop `readOnly` para esconder checkboxes/busca quando usado como preview no cadastro.
+
+**Edge cases tratados:**
+- Conteúdo antigo (sem novas colunas) cai em `targeting_mode='all'` via default da migração.
+- Segmento salvo apagado depois de vinculado: UI mostra fallback e o envio cai em "Todos" só após confirmação explícita.
+- Filtros vazios em modo `filters` = mesmo efeito de "Todos" (sem restrição).
+- Validação Zod no form: se `targeting_mode in ('audiences','filters')` então `audience_types.length >= 1`; se `segment` então `segment_id` obrigatório.
+
+### Arquivos criados / editados
+
+- migração: alterar `content_library` (campos novos com defaults seguros)
+- editado: `src/lib/segments.ts`
+- editado: `src/lib/queries.ts`
+- editado: `src/pages/app/Content.tsx`
+- editado: `src/components/app/RecipientPreview.tsx`
