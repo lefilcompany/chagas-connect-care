@@ -474,20 +474,27 @@ function SendContentDialog({
               <p className="mt-1 text-xs text-muted-foreground line-clamp-3">{item.body}</p>
             </div>
 
-            <div className="flex gap-2 rounded-lg border border-border p-1">
+            <div className="flex gap-1 rounded-lg border border-border p-1 overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setMode("bulk")}
-                className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${mode === "bulk" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+                className={`flex-1 whitespace-nowrap rounded-md py-2 px-2 text-xs sm:text-sm font-medium transition-colors ${mode === "bulk" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
               >
-                Em massa (por grupo)
+                Por grupo
               </button>
               <button
                 type="button"
                 onClick={() => setMode("single")}
-                className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${mode === "single" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+                className={`flex-1 whitespace-nowrap rounded-md py-2 px-2 text-xs sm:text-sm font-medium transition-colors ${mode === "single" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
               >
                 Paciente específico
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("segment")}
+                className={`flex-1 whitespace-nowrap rounded-md py-2 px-2 text-xs sm:text-sm font-medium transition-colors ${mode === "segment" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              >
+                Segmentado
               </button>
             </div>
 
