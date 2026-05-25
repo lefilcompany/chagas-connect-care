@@ -573,11 +573,11 @@ export default function Patients() {
             )}
           </div>
           <form onSubmit={addContact} className="space-y-3 pt-2 border-t border-border">
-            <div className="space-y-2"><Label>Nome</Label><Input name="full_name" required /></div>
+            <div className="space-y-2"><Label>Nome</Label><Input value={contactForm.full_name} onChange={(e) => setContactForm((s) => ({ ...s, full_name: e.target.value }))} required /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Telefone</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
+              <div className="space-y-2"><Label>Telefone</Label><Input value={contactForm.phone} onChange={(e) => setContactForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} type="tel" placeholder="(81) 99999-9999" required maxLength={15} /></div>
               <div className="space-y-2"><Label>Canal</Label>
-                <Select name="channel_pref" defaultValue="whatsapp">
+                <Select value={contactForm.channel_pref} onValueChange={(v) => setContactForm((s) => ({ ...s, channel_pref: v as "whatsapp" | "sms" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="whatsapp">WhatsApp</SelectItem>
@@ -586,7 +586,7 @@ export default function Patients() {
                 </Select>
               </div>
             </div>
-            <Button type="submit" variant="hero" className="w-full">Adicionar</Button>
+            <Button type="submit" variant="hero" className="w-full" disabled={!contactSchema.safeParse(contactForm).success}>Adicionar</Button>
           </form>
         </DialogContent>
       </Dialog>
