@@ -34,6 +34,8 @@ export default function PatientDetail() {
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [contactPhone, setContactPhone] = useState("");
+  const [medDoseValue, setMedDoseValue] = useState("");
+  const [medDoseUnit, setMedDoseUnit] = useState("mg");
 
   const loadAll = async () => {
     if (!id) return;
