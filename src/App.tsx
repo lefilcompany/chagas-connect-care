@@ -16,6 +16,7 @@ import Content from "./pages/app/Content";
 import Reports from "./pages/app/Reports";
 import Integrations from "./pages/app/Integrations";
 import Profile from "./pages/app/Profile";
+import Segments from "./pages/app/Segments";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="pacientes/:id" element={<PatientDetail />} />
               <Route path="mensagens" element={<Messages />} />
               <Route path="conteudos" element={<Content />} />
+              <Route path="segmentos" element={<Segments />} />
               <Route path="relatorios" element={<Reports />} />
               <Route path="integracoes" element={<Integrations />} />
               <Route path="perfil" element={<Profile />} />

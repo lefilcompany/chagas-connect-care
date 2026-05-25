@@ -59,6 +59,42 @@ export type Database = {
           },
         ]
       }
+      audience_segments: {
+        Row: {
+          audience_types: string[]
+          created_at: string
+          description: string
+          filters: Json
+          id: string
+          institution: string
+          name: string
+          owner_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          audience_types?: string[]
+          created_at?: string
+          description?: string
+          filters?: Json
+          id?: string
+          institution?: string
+          name: string
+          owner_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          audience_types?: string[]
+          created_at?: string
+          description?: string
+          filters?: Json
+          id?: string
+          institution?: string
+          name?: string
+          owner_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contacts: {
         Row: {
           address: string
