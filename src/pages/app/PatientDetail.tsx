@@ -168,7 +168,7 @@ export default function PatientDetail() {
               {stageLabels[form.stage] ?? form.stage}
             </span>
           </div>
-          <Button size="sm" variant="hero" onClick={savePatient} disabled={saving}>
+          <Button size="sm" variant="hero" onClick={savePatient} disabled={saving || !hasChanges}>
             <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar alterações"}
           </Button>
         </div>
