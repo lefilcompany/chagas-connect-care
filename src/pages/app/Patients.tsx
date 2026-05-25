@@ -31,6 +31,18 @@ const schema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+const contactSchema = z.object({
+  full_name: z.string().trim().min(2).max(160),
+  phone: z.string().trim().regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, "Telefone deve ter 10 ou 11 dígitos"),
+  channel_pref: z.enum(["whatsapp", "sms"]),
+});
+
+const medicationSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  dose_value: z.string().optional(),
+  schedule: z.string().optional(),
+});
+
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, "");
   if (digits.length <= 2) return digits;
@@ -55,6 +67,9 @@ export default function Patients() {
   const [medIndex, setMedIndex] = useState(0);
   const [contactDir, setContactDir] = useState<1 | -1>(1);
   const [medDir, setMedDir] = useState<1 | -1>(1);
+
+  const [contactForm, setContactForm] = useState({ full_name: "", phone: "", channel_pref: "whatsapp" });
+  const [medForm, setMedForm] = useState({ name: "", dose_value: "", schedule: "" });
 
   const { data: medList = [] } = useQuery({
     queryKey: ["medications", medOpen?.id],
@@ -121,6 +136,14 @@ export default function Patients() {
     if (medIndex >= medList.length) setMedIndex(Math.max(0, medList.length - 1));
   }, [medList.length, medIndex]);
 
+  useEffect(() => {
+    if (medOpen) setMedForm({ name: "", dose_value: "", schedule: "" });
+  }, [medOpen]);
+
+  useEffect(() => {
+    if (contactOpen) setContactForm({ full_name: "", phone: "", channel_pref: "whatsapp" });
+  }, [contactOpen]);
+
   const onCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.currentTarget));
@@ -153,41 +176,34 @@ export default function Patients() {
   const addMedication = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!medOpen) return;
-    const form = e.currentTarget;
-    const fd = new FormData(form);
-    const name = String(fd.get("name") || "").trim();
-    const doseValue = String(fd.get("dose_value") || "").trim();
-    const schedule = String(fd.get("schedule") || "").trim();
-    const dose = doseValue ? `${doseValue} ${medDoseUnit}` : "";
+    const parsed = medicationSchema.safeParse(medForm);
+    if (!parsed.success) return toast.error(parsed.error.issues[0].message);
+    const dose = medForm.dose_value ? `${medForm.dose_value} ${medDoseUnit}` : "";
     const { error } = await supabase
       .from("medications")
-      .insert({ patient_id: medOpen.id, name, dose, schedule } as any);
+      .insert({ patient_id: medOpen.id, name: parsed.data.name, dose, schedule: medForm.schedule || "" } as any);
     if (error) return toast.error(error.message);
     toast.success(`Medicação adicionada para ${medOpen.full_name}`);
     setMedDoseUnit("mg");
-    form.reset();
+    setMedForm({ name: "", dose_value: "", schedule: "" });
     await queryClient.invalidateQueries({ queryKey: ["medications", medOpen.id] });
   };
 
   const addContact = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!contactOpen) return;
-    const form = e.currentTarget;
-    const fd = Object.fromEntries(new FormData(form));
-    const phone = String(fd.phone || "").trim();
-    if (!/^\(\d{2}\) \d{4,5}-\d{4}$/.test(phone)) {
-      return toast.error("Telefone deve ter 10 ou 11 dígitos");
-    }
+    const parsed = contactSchema.safeParse(contactForm);
+    if (!parsed.success) return toast.error(parsed.error.issues[0].message);
     const { error } = await supabase.from("contacts").insert({
       patient_id: contactOpen.p.id,
       relation: contactOpen.relation,
-      full_name: String(fd.full_name || "").trim(),
-      phone,
-      channel_pref: String(fd.channel_pref || "whatsapp"),
+      full_name: parsed.data.full_name,
+      phone: parsed.data.phone,
+      channel_pref: parsed.data.channel_pref,
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
-    form.reset();
+    setContactForm({ full_name: "", phone: "", channel_pref: "whatsapp" });
     await queryClient.invalidateQueries({ queryKey: ["contacts", contactOpen.p.id, contactOpen.relation] });
   };
 
@@ -446,12 +462,12 @@ export default function Patients() {
           <form onSubmit={addMedication} className="space-y-4 pt-2 border-t border-border">
             <div className="space-y-1.5">
               <Label htmlFor="med_name_dlg">Medicamento</Label>
-              <Input id="med_name_dlg" name="name" placeholder="Ex: Benznidazol" required />
+              <Input id="med_name_dlg" value={medForm.name} onChange={(e) => setMedForm((s) => ({ ...s, name: e.target.value }))} placeholder="Ex: Benznidazol" required />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="med_dose_value_dlg">Dose</Label>
-                <Input id="med_dose_value_dlg" name="dose_value" type="number" min="0" step="any" placeholder="Ex: 100" />
+                <Input id="med_dose_value_dlg" value={medForm.dose_value} onChange={(e) => setMedForm((s) => ({ ...s, dose_value: e.target.value }))} type="number" min="0" step="any" placeholder="Ex: 100" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="med_dose_unit_dlg">Unidade</Label>
@@ -471,10 +487,10 @@ export default function Patients() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="med_schedule_dlg">Horários</Label>
-                <Input id="med_schedule_dlg" name="schedule" placeholder="Ex: 8h, 14h, 20h" />
+                <Input id="med_schedule_dlg" value={medForm.schedule} onChange={(e) => setMedForm((s) => ({ ...s, schedule: e.target.value }))} placeholder="Ex: 8h, 14h, 20h" />
               </div>
             </div>
-            <Button type="submit" variant="hero" className="w-full">Adicionar medicação</Button>
+            <Button type="submit" variant="hero" className="w-full" disabled={!medicationSchema.safeParse(medForm).success}>Adicionar medicação</Button>
           </form>
         </DialogContent>
       </Dialog>
@@ -550,11 +566,11 @@ export default function Patients() {
             )}
           </div>
           <form onSubmit={addContact} className="space-y-3 pt-2 border-t border-border">
-            <div className="space-y-2"><Label>Nome</Label><Input name="full_name" required /></div>
+            <div className="space-y-2"><Label>Nome</Label><Input value={contactForm.full_name} onChange={(e) => setContactForm((s) => ({ ...s, full_name: e.target.value }))} required /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Telefone</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
+              <div className="space-y-2"><Label>Telefone</Label><Input value={contactForm.phone} onChange={(e) => setContactForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} type="tel" placeholder="(81) 99999-9999" required maxLength={15} /></div>
               <div className="space-y-2"><Label>Canal</Label>
-                <Select name="channel_pref" defaultValue="whatsapp">
+                <Select value={contactForm.channel_pref} onValueChange={(v) => setContactForm((s) => ({ ...s, channel_pref: v as "whatsapp" | "sms" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="whatsapp">WhatsApp</SelectItem>
@@ -563,7 +579,7 @@ export default function Patients() {
                 </Select>
               </div>
             </div>
-            <Button type="submit" variant="hero" className="w-full">Adicionar</Button>
+            <Button type="submit" variant="hero" className="w-full" disabled={!contactSchema.safeParse(contactForm).success}>Adicionar</Button>
           </form>
         </DialogContent>
       </Dialog>
