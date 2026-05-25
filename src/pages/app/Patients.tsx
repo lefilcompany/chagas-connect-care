@@ -43,6 +43,7 @@ export default function Patients() {
   const [medOpen, setMedOpen] = useState<Patient | null>(null);
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
   const [contactOpen, setContactOpen] = useState<{ p: Patient; relation: "familiar" | "cuidador" | "medico" } | null>(null);
+  const [contactExpanded, setContactExpanded] = useState(false);
 
   const { data: medList = [] } = useQuery({
     queryKey: ["medications", medOpen?.id],
