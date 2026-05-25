@@ -260,7 +260,16 @@ export default function PatientDetail() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="contact_phone">Telefone</Label>
-                  <Input id="contact_phone" name="phone" type="tel" placeholder="(11) 99999-0000" required maxLength={20} />
+                  <Input
+                    id="contact_phone"
+                    name="phone"
+                    type="tel"
+                    placeholder="(11) 99999-0000"
+                    required
+                    maxLength={20}
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(formatPhone(e.target.value))}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Relação com o paciente</Label>
