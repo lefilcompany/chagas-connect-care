@@ -441,10 +441,12 @@ export default function PatientDetail() {
                   </div>
                   <div className="mt-1 text-sm">{m.body}</div>
                   <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-                    {m.status === "enviado" && <><Check className="h-3 w-3" /> Enviado</>}
-                    {m.status === "entregue" && <><CheckCheck className="h-3 w-3" /> Entregue</>}
-                    {m.status === "lido" && <><CheckCheck className="h-3 w-3 text-sky-500" /> <span className="text-sky-500">Lido</span></>}
-                    {!["enviado", "entregue", "lido"].includes(m.status) && <><Clock className="h-3 w-3" /> {m.status}</>}
+                    {(m.status === "enviado" || m.status === "sent") && <><Check className="h-3 w-3" /> Enviado</>}
+                    {(m.status === "entregue" || m.status === "delivered") && <><CheckCheck className="h-3 w-3" /> Entregue</>}
+                    {(m.status === "lido" || m.status === "read") && <><CheckCheck className="h-3 w-3 text-sky-500" /> <span className="text-sky-500">Lido</span></>}
+                    {(m.status === "pendente" || m.status === "pending" || m.status === "queued") && <><Clock className="h-3 w-3" /> Pendente</>}
+                    {(m.status === "falhou" || m.status === "failed" || m.status === "error") && <><Clock className="h-3 w-3 text-destructive" /> <span className="text-destructive">Falhou</span></>}
+                    {!["enviado","sent","entregue","delivered","lido","read","pendente","pending","queued","falhou","failed","error"].includes(m.status) && <><Clock className="h-3 w-3" /> {m.status}</>}
                   </div>
                 </li>
               ))}</ul>
