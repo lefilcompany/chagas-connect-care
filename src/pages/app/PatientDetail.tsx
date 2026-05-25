@@ -25,6 +25,7 @@ export default function PatientDetail() {
   const [tab, setTab] = useState<"familia" | "medicacao" | "mensagens" | "adesao">("familia");
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
+  const [contactPhone, setContactPhone] = useState("");
 
   const loadAll = async () => {
     if (!id) return;
