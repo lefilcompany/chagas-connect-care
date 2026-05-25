@@ -176,19 +176,16 @@ export default function Patients() {
   const addMedication = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!medOpen) return;
-    const form = e.currentTarget;
-    const fd = new FormData(form);
-    const name = String(fd.get("name") || "").trim();
-    const doseValue = String(fd.get("dose_value") || "").trim();
-    const schedule = String(fd.get("schedule") || "").trim();
-    const dose = doseValue ? `${doseValue} ${medDoseUnit}` : "";
+    const parsed = medicationSchema.safeParse(medForm);
+    if (!parsed.success) return toast.error(parsed.error.issues[0].message);
+    const dose = medForm.dose_value ? `${medForm.dose_value} ${medDoseUnit}` : "";
     const { error } = await supabase
       .from("medications")
-      .insert({ patient_id: medOpen.id, name, dose, schedule } as any);
+      .insert({ patient_id: medOpen.id, name: parsed.data.name, dose, schedule: medForm.schedule || "" } as any);
     if (error) return toast.error(error.message);
     toast.success(`Medicação adicionada para ${medOpen.full_name}`);
     setMedDoseUnit("mg");
-    form.reset();
+    setMedForm({ name: "", dose_value: "", schedule: "" });
     await queryClient.invalidateQueries({ queryKey: ["medications", medOpen.id] });
   };
 
