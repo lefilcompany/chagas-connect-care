@@ -294,12 +294,24 @@ export default function Patients() {
           <DialogTrigger asChild>
             <Button variant="hero"><Plus className="h-4 w-4" /> Novo paciente</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Cadastrar paciente</DialogTitle></DialogHeader>
             <form onSubmit={onCreate} className="space-y-4">
-              <div className="space-y-2"><Label>Nome completo</Label><Input name="full_name" placeholder="Ex: Maria da Silva" required /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Telefone</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
+              <div className="space-y-2"><Label>Nome completo *</Label><Input name="full_name" placeholder="Ex: Maria da Silva" required /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>Telefone *</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
+                <div className="space-y-2"><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>Data de nascimento</Label><Input name="birth_date" type="date" /></div>
+                <div className="space-y-2"><Label>CPF</Label><Input name="cpf" placeholder="000.000.000-00" maxLength={14} /></div>
+              </div>
+              <div className="space-y-2"><Label>Endereço</Label><Input name="address" placeholder="Rua, número, complemento" /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3">
+                <div className="space-y-2"><Label>Cidade</Label><Input name="city" placeholder="Ex: Recife" /></div>
+                <div className="space-y-2"><Label>Estado</Label><Input name="state" placeholder="SP" maxLength={2} className="uppercase" /></div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Etapa</Label>
                   <Select name="stage" defaultValue="diagnostico">
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -310,8 +322,6 @@ export default function Patients() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Canal preferido</Label>
                   <Select name="channel_pref" defaultValue="whatsapp">
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -321,8 +331,17 @@ export default function Patients() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2"><Label>Instituição</Label><Input name="institution" defaultValue={institution} placeholder="Ex: Hospital das Clínicas" /></div>
+                <div className="space-y-2"><Label>Status</Label>
+                  <Select name="status" defaultValue="ativo">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="inativo">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+              <div className="space-y-2"><Label>Instituição</Label><Input name="institution" defaultValue={institution} placeholder="Ex: Hospital das Clínicas" /></div>
               <div className="space-y-2"><Label>Observações</Label><Input name="notes" placeholder="Ex: Alergia a penicilina" /></div>
               <Button type="submit" variant="hero" className="w-full">Cadastrar</Button>
             </form>
