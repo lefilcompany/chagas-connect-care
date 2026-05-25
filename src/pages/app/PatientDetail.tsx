@@ -161,21 +161,79 @@ export default function PatientDetail() {
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
       <header className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-card">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-display text-2xl sm:text-3xl font-bold text-brand truncate">{patient.full_name}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className={`rounded-full border px-2 py-0.5 font-medium ${stageColors[patient.stage] ?? ""}`}>
-                {stageLabels[patient.stage] ?? patient.stage}
-              </span>
-              <span className="inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{patient.phone || "—"}</span>
-              <span className="uppercase">{patient.channel_pref}</span>
-              {patient.institution && (
-                <span className="inline-flex items-center gap-1"><Building2 className="h-3.5 w-3.5" />{patient.institution}</span>
+        {!editing ? (
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="font-display text-2xl sm:text-3xl font-bold text-brand truncate">{patient.full_name}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className={`rounded-full border px-2 py-0.5 font-medium ${stageColors[patient.stage] ?? ""}`}>
+                  {stageLabels[patient.stage] ?? patient.stage}
+                </span>
+                <span className="inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{patient.phone || "—"}</span>
+                <span className="uppercase">{patient.channel_pref}</span>
+                {patient.institution && (
+                  <span className="inline-flex items-center gap-1"><Building2 className="h-3.5 w-3.5" />{patient.institution}</span>
+                )}
+              </div>
+              {patient.notes && (
+                <p className="mt-3 text-sm text-muted-foreground whitespace-pre-wrap">{patient.notes}</p>
               )}
             </div>
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              <Pencil className="h-4 w-4" /> Editar
+            </Button>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Nome completo</Label>
+                <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} maxLength={160} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Telefone</Label>
+                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} maxLength={20} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Instituição</Label>
+                <Input value={form.institution} onChange={(e) => setForm({ ...form, institution: e.target.value })} maxLength={160} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Etapa</Label>
+                <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="diagnostico">Diagnóstico</SelectItem>
+                    <SelectItem value="agudo">Agudo</SelectItem>
+                    <SelectItem value="cronico">Crônico</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Canal preferido</Label>
+                <Select value={form.channel_pref} onValueChange={(v) => setForm({ ...form, channel_pref: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="sms">SMS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Observações</Label>
+                <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={2000} />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button size="sm" variant="outline" onClick={cancelEdit} disabled={saving}>
+                <X className="h-4 w-4" /> Cancelar
+              </Button>
+              <Button size="sm" variant="hero" onClick={savePatient} disabled={saving}>
+                <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </div>
+        )}
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
             { label: "Contatos", value: contacts.length, icon: Users, tone: "text-blue-600 dark:text-blue-400" },
