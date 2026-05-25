@@ -346,11 +346,34 @@ export default function Patients() {
 
       {/* Medication dialog */}
       <Dialog open={!!medOpen} onOpenChange={(o) => !o && setMedOpen(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nova medicação {medOpen ? `— ${medOpen.full_name}` : ""}</DialogTitle>
+            <DialogTitle>Medicações {medOpen ? `— ${medOpen.full_name}` : ""}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={addMedication} className="space-y-4">
+          <div className="space-y-2">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">
+              Cadastradas ({medList.length})
+            </div>
+            <div className="max-h-48 overflow-y-auto rounded-xl border border-border bg-muted/30 divide-y divide-border">
+              {medList.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground text-center">Nenhuma medicação cadastrada.</div>
+              ) : medList.map((m: any) => (
+                <div key={m.id} className="flex items-center gap-3 p-3">
+                  <Pill className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{m.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {[m.dose, m.schedule].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => removeMedication(m.id)} aria-label="Remover" className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <form onSubmit={addMedication} className="space-y-4 pt-2 border-t border-border">
             <div className="space-y-1.5">
               <Label htmlFor="med_name_dlg">Medicamento</Label>
               <Input id="med_name_dlg" name="name" placeholder="Ex: Benznidazol" required />
@@ -388,16 +411,41 @@ export default function Patients() {
 
       {/* Contact dialog */}
       <Dialog open={!!contactOpen} onOpenChange={(o) => !o && setContactOpen(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {contactOpen?.relation === "familiar" && "Adicionar familiar"}
-              {contactOpen?.relation === "cuidador" && "Adicionar cuidador"}
-              {contactOpen?.relation === "medico" && "Adicionar médico"}
+              {contactOpen?.relation === "familiar" && "Familiares"}
+              {contactOpen?.relation === "cuidador" && "Cuidadores"}
+              {contactOpen?.relation === "medico" && "Médicos"}
               {contactOpen ? ` — ${contactOpen.p.full_name}` : ""}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={addContact} className="space-y-3">
+          <div className="space-y-2">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">
+              Cadastrados ({contactList.length})
+            </div>
+            <div className="max-h-48 overflow-y-auto rounded-xl border border-border bg-muted/30 divide-y divide-border">
+              {contactList.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground text-center">Nenhum contato cadastrado.</div>
+              ) : contactList.map((c: any) => (
+                <div key={c.id} className="flex items-center gap-3 p-3">
+                  {contactOpen?.relation === "medico"
+                    ? <Stethoscope className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                    : <Users className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{c.full_name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {c.phone} · <span className="uppercase">{c.channel_pref}</span>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => removeContact(c.id)} aria-label="Remover" className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <form onSubmit={addContact} className="space-y-3 pt-2 border-t border-border">
             <div className="space-y-2"><Label>Nome</Label><Input name="full_name" required /></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2"><Label>Telefone</Label><Input name="phone" required /></div>
