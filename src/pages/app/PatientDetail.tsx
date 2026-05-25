@@ -234,21 +234,6 @@ export default function PatientDetail() {
             </div>
           </div>
         )}
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-          {[
-            { label: "Contatos", value: contacts.length, icon: Users, tone: "text-blue-600 dark:text-blue-400" },
-            { label: "Medicações", value: meds.length, icon: Pill, tone: "text-emerald-600 dark:text-emerald-400" },
-            { label: "Mensagens", value: messages.length, icon: MessageSquare, tone: "text-violet-600 dark:text-violet-400" },
-            { label: "Adesão 30d", value: `${adhRate}%`, icon: Activity, tone: "text-rose-600 dark:text-rose-400" },
-          ].map((s) => (
-            <div key={s.label} className="rounded-xl border border-border bg-muted/30 p-3">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-                <s.icon className={`h-3.5 w-3.5 ${s.tone}`} /> {s.label}
-              </div>
-              <div className="mt-1 text-xl font-bold text-brand">{s.value}</div>
-            </div>
-          ))}
-        </div>
       </header>
 
       <div className="-mx-1 overflow-x-auto">
