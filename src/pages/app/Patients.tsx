@@ -260,7 +260,7 @@ export default function Patients() {
           <DialogContent>
             <DialogHeader><DialogTitle>Cadastrar paciente</DialogTitle></DialogHeader>
             <form onSubmit={onCreate} className="space-y-4">
-              <div className="space-y-2"><Label>Nome completo</Label><Input name="full_name" required /></div>
+              <div className="space-y-2"><Label>Nome completo</Label><Input name="full_name" placeholder="Ex: Maria da Silva" required /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Telefone</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
                 <div className="space-y-2"><Label>Etapa</Label>
@@ -284,9 +284,9 @@ export default function Patients() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2"><Label>Instituição</Label><Input name="institution" defaultValue={institution} /></div>
+                <div className="space-y-2"><Label>Instituição</Label><Input name="institution" defaultValue={institution} placeholder="Ex: Hospital das Clínicas" /></div>
               </div>
-              <div className="space-y-2"><Label>Observações</Label><Input name="notes" /></div>
+              <div className="space-y-2"><Label>Observações</Label><Input name="notes" placeholder="Ex: Alergia a penicilina" /></div>
               <Button type="submit" variant="hero" className="w-full">Cadastrar</Button>
             </form>
           </DialogContent>
@@ -566,7 +566,7 @@ export default function Patients() {
             )}
           </div>
           <form onSubmit={addContact} className="space-y-3 pt-2 border-t border-border">
-            <div className="space-y-2"><Label>Nome</Label><Input value={contactForm.full_name} onChange={(e) => setContactForm((s) => ({ ...s, full_name: e.target.value }))} required /></div>
+            <div className="space-y-2"><Label>Nome</Label><Input value={contactForm.full_name} onChange={(e) => setContactForm((s) => ({ ...s, full_name: e.target.value }))} placeholder="Ex: João da Silva" required /></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2"><Label>Telefone</Label><Input value={contactForm.phone} onChange={(e) => setContactForm((s) => ({ ...s, phone: formatPhone(e.target.value) }))} type="tel" placeholder="(81) 99999-9999" required maxLength={15} /></div>
               <div className="space-y-2"><Label>Canal</Label>
