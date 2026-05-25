@@ -89,9 +89,9 @@ export default function Dashboard() {
       </div>
 
       <section>
-        <h2 className="font-display text-lg font-bold text-brand">Próximos passos</h2>
+        <h2 className="font-display text-base sm:text-lg font-bold text-brand">Próximos passos</h2>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">Siga a jornada na ordem.</p>
-        <ol className="mt-4 grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <ol className="mt-4 grid gap-2.5 sm:gap-3 lg:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((s, i) => {
             const isDone = s.done;
             const isActive = !isDone && i === currentStepIndex;
@@ -101,7 +101,7 @@ export default function Dashboard() {
               <li
                 key={s.title}
                 className={cn(
-                  "relative rounded-2xl border p-4 shadow-card flex flex-col gap-3 transition-smooth",
+                  "relative rounded-2xl border p-3 sm:p-4 shadow-card flex flex-col gap-2.5 sm:gap-3 transition-smooth",
                   isDone && "border-brand/30 bg-primary/30",
                   isActive && "border-brand bg-card ring-2 ring-brand/20",
                   isLocked && "border-border bg-muted/60 opacity-70",
@@ -112,25 +112,26 @@ export default function Dashboard() {
                     aria-hidden
                     className={cn(
                       "pointer-events-none absolute z-0",
-                      // mobile (1 col): vertical line below card
-                      "left-1/2 -translate-x-1/2 bottom-[-12px] h-3 w-0.5",
-                      // tablet (2 cols): only between col 1->2 (even index, i.e. i=0,2)
-                      "sm:left-auto sm:translate-x-0 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:right-[-16px] sm:h-0.5 sm:w-4",
+                      // mobile (1 col): vertical line centered between cards
+                      "left-1/2 -translate-x-1/2 -bottom-2.5 h-2.5 w-0.5",
+                      // tablet (2 cols): horizontal connector aligned to icon center (top ≈ p-3 + h-9/2)
+                      "sm:left-auto sm:translate-x-0 sm:bottom-auto sm:-right-3 sm:top-[30px] sm:-translate-y-1/2 sm:h-0.5 sm:w-3",
+                      // hide tablet connector after col 2 (i=1) so it doesn't dangle; show on desktop instead
                       i % 2 === 1 && "sm:hidden lg:block",
-                      // desktop (4 cols): horizontal between every card
-                      "lg:right-[-16px] lg:top-1/2 lg:-translate-y-1/2 lg:h-0.5 lg:w-4",
+                      // desktop (4 cols): horizontal aligned to icon center (p-4 + h-9/2 = 16+18)
+                      "lg:-right-4 lg:top-[34px] lg:h-0.5 lg:w-4",
                       isDone ? "bg-brand" : "bg-border",
                     )}
                   />
                 )}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 sm:gap-3">
                   <div className={cn(
-                    "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center",
+                    "h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-lg flex items-center justify-center",
                     isDone ? "bg-brand text-brand-foreground" : isActive ? "bg-primary text-brand" : "bg-muted text-muted-foreground",
                   )}>
                     {isDone ? <Check className="h-4 w-4" /> : isLocked ? <Lock className="h-4 w-4" /> : <s.icon className="h-4 w-4" />}
                   </div>
-                  <div className="flex flex-col leading-tight">
+                  <div className="flex flex-col leading-tight min-w-0">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Passo {i + 1}</span>
                     {isDone && <span className="text-[11px] font-semibold text-brand">Concluído</span>}
                     {isActive && <span className="text-[11px] font-semibold text-brand">Em andamento</span>}
@@ -138,21 +139,21 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-display text-sm font-bold text-brand">{s.title}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground line-clamp-3">{s.description}</p>
+                  <h3 className="font-display text-[13px] sm:text-sm font-bold text-brand leading-snug">{s.title}</h3>
+                  <p className="mt-1 text-[11px] sm:text-xs text-muted-foreground line-clamp-3 leading-snug">{s.description}</p>
                 </div>
                 <div className="mt-auto">
                   {isLocked ? (
-                    <Button variant="outline" size="sm" disabled className="w-full gap-2">
+                    <Button variant="outline" size="sm" disabled className="w-full gap-1.5 h-8 text-xs">
                       <Lock className="h-3.5 w-3.5" /> Bloqueado
                     </Button>
                   ) : isDone ? (
-                    <Button asChild variant="outline" size="sm" className="w-full gap-2">
+                    <Button asChild variant="outline" size="sm" className="w-full gap-1.5 h-8 text-xs">
                       <Link to={s.to}>Revisar</Link>
                     </Button>
                   ) : (
-                    <Button asChild size="sm" className="w-full gap-2 bg-brand text-brand-foreground hover:bg-brand/90">
-                      <Link to={s.to}>{s.cta} <ArrowRight className="h-3.5 w-3.5" /></Link>
+                    <Button asChild size="sm" className="w-full gap-1.5 h-8 text-xs bg-brand text-brand-foreground hover:bg-brand/90">
+                      <Link to={s.to} className="truncate">{s.cta} <ArrowRight className="h-3.5 w-3.5 shrink-0" /></Link>
                     </Button>
                   )}
                 </div>
