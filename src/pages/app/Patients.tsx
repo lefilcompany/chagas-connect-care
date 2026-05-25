@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
-  Plus, Search, Pill, Users, Stethoscope, LayoutGrid, List, Columns,
+  Plus, Search, Pill, Users, Stethoscope, LayoutGrid, List,
   Phone, ArrowRight,
 } from "lucide-react";
 import { z } from "zod";
