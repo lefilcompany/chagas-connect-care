@@ -239,26 +239,45 @@ export default function PatientDetail() {
       {tab === "familia" && (
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
-            <h3 className="font-display font-bold text-brand mb-4">Adicionar familiar/cuidador</h3>
-            <form onSubmit={addContact} className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
-              <Input name="full_name" placeholder="Nome" required />
-              <Select name="relation" defaultValue="familiar">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="familiar">Familiar</SelectItem>
-                  <SelectItem value="cuidador">Cuidador</SelectItem>
-                  <SelectItem value="medico">Médico</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input name="phone" placeholder="Telefone" required />
-              <Select name="channel_pref" defaultValue="whatsapp">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  <SelectItem value="sms">SMS</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button type="submit" variant="hero"><Plus className="h-4 w-4" /> Adicionar</Button>
+            <div className="mb-5">
+              <h3 className="font-display font-bold text-brand text-lg">Adicionar familiar ou cuidador</h3>
+              <p className="text-xs text-muted-foreground mt-1">Preencha os dados para enviar lembretes e mensagens a esta pessoa.</p>
+            </div>
+            <form onSubmit={addContact} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="contact_full_name">Nome completo</Label>
+                  <Input id="contact_full_name" name="full_name" placeholder="Ex: Maria Silva" required maxLength={160} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact_phone">Telefone</Label>
+                  <Input id="contact_phone" name="phone" type="tel" placeholder="(11) 99999-0000" required maxLength={20} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Relação com o paciente</Label>
+                  <Select name="relation" defaultValue="familiar">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="familiar">Familiar</SelectItem>
+                      <SelectItem value="cuidador">Cuidador</SelectItem>
+                      <SelectItem value="medico">Médico</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Canal preferido para mensagens</Label>
+                  <Select name="channel_pref" defaultValue="whatsapp">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                      <SelectItem value="sms">SMS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2 border-t border-border">
+                <Button type="submit" variant="hero"><Plus className="h-4 w-4" /> Adicionar contato</Button>
+              </div>
             </form>
           </div>
           <div className="rounded-2xl border border-border bg-card overflow-x-auto">
