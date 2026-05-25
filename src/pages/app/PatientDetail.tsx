@@ -127,18 +127,40 @@ export default function PatientDetail() {
     const channel = String(fd.get("channel") ?? "whatsapp");
     const contactId = String(fd.get("contact_id") ?? "").trim();
     if (!body) return toast.error("Mensagem vazia");
-    const { error } = await supabase.from("messages").insert({
+    const { data: inserted, error } = await supabase.from("messages").insert({
       patient_id: id,
       contact_id: contactId && contactId !== "patient" ? contactId : null,
       channel,
       body,
-      status: "sent",
+      status: "enviado",
       sent_at: new Date().toISOString(),
       created_by: user!.id,
-    } as any);
+    } as any).select().single();
     if (error) return toast.error(error.message);
     toast.success(`Mensagem enviada por ${channel.toUpperCase()} (simulado)`);
     (e.target as HTMLFormElement).reset();
+    loadAll();
+    // Simulate delivery / read receipts (WhatsApp-like)
+    if (inserted?.id) {
+      const msgId = inserted.id;
+      setTimeout(async () => {
+        await supabase.from("messages").update({ status: "entregue" } as any).eq("id", msgId);
+        loadAll();
+      }, 1500);
+      if (channel === "whatsapp") {
+        setTimeout(async () => {
+          await supabase.from("messages").update({ status: "lido" } as any).eq("id", msgId);
+          loadAll();
+        }, 4000);
+      }
+    }
+  };
+
+  const deleteMsg = async (msgId: string) => {
+    if (!confirm("Apagar esta mensagem?")) return;
+    const { error } = await supabase.from("messages").delete().eq("id", msgId);
+    if (error) return toast.error(error.message);
+    toast.success("Mensagem apagada");
     loadAll();
   };
 
