@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, CheckCircle2, XCircle } from "lucide-react";
+import {
+  ArrowLeft, Plus, CheckCircle2, XCircle,
+  Users, Pill, MessageSquare, Activity, Phone, Building2,
+} from "lucide-react";
 
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +20,7 @@ export default function PatientDetail() {
   const [meds, setMeds] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [adherence, setAdherence] = useState<any[]>([]);
+  const [tab, setTab] = useState<"familia" | "medicacao" | "mensagens" | "adesao">("familia");
 
   const loadAll = async () => {
     if (!id) return;
@@ -90,37 +93,90 @@ export default function PatientDetail() {
 
   if (!patient) return <div className="text-muted-foreground">Carregando...</div>;
 
+  const stageLabels: Record<string, string> = { diagnostico: "Diagnóstico", agudo: "Agudo", cronico: "Crônico" };
+  const stageColors: Record<string, string> = {
+    diagnostico: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
+    agudo: "bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/20",
+    cronico: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  };
+  const okCount = adherence.filter((a) => a.event_type === "confirmado").length;
+  const adhRate = adherence.length ? Math.round((okCount / adherence.length) * 100) : 0;
+
+  const tabs = [
+    { v: "familia", label: "Família & Cuidadores", icon: Users, count: contacts.length },
+    { v: "medicacao", label: "Medicação", icon: Pill, count: meds.length },
+    { v: "mensagens", label: "Mensagens", icon: MessageSquare, count: messages.length },
+    { v: "adesao", label: "Adesão", icon: Activity, count: adherence.length },
+  ] as const;
+
   return (
     <div className="space-y-6">
       <Link to="/app/pacientes" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-brand">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
-      <header>
-        <h1 className="font-display text-3xl font-bold text-brand">{patient.full_name}</h1>
-        <p className="text-muted-foreground mt-1">
-          <span className="capitalize">{patient.stage}</span> • {patient.channel_pref.toUpperCase()} • {patient.phone}
-        </p>
+      <header className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-card">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-brand truncate">{patient.full_name}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className={`rounded-full border px-2 py-0.5 font-medium ${stageColors[patient.stage] ?? ""}`}>
+                {stageLabels[patient.stage] ?? patient.stage}
+              </span>
+              <span className="inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{patient.phone || "—"}</span>
+              <span className="uppercase">{patient.channel_pref}</span>
+              {patient.institution && (
+                <span className="inline-flex items-center gap-1"><Building2 className="h-3.5 w-3.5" />{patient.institution}</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+          {[
+            { label: "Contatos", value: contacts.length, icon: Users, tone: "text-blue-600 dark:text-blue-400" },
+            { label: "Medicações", value: meds.length, icon: Pill, tone: "text-emerald-600 dark:text-emerald-400" },
+            { label: "Mensagens", value: messages.length, icon: MessageSquare, tone: "text-violet-600 dark:text-violet-400" },
+            { label: "Adesão 30d", value: `${adhRate}%`, icon: Activity, tone: "text-rose-600 dark:text-rose-400" },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl border border-border bg-muted/30 p-3">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                <s.icon className={`h-3.5 w-3.5 ${s.tone}`} /> {s.label}
+              </div>
+              <div className="mt-1 text-xl font-bold text-brand">{s.value}</div>
+            </div>
+          ))}
+        </div>
       </header>
 
-      <Tabs defaultValue="familia">
-        <TabsList>
-          <TabsTrigger value="familia">Família & Cuidadores</TabsTrigger>
-          <TabsTrigger value="medicacao">Medicação</TabsTrigger>
-          <TabsTrigger value="mensagens">Mensagens</TabsTrigger>
-          <TabsTrigger value="adesao">Adesão</TabsTrigger>
-        </TabsList>
+      <div className="-mx-1 overflow-x-auto">
+        <div className="inline-flex min-w-full sm:min-w-0 rounded-full border border-border bg-card p-1 shadow-sm">
+          {tabs.map(({ v, label, icon: Icon, count }) => (
+            <button
+              key={v}
+              onClick={() => setTab(v)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+                tab === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span>{label}</span>
+              <span className={`ml-1 rounded-full px-1.5 text-[10px] ${tab === v ? "bg-primary-foreground/20" : "bg-muted"}`}>{count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
-        <TabsContent value="familia" className="space-y-4">
+      {tab === "familia" && (
+        <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
             <h3 className="font-display font-bold text-brand mb-4">Adicionar familiar/cuidador</h3>
-            <form onSubmit={addContact} className="grid gap-3 md:grid-cols-5">
+            <form onSubmit={addContact} className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
               <Input name="full_name" placeholder="Nome" required />
               <Select name="relation" defaultValue="familiar">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="familiar">Familiar</SelectItem>
                   <SelectItem value="cuidador">Cuidador</SelectItem>
-                  <SelectItem value="responsavel">Responsável</SelectItem>
+                  <SelectItem value="medico">Médico</SelectItem>
                 </SelectContent>
               </Select>
               <Input name="phone" placeholder="Telefone" required />
@@ -134,9 +190,9 @@ export default function PatientDetail() {
               <Button type="submit" variant="hero"><Plus className="h-4 w-4" /> Adicionar</Button>
             </form>
           </div>
-          <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="rounded-2xl border border-border bg-card overflow-x-auto">
             {contacts.length === 0 ? <div className="p-8 text-center text-muted-foreground">Nenhum contato cadastrado.</div> : (
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[560px]">
                 <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground"><tr><th className="p-4">Nome</th><th className="p-4">Relação</th><th className="p-4">Telefone</th><th className="p-4">Canal</th></tr></thead>
                 <tbody>{contacts.map((c) => (
                   <tr key={c.id} className="border-t border-border"><td className="p-4 font-medium">{c.full_name}</td><td className="p-4 capitalize">{c.relation}</td><td className="p-4">{c.phone}</td><td className="p-4 uppercase">{c.channel_pref}</td></tr>
@@ -144,21 +200,23 @@ export default function PatientDetail() {
               </table>
             )}
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="medicacao" className="space-y-4">
+      {tab === "medicacao" && (
+        <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
             <h3 className="font-display font-bold text-brand mb-4">Nova medicação</h3>
-            <form onSubmit={addMed} className="grid gap-3 md:grid-cols-4">
+            <form onSubmit={addMed} className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
               <Input name="name" placeholder="Ex: Benznidazol" required />
               <Input name="dose" placeholder="Ex: 100mg" />
               <Input name="schedule" placeholder="Ex: 8h, 14h, 20h" />
               <Button type="submit" variant="hero"><Plus className="h-4 w-4" /> Adicionar</Button>
             </form>
           </div>
-          <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="rounded-2xl border border-border bg-card overflow-x-auto">
             {meds.length === 0 ? <div className="p-8 text-center text-muted-foreground">Nenhuma medicação cadastrada.</div> : (
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground"><tr><th className="p-4">Medicamento</th><th className="p-4">Dose</th><th className="p-4">Horários</th><th className="p-4">Adesão</th></tr></thead>
                 <tbody>{meds.map((m) => (
                   <tr key={m.id} className="border-t border-border">
@@ -174,9 +232,11 @@ export default function PatientDetail() {
               </table>
             )}
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="mensagens" className="space-y-4">
+      {tab === "mensagens" && (
+        <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
             <h3 className="font-display font-bold text-brand mb-4">Enviar mensagem</h3>
             <form onSubmit={sendMsg} className="space-y-3">
@@ -207,12 +267,14 @@ export default function PatientDetail() {
               ))}</ul>
             )}
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="adesao">
-          <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      {tab === "adesao" && (
+        <div>
+          <div className="rounded-2xl border border-border bg-card overflow-x-auto">
             {adherence.length === 0 ? <div className="p-8 text-center text-muted-foreground">Sem registros de adesão.</div> : (
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[480px]">
                 <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground"><tr><th className="p-4">Quando</th><th className="p-4">Evento</th><th className="p-4">Origem</th></tr></thead>
                 <tbody>{adherence.map((a) => (
                   <tr key={a.id} className="border-t border-border"><td className="p-4">{new Date(a.occurred_at).toLocaleString("pt-BR")}</td><td className="p-4 capitalize">{a.event_type}</td><td className="p-4">{a.source}</td></tr>
@@ -220,8 +282,8 @@ export default function PatientDetail() {
               </table>
             )}
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </div>
   );
 }
