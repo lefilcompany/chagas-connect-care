@@ -24,12 +24,20 @@ type Patient = {
 
 const schema = z.object({
   full_name: z.string().trim().min(2).max(160),
-  phone: z.string().trim().min(8).max(20),
+  phone: z.string().trim().regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, "Telefone deve ter 10 ou 11 dígitos"),
   stage: z.enum(["diagnostico", "agudo", "cronico"]),
   channel_pref: z.enum(["whatsapp", "sms"]),
   institution: z.string().trim().max(160),
   notes: z.string().max(2000).optional(),
 });
+
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(3, 5)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+}
 
 export default function Patients() {
   const { user } = useAuth();
