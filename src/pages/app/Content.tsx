@@ -295,20 +295,30 @@ function SendContentDialog({
   onSent: () => void;
 }) {
   const open = !!item;
+  const [mode, setMode] = useState<"bulk" | "single">("bulk");
   const [patientId, setPatientId] = useState<string>("");
   const [channel, setChannel] = useState<"whatsapp" | "sms">("whatsapp");
   const [sendToPatient, setSendToPatient] = useState(true);
   const [selectedContacts, setSelectedContacts] = useState<Record<string, boolean>>({});
+  const [bulkGroups, setBulkGroups] = useState<Record<string, boolean>>({});
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (open) {
+      const aud = item?.audience ?? "ambos";
+      setMode("bulk");
       setPatientId("");
       setChannel("whatsapp");
       setSendToPatient(true);
       setSelectedContacts({});
+      setBulkGroups({
+        paciente: aud === "paciente" || aud === "ambos",
+        familiar: aud === "familia" || aud === "ambos",
+        cuidador: aud === "cuidador" || aud === "ambos",
+        medico: false,
+      });
     }
-  }, [open]);
+  }, [open, item]);
 
   const { data: patients = [] } = useQuery({
     queryKey: qk.patients,
@@ -328,25 +338,61 @@ function SendContentDialog({
     },
   });
 
+  // For bulk: load all contacts across all patients (RLS scopes to institution)
+  const { data: allContacts = [] } = useQuery({
+    queryKey: ["all-contacts"],
+    enabled: open && mode === "bulk",
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("contacts")
+        .select("id, patient_id, relation");
+      return data ?? [];
+    },
+  });
+
   const selectedContactIds = Object.entries(selectedContacts).filter(([, v]) => v).map(([k]) => k);
-  const canSend = !!patientId && (sendToPatient || selectedContactIds.length > 0);
+
+  const bulkPreview = useMemo(() => {
+    if (mode !== "bulk") return { patients: 0, contacts: 0, total: 0 };
+    const pCount = bulkGroups.paciente ? (patients as any[]).length : 0;
+    const relations = ["familiar", "cuidador", "medico"].filter((r) => bulkGroups[r]);
+    const cCount = (allContacts as any[]).filter((c) => relations.includes(c.relation)).length;
+    return { patients: pCount, contacts: cCount, total: pCount + cCount };
+  }, [mode, bulkGroups, patients, allContacts]);
+
+  const canSend = mode === "single"
+    ? !!patientId && (sendToPatient || selectedContactIds.length > 0)
+    : bulkPreview.total > 0;
 
   const send = async () => {
     if (!item || !canSend) return;
     setSending(true);
+    const body = `${item.title}\n\n${item.body}`;
+    const now = new Date().toISOString();
     const rows: any[] = [];
-    if (sendToPatient) {
-      rows.push({
-        patient_id: patientId, channel, direction: "outbound",
-        body: `${item.title}\n\n${item.body}`, status: "sent", sent_at: new Date().toISOString(),
-      });
+
+    if (mode === "single") {
+      if (sendToPatient) {
+        rows.push({ patient_id: patientId, channel, direction: "outbound", body, status: "sent", sent_at: now });
+      }
+      for (const cid of selectedContactIds) {
+        rows.push({ patient_id: patientId, contact_id: cid, channel, direction: "outbound", body, status: "sent", sent_at: now });
+      }
+    } else {
+      if (bulkGroups.paciente) {
+        for (const p of patients as any[]) {
+          rows.push({ patient_id: p.id, channel, direction: "outbound", body, status: "sent", sent_at: now });
+        }
+      }
+      const relations = ["familiar", "cuidador", "medico"].filter((r) => bulkGroups[r]);
+      for (const c of allContacts as any[]) {
+        if (relations.includes(c.relation)) {
+          rows.push({ patient_id: c.patient_id, contact_id: c.id, channel, direction: "outbound", body, status: "sent", sent_at: now });
+        }
+      }
     }
-    for (const cid of selectedContactIds) {
-      rows.push({
-        patient_id: patientId, contact_id: cid, channel, direction: "outbound",
-        body: `${item.title}\n\n${item.body}`, status: "sent", sent_at: new Date().toISOString(),
-      });
-    }
+
+    if (rows.length === 0) { setSending(false); return; }
     const { error } = await supabase.from("messages").insert(rows);
     setSending(false);
     if (error) return toast.error(error.message);
@@ -368,42 +414,88 @@ function SendContentDialog({
               <p className="mt-1 text-xs text-muted-foreground line-clamp-3">{item.body}</p>
             </div>
 
-            <div className="space-y-2">
-              <Label>Paciente</Label>
-              <Select value={patientId} onValueChange={setPatientId}>
-                <SelectTrigger><SelectValue placeholder="Selecione o paciente" /></SelectTrigger>
-                <SelectContent>
-                  {(patients as any[]).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex gap-2 rounded-lg border border-border p-1">
+              <button
+                type="button"
+                onClick={() => setMode("bulk")}
+                className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${mode === "bulk" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              >
+                Em massa (por grupo)
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("single")}
+                className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${mode === "single" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              >
+                Paciente específico
+              </button>
             </div>
 
-            {patientId && (
+            {mode === "bulk" ? (
               <div className="space-y-2">
                 <Label>Para quem enviar</Label>
                 <div className="space-y-2 rounded-lg border border-border p-3">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox checked={sendToPatient} onCheckedChange={(v) => setSendToPatient(!!v)} />
-                    <span>Paciente</span>
-                  </label>
-                  {(contacts as any[]).map((c) => (
-                    <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                  {[
+                    { key: "paciente", label: "Todos os pacientes" },
+                    { key: "familiar", label: "Todos os familiares" },
+                    { key: "cuidador", label: "Todos os cuidadores" },
+                    { key: "medico", label: "Todos os médicos" },
+                  ].map((g) => (
+                    <label key={g.key} className="flex items-center gap-2 text-sm cursor-pointer">
                       <Checkbox
-                        checked={!!selectedContacts[c.id]}
-                        onCheckedChange={(v) =>
-                          setSelectedContacts((s) => ({ ...s, [c.id]: !!v }))
-                        }
+                        checked={!!bulkGroups[g.key]}
+                        onCheckedChange={(v) => setBulkGroups((s) => ({ ...s, [g.key]: !!v }))}
                       />
-                      <span>{c.full_name} <span className="text-muted-foreground">· {c.relation}</span></span>
+                      <span>{g.label}</span>
                     </label>
                   ))}
-                  {contacts.length === 0 && (
-                    <p className="text-xs text-muted-foreground">Nenhum contato cadastrado para este paciente.</p>
-                  )}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {bulkPreview.total > 0
+                    ? `Será enviado para ${bulkPreview.total} ${bulkPreview.total === 1 ? "destinatário" : "destinatários"}.`
+                    : "Selecione ao menos um grupo."}
+                </p>
               </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>Paciente</Label>
+                  <Select value={patientId} onValueChange={setPatientId}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o paciente" /></SelectTrigger>
+                    <SelectContent>
+                      {(patients as any[]).map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {patientId && (
+                  <div className="space-y-2">
+                    <Label>Para quem enviar</Label>
+                    <div className="space-y-2 rounded-lg border border-border p-3">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox checked={sendToPatient} onCheckedChange={(v) => setSendToPatient(!!v)} />
+                        <span>Paciente</span>
+                      </label>
+                      {(contacts as any[]).map((c) => (
+                        <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={!!selectedContacts[c.id]}
+                            onCheckedChange={(v) =>
+                              setSelectedContacts((s) => ({ ...s, [c.id]: !!v }))
+                            }
+                          />
+                          <span>{c.full_name} <span className="text-muted-foreground">· {c.relation}</span></span>
+                        </label>
+                      ))}
+                      {contacts.length === 0 && (
+                        <p className="text-xs text-muted-foreground">Nenhum contato cadastrado para este paciente.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="space-y-2">
