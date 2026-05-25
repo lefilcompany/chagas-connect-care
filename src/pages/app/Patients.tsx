@@ -68,6 +68,9 @@ export default function Patients() {
   const [contactDir, setContactDir] = useState<1 | -1>(1);
   const [medDir, setMedDir] = useState<1 | -1>(1);
 
+  const [contactForm, setContactForm] = useState({ full_name: "", phone: "", channel_pref: "whatsapp" });
+  const [medForm, setMedForm] = useState({ name: "", dose_value: "", schedule: "" });
+
   const { data: medList = [] } = useQuery({
     queryKey: ["medications", medOpen?.id],
     enabled: !!medOpen,
