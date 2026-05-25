@@ -633,16 +633,18 @@ function SendContentDialog({
               </>
             )}
 
-            <div className="space-y-2">
-              <Label>Canal</Label>
-              <Select value={channel} onValueChange={(v) => setChannel(v as any)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  <SelectItem value="sms">SMS</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {mode !== "segment" && (
+              <div className="space-y-2">
+                <Label>Canal</Label>
+                <Select value={channel} onValueChange={(v) => setChannel(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="sms">SMS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         )}
         <DialogFooter>
