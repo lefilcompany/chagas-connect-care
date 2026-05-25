@@ -14,6 +14,14 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 
+function formatPhone(v: string) {
+  const digits = v.replace(/\D/g, "");
+  if (digits.length <= 10) {
+    return digits.replace(/(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3").replace(/[-\s]$/, "");
+  }
+  return digits.replace(/(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3").replace(/[-\s]$/, "");
+}
+
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -25,6 +33,7 @@ export default function PatientDetail() {
   const [tab, setTab] = useState<"familia" | "medicacao" | "mensagens" | "adesao">("familia");
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
+  const [contactPhone, setContactPhone] = useState("");
 
   const loadAll = async () => {
     if (!id) return;
@@ -87,9 +96,11 @@ export default function PatientDetail() {
   const addContact = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.currentTarget));
-    const { error } = await supabase.from("contacts").insert({ patient_id: id, ...fd } as any);
+    const payload = { patient_id: id, ...fd, phone: contactPhone } as any;
+    const { error } = await supabase.from("contacts").insert(payload);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
+    setContactPhone("");
     (e.target as HTMLFormElement).reset();
     loadAll();
   };
@@ -251,7 +262,16 @@ export default function PatientDetail() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="contact_phone">Telefone</Label>
-                  <Input id="contact_phone" name="phone" type="tel" placeholder="(11) 99999-0000" required maxLength={20} />
+                  <Input
+                    id="contact_phone"
+                    name="phone"
+                    type="tel"
+                    placeholder="(11) 99999-0000"
+                    required
+                    maxLength={20}
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(formatPhone(e.target.value))}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Relação com o paciente</Label>
