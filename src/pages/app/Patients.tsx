@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -111,20 +112,31 @@ export default function Patients() {
   };
 
   const QuickActions = ({ p }: { p: Patient }) => (
-    <div className="flex flex-wrap gap-1.5">
-      <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setMedOpen(p)}>
-        <Pill className="h-3.5 w-3.5" /> Medicação
-      </Button>
-      <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setContactOpen({ p, relation: "familiar" })}>
-        <Users className="h-3.5 w-3.5" /> Familiar
-      </Button>
-      <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setContactOpen({ p, relation: "cuidador" })}>
-        <Users className="h-3.5 w-3.5" /> Cuidador
-      </Button>
-      <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setContactOpen({ p, relation: "medico" })}>
-        <Stethoscope className="h-3.5 w-3.5" /> Médico
-      </Button>
-    </div>
+    <TooltipProvider delayDuration={150}>
+      <div className="grid grid-cols-4 gap-1.5 rounded-xl border border-border bg-muted/30 p-1.5">
+        {[
+          { key: "med", icon: Pill, label: "Medicação", tone: "text-emerald-600 dark:text-emerald-400", onClick: () => setMedOpen(p) },
+          { key: "fam", icon: Users, label: "Familiar", tone: "text-blue-600 dark:text-blue-400", onClick: () => setContactOpen({ p, relation: "familiar" }) },
+          { key: "cui", icon: Users, label: "Cuidador", tone: "text-amber-600 dark:text-amber-400", onClick: () => setContactOpen({ p, relation: "cuidador" }) },
+          { key: "med2", icon: Stethoscope, label: "Médico", tone: "text-rose-600 dark:text-rose-400", onClick: () => setContactOpen({ p, relation: "medico" }) },
+        ].map(({ key, icon: Icon, label, tone, onClick }) => (
+          <Tooltip key={key}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onClick}
+                aria-label={label}
+                className="group inline-flex flex-col items-center justify-center gap-0.5 rounded-lg bg-card px-1 py-1.5 text-[10px] font-medium text-muted-foreground transition-all hover:bg-background hover:text-foreground hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Icon className={`h-4 w-4 ${tone} transition-transform group-hover:scale-110`} />
+                <span className="leading-none truncate max-w-full">{label}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">Adicionar {label.toLowerCase()}</TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
+    </TooltipProvider>
   );
 
   return (
