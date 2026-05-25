@@ -15,6 +15,12 @@ import {
 import { toast } from "sonner";
 import { Plus, Search, Send, Trash2, X } from "lucide-react";
 import { z } from "zod";
+import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
+import { RecipientPreview } from "@/components/app/RecipientPreview";
+import {
+  AudienceType, Recipient, SegmentDef, SegmentFilters,
+  emptyFilters, resolveRecipients,
+} from "@/lib/segments";
 
 const CATEGORIES = [
   { value: "medicacao", label: "Medicação" },
