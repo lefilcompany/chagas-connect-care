@@ -67,6 +67,21 @@ type ContentRow = {
 const labelOf = (arr: { value: string; label: string }[], v: string) =>
   arr.find((x) => x.value === v)?.label ?? v;
 
+function describeTargeting(c: ContentRow, segments: SegmentDef[]): string {
+  const mode = c.targeting_mode ?? "all";
+  if (mode === "all") return "Todos os públicos";
+  if (mode === "audiences") {
+    const list = (c.audience_types ?? []).map((a) => AUDIENCE_LABELS[a]);
+    return list.length ? list.join(" + ") : "Tipos de público";
+  }
+  if (mode === "segment") {
+    const seg = segments.find((s) => s.id === c.segment_id);
+    return seg ? `Segmento: ${seg.name}` : "Segmento removido";
+  }
+  const aud = (c.audience_types ?? []).map((a) => AUDIENCE_LABELS[a]).join("+") || "público";
+  return `Filtros personalizados (${aud})`;
+}
+
 export default function Content() {
   const queryClient = useQueryClient();
   const { data: items = [] } = useQuery({ queryKey: qk.content, queryFn: fetchers.content });
