@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   ArrowLeft, Plus, CheckCircle2, XCircle,
@@ -36,6 +40,7 @@ export default function PatientDetail() {
   const [contactPhone, setContactPhone] = useState("");
   const [medDoseValue, setMedDoseValue] = useState("");
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
+  const [msgToDelete, setMsgToDelete] = useState<string | null>(null);
 
   const loadAll = async () => {
     if (!id) return;
@@ -156,9 +161,10 @@ export default function PatientDetail() {
     }
   };
 
-  const deleteMsg = async (msgId: string) => {
-    if (!confirm("Apagar esta mensagem?")) return;
-    const { error } = await supabase.from("messages").delete().eq("id", msgId);
+  const confirmDeleteMsg = async () => {
+    if (!msgToDelete) return;
+    const { error } = await supabase.from("messages").delete().eq("id", msgToDelete);
+    setMsgToDelete(null);
     if (error) return toast.error(error.message);
     toast.success("Mensagem apagada");
     loadAll();
@@ -431,7 +437,7 @@ export default function PatientDetail() {
                       <span>{new Date(m.sent_at).toLocaleString("pt-BR")}</span>
                       <button
                         type="button"
-                        onClick={() => deleteMsg(m.id)}
+                        onClick={() => setMsgToDelete(m.id)}
                         className="text-muted-foreground hover:text-destructive transition-colors"
                         aria-label="Apagar mensagem"
                       >
@@ -469,6 +475,23 @@ export default function PatientDetail() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!msgToDelete} onOpenChange={(o) => !o && setMsgToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar esta mensagem?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A mensagem será removida permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteMsg} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Apagar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
