@@ -1,99 +1,54 @@
+## Tela de Conteúdos — Padronização e edição
 
-# Sistema para equipes de saúde — área logada
+Atualizar `src/pages/app/Conteúdos` (`Content.tsx`) para padronizar todos os cards, adicionar filtros, ações de envio e permitir editar.
 
-Vamos transformar a landing atual num produto: manter o site público em `/` e criar uma área autenticada em `/app` para as equipes gerenciarem a comunicação com pacientes, famílias e cuidadores via WhatsApp/SMS (simulado).
+### 1. Filtros no topo
 
-## 1. Infraestrutura
+Acima da grade de conteúdos:
+- Campo de busca por título.
+- Select **Categoria**: Todos, Medicação, Alimentação, Sono, Atividade física, Família, Geral.
+- Select **Público**: Todos, Paciente, Família, Ambos.
+- Botão "Limpar filtros" quando algum estiver ativo.
 
-- Ativar **Lovable Cloud** (banco, auth, edge functions).
-- Auth por **email + senha** e **Google**.
-- Tabela `profiles` (criada via trigger no signup) com: `full_name`, `role_label` (médico, enfermeiro, coordenador…), `institution`, `professional_registry` (CRM/COREN).
-- Tabela `user_roles` + enum `app_role` (`admin`, `equipe`) com função `has_role()` SECURITY DEFINER (padrão Lovable, sem recursão).
-- RLS em todas as tabelas; admin enxerga tudo da instituição, equipe enxerga apenas seus pacientes atribuídos + os da instituição quando aplicável.
+Filtragem feita no cliente sobre `useQuery(qk.content)`.
 
-## 2. Modelo de dados
+### 2. Card padronizado
 
-```text
-profiles (id, full_name, role_label, institution, professional_registry)
-user_roles (user_id, role)                       -- admin | equipe
-patients (id, full_name, birth_date, stage,       -- diagnóstico, agudo, crônico
-          phone, channel_pref, institution, owner_id, notes)
-contacts (id, patient_id, full_name, relation,    -- familiar | cuidador | responsável
-          phone, channel_pref, receives_reminders)
-content_library (id, category, title, body,       -- alimentação, sono, medicação…
-                 audience)                        -- paciente | familia | ambos
-journeys (id, name, stage)                        -- trilha por etapa
-journey_steps (id, journey_id, day_offset,
-               content_id, audience)
-patient_journeys (id, patient_id, journey_id, started_at, status)
-medications (id, patient_id, name, dose, schedule_cron, start_date, end_date)
-messages (id, patient_id, contact_id, channel,    -- whatsapp | sms
-          direction, body, status, scheduled_for, sent_at,
-          template_id, created_by)
-adherence_events (id, patient_id, medication_id,
-                  event_type, occurred_at, source) -- confirmado | perdido
-crm_sync_log (id, patient_id, crm_name, payload, status, created_at)
-```
+Todos os cards seguem o mesmo layout:
+- Cabeçalho: badge da categoria + badge do público.
+- Título (truncado em 2 linhas).
+- Trecho do corpo (clamp 3 linhas).
+- Rodapé com 2 botões padrão em todos:
+  - **Enviar** (ícone Send) → abre modal "Enviar conteúdo".
+  - **Para quem** já fica embutido dentro do modal de envio (ver passo 3).
+- Card inteiro clicável → abre modal de visualização/edição.
 
-## 3. Rotas e telas (`/app`)
+### 3. Modal "Enviar conteúdo"
 
-- `/login`, `/signup`, `/reset-password`
-- `/app` — dashboard: KPIs (pacientes ativos, adesão %, mensagens enviadas hoje, próximos lembretes)
-- `/app/pacientes` — lista + busca + filtros (etapa, instituição)
-- `/app/pacientes/novo` e `/app/pacientes/:id` — perfil com abas: Dados, Família & Cuidadores, Medicação, Jornada, Mensagens, Adesão
-- `/app/mensagens` — composer manual (1:1 ou em massa), seleção de canal WhatsApp/SMS, escolha de template, agendamento
-- `/app/conteudos` — biblioteca educativa (CRUD)
-- `/app/jornadas` — configurar trilhas por etapa e passos
-- `/app/relatorios` — adesão por paciente, por equipe, taxa de resposta
-- `/app/integracoes` — toggle CRM mock (HubSpot/Salesforce/Pipedrive), botão "Sincronizar" que grava em `crm_sync_log`
-- `/app/equipe` (admin) — convidar membros, gerenciar papéis
-- `/app/perfil` — editar dados do profissional
+Acionado pelo botão Enviar do card:
+- Mostra título + prévia do conteúdo.
+- Select **Paciente** (busca em `patients`).
+- Após escolher paciente, lista os **contatos** dele (`contacts` filtrados por `patient_id`) com checkboxes — "Para quem enviar" (paciente, familiar, cuidador, médico). Pelo menos um obrigatório.
+- Select **Canal**: WhatsApp / SMS (default `channel_pref` do contato).
+- Botão "Enviar" insere linhas em `messages` (uma por destinatário) com `body` = corpo do conteúdo, `direction='outbound'`, `status='sent'`, `sent_at=now()`.
 
-Header da área logada com sidebar e avatar/logout. A landing `/` continua intacta com CTA "Entrar" e "Cadastre-se agora" apontando para `/signup`.
+### 4. Modal "Ver / editar conteúdo"
 
-## 4. Envio de mensagens (simulado)
+Acionado ao clicar no card:
+- Mesma estrutura do modal "Novo conteúdo" mas pré-preenchido.
+- Campos: Título, Categoria, Público, Conteúdo.
+- Validação Zod (título min 2, body min 5).
+- Botões: **Salvar** (UPDATE em `content_library`), **Excluir** (DELETE com confirm), **Fechar**.
+- Botão Salvar desabilitado até o schema validar.
 
-- Edge function `send-message` grava em `messages` com `status='sent'` e `sent_at=now()` — sem provedor externo.
-- Edge function agendada `process-reminders` (cron diário) lê `medications` e `patient_journeys`, gera mensagens pendentes respeitando horário e canal preferido do destinatário (paciente e/ou responsável).
-- Edge function `simulate-adherence-response` para o usuário marcar manualmente "paciente confirmou" / "não tomou" gerando `adherence_events`.
+### 5. Detalhes técnicos
 
-## 5. Relatórios
+- Reaproveitar `Dialog`, `Select`, `Input`, `Textarea`, `Badge`, `Button` já existentes.
+- Estado local: `filters {q, category, audience}`, `sendOpen`, `editOpen`.
+- Invalidar `qk.content` após create/update/delete; invalidar `qk.messages` após envio.
+- Manter todas as cores via tokens semânticos (sem cores hardcoded).
+- Sem mudanças de schema no banco — `content_library`, `patients`, `contacts`, `messages` já cobrem o necessário.
 
-- View SQL `v_adherence_by_patient` (eventos confirmados / esperados nos últimos 30 dias).
-- Tela de relatório consome a view e renderiza com Recharts (linha de adesão, barras por etapa, ranking de pacientes em risco).
+### Arquivos alterados
 
-## 6. Integração CRM (mock)
-
-- Tela `/app/integracoes`: cards de HubSpot / Salesforce / Pipedrive com switch "conectado" (apenas visual nesta fase).
-- Botão "Sincronizar agora" chama edge function `crm-sync` que serializa pacientes + contatos e grava no `crm_sync_log` — sem chamada externa real. Estrutura pronta para plugar provedor depois.
-
-## 7. UI/UX
-
-- Reutilizar o design system atual (cores brand/primary, fonte display, cards arredondados, shadow-soft).
-- Sidebar fixa no `/app` com ícones lucide já presentes (Users, Pill, MessageCircle, HeartPulse, Apple, Plug, BarChart3, Settings).
-- Estados vazios ilustrados com microcopy em PT-BR.
-- Toda comunicação em PT-BR; manter tom acolhedor da landing.
-
-## 8. Segurança
-
-- RLS obrigatória em todas as tabelas; nada de role na `profiles`.
-- Validação de entrada com Zod em formulários e edge functions.
-- Senhas: ativar HIBP (leaked password protection).
-- Convites de equipe via edge function que cria registro em `user_roles` após signup confirmado.
-
-## 9. Entrega faseada (dentro deste plano)
-
-1. Cloud + auth + profiles + roles + login/signup/reset + layout `/app` com sidebar.
-2. Pacientes + contatos (família/cuidadores) + CRUD completo.
-3. Biblioteca de conteúdos + jornadas + medicação.
-4. Mensagens (composer + lista) + edge function simulada + lembretes agendados.
-5. Adesão + relatórios com gráficos.
-6. CRM mock + tela de integrações + admin/convites.
-
-Tudo fica numa só entrega; a numeração é só a ordem de implementação interna.
-
-## Fora de escopo agora
-
-- Envio real via Twilio/WhatsApp Business API (estrutura fica pronta para plugar).
-- Integração CRM real (apenas mock + log).
-- App mobile dedicado para paciente — comunicação continua por WhatsApp/SMS.
+- `src/pages/app/Content.tsx` — reescrita do componente.
