@@ -51,7 +51,10 @@ export default function Patients() {
   const [medOpen, setMedOpen] = useState<Patient | null>(null);
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
   const [contactOpen, setContactOpen] = useState<{ p: Patient; relation: "familiar" | "cuidador" | "medico" } | null>(null);
-  const [contactExpanded, setContactExpanded] = useState(false);
+  const [contactIndex, setContactIndex] = useState(0);
+  const [medIndex, setMedIndex] = useState(0);
+  const [contactDir, setContactDir] = useState<1 | -1>(1);
+  const [medDir, setMedDir] = useState<1 | -1>(1);
 
   const { data: medList = [] } = useQuery({
     queryKey: ["medications", medOpen?.id],
@@ -103,8 +106,20 @@ export default function Patients() {
   }, [user]);
 
   useEffect(() => {
-    if (contactOpen) setContactExpanded(false);
+    setContactIndex(0);
   }, [contactOpen?.p.id, contactOpen?.relation]);
+
+  useEffect(() => {
+    setMedIndex(0);
+  }, [medOpen?.id]);
+
+  useEffect(() => {
+    if (contactIndex >= contactList.length) setContactIndex(Math.max(0, contactList.length - 1));
+  }, [contactList.length, contactIndex]);
+
+  useEffect(() => {
+    if (medIndex >= medList.length) setMedIndex(Math.max(0, medList.length - 1));
+  }, [medList.length, medIndex]);
 
   const onCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
