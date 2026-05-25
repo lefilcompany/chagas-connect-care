@@ -157,3 +157,39 @@ export const emptyFilters = (): SegmentFilters => ({
   channel: "",
   institution: "",
 });
+
+export type TargetingMode = "all" | "audiences" | "segment" | "filters";
+
+export type ContentTargeting = {
+  targeting_mode: TargetingMode;
+  audience_types: AudienceType[];
+  segment_id: string | null;
+  filters: SegmentFilters;
+};
+
+export const ALL_AUDIENCES: AudienceType[] = ["paciente", "familiar", "cuidador", "medico"];
+
+/**
+ * Resolve the (audience_types, filters) effectively used by a piece of content.
+ * If the linked segment was deleted, falls back to "all".
+ */
+export const resolveContentTargeting = async (
+  c: Partial<ContentTargeting> | null | undefined,
+): Promise<{ audience_types: AudienceType[]; filters: SegmentFilters; segmentMissing?: boolean }> => {
+  const mode = (c?.targeting_mode ?? "all") as TargetingMode;
+  if (mode === "all") return { audience_types: ALL_AUDIENCES, filters: emptyFilters() };
+  if (mode === "audiences") return { audience_types: c?.audience_types ?? [], filters: emptyFilters() };
+  if (mode === "filters") return { audience_types: c?.audience_types ?? [], filters: c?.filters ?? emptyFilters() };
+  // segment
+  if (!c?.segment_id) return { audience_types: ALL_AUDIENCES, filters: emptyFilters(), segmentMissing: true };
+  const { data } = await supabase
+    .from("audience_segments")
+    .select("audience_types, filters")
+    .eq("id", c.segment_id)
+    .maybeSingle();
+  if (!data) return { audience_types: ALL_AUDIENCES, filters: emptyFilters(), segmentMissing: true };
+  return {
+    audience_types: (data.audience_types as AudienceType[]) ?? [],
+    filters: (data.filters as SegmentFilters) ?? emptyFilters(),
+  };
+};
