@@ -364,6 +364,30 @@ export default function PatientDetail() {
                   />
                 </div>
                 <div className="space-y-1.5">
+                  <Label htmlFor="contact_email">Email</Label>
+                  <Input id="contact_email" name="email" type="email" placeholder="email@exemplo.com" maxLength={160} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact_birth">Data de nascimento</Label>
+                  <Input id="contact_birth" name="birth_date" type="date" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact_cpf">CPF</Label>
+                  <Input id="contact_cpf" name="cpf" placeholder="000.000.000-00" maxLength={14} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="contact_address">Endereço</Label>
+                  <Input id="contact_address" name="address" placeholder="Rua, número, complemento" maxLength={240} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact_city">Cidade</Label>
+                  <Input id="contact_city" name="city" placeholder="Ex: Recife" maxLength={120} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="contact_state">Estado</Label>
+                  <Input id="contact_state" name="state" placeholder="SP" maxLength={2} className="uppercase" />
+                </div>
+                <div className="space-y-1.5">
                   <Label>Relação com o paciente</Label>
                   <Select name="relation" defaultValue="familiar">
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -374,13 +398,23 @@ export default function PatientDetail() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
+                <div className="space-y-1.5">
                   <Label>Canal preferido para mensagens</Label>
                   <Select name="channel_pref" defaultValue="whatsapp">
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="whatsapp">WhatsApp</SelectItem>
                       <SelectItem value="sms">SMS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Status</Label>
+                  <Select name="status" defaultValue="ativo">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="inativo">Inativo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
