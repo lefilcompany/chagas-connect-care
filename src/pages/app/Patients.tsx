@@ -225,7 +225,7 @@ export default function Patients() {
             <form onSubmit={onCreate} className="space-y-4">
               <div className="space-y-2"><Label>Nome completo</Label><Input name="full_name" required /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Telefone</Label><Input name="phone" placeholder="(81) 9..." required /></div>
+                <div className="space-y-2"><Label>Telefone</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
                 <div className="space-y-2"><Label>Etapa</Label>
                   <Select name="stage" defaultValue="diagnostico">
                     <SelectTrigger><SelectValue /></SelectTrigger>
