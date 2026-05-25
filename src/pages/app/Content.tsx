@@ -498,7 +498,75 @@ function SendContentDialog({
               </button>
             </div>
 
-            {mode === "bulk" ? (
+            {mode === "segment" ? (
+              <div className="space-y-4">
+                <div className="flex gap-1 rounded-lg border border-border p-1">
+                  <button
+                    type="button"
+                    onClick={() => setSegMode("saved")}
+                    className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors ${segMode === "saved" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+                  >
+                    Usar segmento salvo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSegMode("adhoc")}
+                    className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors ${segMode === "adhoc" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+                  >
+                    Montar filtros agora
+                  </button>
+                </div>
+
+                {segMode === "saved" ? (
+                  <div className="space-y-2">
+                    <Label>Segmento</Label>
+                    <Select value={savedSegmentId} onValueChange={setSavedSegmentId}>
+                      <SelectTrigger><SelectValue placeholder="Selecione um segmento" /></SelectTrigger>
+                      <SelectContent>
+                        {(savedSegments as SegmentDef[]).length === 0 ? (
+                          <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum segmento salvo. Crie em Segmentos.</div>
+                        ) : (
+                          (savedSegments as SegmentDef[]).map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {activeSegment?.description && (
+                      <p className="text-xs text-muted-foreground">{activeSegment.description}</p>
+                    )}
+                  </div>
+                ) : (
+                  <SegmentFiltersForm
+                    audienceTypes={adhocAudiences}
+                    onAudienceChange={setAdhocAudiences}
+                    filters={adhocFilters}
+                    onFiltersChange={setAdhocFilters}
+                  />
+                )}
+
+                {activeAudiences.length > 0 && (
+                  <RecipientPreview
+                    recipients={segmentRecipients}
+                    loading={segLoading}
+                    selectedKeys={selectedKeys}
+                    onChange={setSelectedKeys}
+                  />
+                )}
+
+                <div className="space-y-2">
+                  <Label>Canal de envio</Label>
+                  <Select value={channelOverride} onValueChange={(v) => setChannelOverride(v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Canal preferido de cada destinatário</SelectItem>
+                      <SelectItem value="whatsapp">Forçar WhatsApp</SelectItem>
+                      <SelectItem value="sms">Forçar SMS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : mode === "bulk" ? (
               <div className="space-y-2">
                 <Label>Para quem enviar</Label>
                 <div className="space-y-2 rounded-lg border border-border p-3">
