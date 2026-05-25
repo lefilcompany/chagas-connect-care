@@ -31,6 +31,18 @@ const schema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+const contactSchema = z.object({
+  full_name: z.string().trim().min(2).max(160),
+  phone: z.string().trim().regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, "Telefone deve ter 10 ou 11 dígitos"),
+  channel_pref: z.enum(["whatsapp", "sms"]),
+});
+
+const medicationSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  dose_value: z.string().optional(),
+  schedule: z.string().optional(),
+});
+
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, "");
   if (digits.length <= 2) return digits;
