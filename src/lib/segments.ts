@@ -120,7 +120,7 @@ export const resolveRecipients = async (
       .select("id, patient_id, full_name, phone, channel_pref, relation, city, state, status, birth_date");
     const contacts = contactsData ?? [];
     for (const c of contacts) {
-      if (!contactRels.includes(c.relation as AudienceType)) continue;
+      if (!(contactRels as AudienceType[]).includes(c.relation as AudienceType)) continue;
       const parent = patientMap.get(c.patient_id) as any;
       if (!parent) continue;
       // patient-level filters (stage, institution) still apply via parent
