@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchers, qk } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,10 +12,9 @@ import { toast } from "sonner";
 import { Plus } from "lucide-react";
 
 export default function Content() {
-  const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
-  const load = () => supabase.from("content_library").select("*").order("created_at", { ascending: false }).then(({ data }) => setItems(data ?? []));
-  useEffect(() => { load(); }, []);
+  const queryClient = useQueryClient();
+  const { data: items = [] } = useQuery({ queryKey: qk.content, queryFn: fetchers.content });
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -21,7 +22,8 @@ export default function Content() {
     const { error } = await supabase.from("content_library").insert(fd as any);
     if (error) return toast.error(error.message);
     toast.success("Conteúdo adicionado");
-    setOpen(false); load();
+    setOpen(false);
+    queryClient.invalidateQueries({ queryKey: qk.content });
   };
 
   return (

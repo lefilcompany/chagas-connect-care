@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchers, qk } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,17 +29,11 @@ const schema = z.object({
 
 export default function Patients() {
   const { user } = useAuth();
-  const [items, setItems] = useState<Patient[]>([]);
+  const queryClient = useQueryClient();
+  const { data: items = [] } = useQuery({ queryKey: qk.patients, queryFn: fetchers.patients as () => Promise<Patient[]> });
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [institution, setInstitution] = useState("");
-
-  const load = async () => {
-    const { data } = await supabase.from("patients").select("*").order("created_at", { ascending: false });
-    setItems((data as Patient[]) ?? []);
-  };
-
-  useEffect(() => { load(); }, []);
   useEffect(() => {
     if (user) supabase.from("profiles").select("institution").eq("id", user.id).maybeSingle().then(({ data }) => setInstitution(data?.institution ?? ""));
   }, [user]);
@@ -59,7 +55,8 @@ export default function Patients() {
     if (error) return toast.error(error.message);
     toast.success("Paciente cadastrado");
     setOpen(false);
-    load();
+    queryClient.invalidateQueries({ queryKey: qk.patients });
+    queryClient.invalidateQueries({ queryKey: qk.dashboard });
   };
 
   const filtered = items.filter((p) => p.full_name.toLowerCase().includes(q.toLowerCase()));

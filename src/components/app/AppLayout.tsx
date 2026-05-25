@@ -2,6 +2,8 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { prefetchAllAppRoutes, prefetchRoute } from "@/lib/queries";
 import {
   Heart, LayoutDashboard, Users, MessageCircle, BookOpen, BarChart3,
   Plug, UserCircle, LogOut, Menu, X,
@@ -22,6 +24,7 @@ const nav = [
 export const AppLayout = () => {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [profileName, setProfileName] = useState<string>("");
   const [open, setOpen] = useState(false);
 
@@ -35,6 +38,13 @@ export const AppLayout = () => {
       if (data) setProfileName(data.full_name || user.email || "");
     });
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    // Warm all main screens after first render so navigation is instant.
+    const id = window.setTimeout(() => prefetchAllAppRoutes(queryClient), 150);
+    return () => window.clearTimeout(id);
+  }, [user, queryClient]);
 
   if (loading || !user) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Carregando...</div>;
@@ -63,6 +73,9 @@ export const AppLayout = () => {
               to={n.to}
               end={n.end}
               onClick={() => setOpen(false)}
+              onMouseEnter={() => prefetchRoute(queryClient, n.to)}
+              onFocus={() => prefetchRoute(queryClient, n.to)}
+              onTouchStart={() => prefetchRoute(queryClient, n.to)}
               className={({ isActive }) => cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isActive ? "bg-primary text-brand" : "text-foreground/70 hover:bg-muted hover:text-brand",

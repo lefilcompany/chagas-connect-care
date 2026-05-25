@@ -1,12 +1,9 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { fetchers, qk } from "@/lib/queries";
 import { Link } from "react-router-dom";
 
 export default function Messages() {
-  const [msgs, setMsgs] = useState<any[]>([]);
-  useEffect(() => {
-    supabase.from("messages").select("*, patients(full_name)").order("sent_at", { ascending: false }).limit(100).then(({ data }) => setMsgs(data ?? []));
-  }, []);
+  const { data: msgs = [] } = useQuery({ queryKey: qk.messages, queryFn: fetchers.messages });
   return (
     <div className="space-y-6">
       <header>
