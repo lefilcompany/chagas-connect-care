@@ -19,7 +19,8 @@ import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
 import { RecipientPreview } from "@/components/app/RecipientPreview";
 import {
   AudienceType, Recipient, SegmentDef, SegmentFilters,
-  emptyFilters, resolveRecipients,
+  emptyFilters, resolveRecipients, resolveContentTargeting, TargetingMode,
+  AUDIENCE_LABELS, ALL_AUDIENCES,
 } from "@/lib/segments";
 
 const CATEGORIES = [
@@ -42,10 +43,25 @@ const contentSchema = z.object({
   category: z.string().min(1),
   audience: z.string().min(1),
   body: z.string().trim().min(5).max(5000),
+  targeting_mode: z.enum(["all", "audiences", "segment", "filters"]),
+  audience_types: z.array(z.enum(["paciente", "familiar", "cuidador", "medico"])).default([]),
+  segment_id: z.string().nullable().optional(),
+  filters: z.any().optional(),
+}).superRefine((v, ctx) => {
+  if ((v.targeting_mode === "audiences" || v.targeting_mode === "filters") && v.audience_types.length === 0) {
+    ctx.addIssue({ code: "custom", path: ["audience_types"], message: "Selecione ao menos um tipo de público" });
+  }
+  if (v.targeting_mode === "segment" && !v.segment_id) {
+    ctx.addIssue({ code: "custom", path: ["segment_id"], message: "Selecione um segmento" });
+  }
 });
 
 type ContentRow = {
   id: string; title: string; category: string; audience: string; body: string;
+  targeting_mode?: TargetingMode | null;
+  audience_types?: AudienceType[] | null;
+  segment_id?: string | null;
+  filters?: SegmentFilters | null;
 };
 
 const labelOf = (arr: { value: string; label: string }[], v: string) =>
