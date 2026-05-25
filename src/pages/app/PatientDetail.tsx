@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Plus, CheckCircle2, XCircle,
   Users, Pill, MessageSquare, Activity, Phone, Building2,
-  Save,
+  Save, Trash2, Check, CheckCheck, Clock,
 } from "lucide-react";
 import { z } from "zod";
 
@@ -127,18 +127,40 @@ export default function PatientDetail() {
     const channel = String(fd.get("channel") ?? "whatsapp");
     const contactId = String(fd.get("contact_id") ?? "").trim();
     if (!body) return toast.error("Mensagem vazia");
-    const { error } = await supabase.from("messages").insert({
+    const { data: inserted, error } = await supabase.from("messages").insert({
       patient_id: id,
       contact_id: contactId && contactId !== "patient" ? contactId : null,
       channel,
       body,
-      status: "sent",
+      status: "enviado",
       sent_at: new Date().toISOString(),
       created_by: user!.id,
-    } as any);
+    } as any).select().single();
     if (error) return toast.error(error.message);
     toast.success(`Mensagem enviada por ${channel.toUpperCase()} (simulado)`);
     (e.target as HTMLFormElement).reset();
+    loadAll();
+    // Simulate delivery / read receipts (WhatsApp-like)
+    if (inserted?.id) {
+      const msgId = inserted.id;
+      setTimeout(async () => {
+        await supabase.from("messages").update({ status: "entregue" } as any).eq("id", msgId);
+        loadAll();
+      }, 1500);
+      if (channel === "whatsapp") {
+        setTimeout(async () => {
+          await supabase.from("messages").update({ status: "lido" } as any).eq("id", msgId);
+          loadAll();
+        }, 4000);
+      }
+    }
+  };
+
+  const deleteMsg = async (msgId: string) => {
+    if (!confirm("Apagar esta mensagem?")) return;
+    const { error } = await supabase.from("messages").delete().eq("id", msgId);
+    if (error) return toast.error(error.message);
+    toast.success("Mensagem apagada");
     loadAll();
   };
 
@@ -403,8 +425,27 @@ export default function PatientDetail() {
             {messages.length === 0 ? <div className="p-8 text-center text-muted-foreground">Nenhuma mensagem ainda.</div> : (
               <ul className="divide-y divide-border">{messages.map((m) => (
                 <li key={m.id} className="p-4">
-                  <div className="flex justify-between text-xs text-muted-foreground"><span className="uppercase font-semibold text-brand">{m.channel}</span><span>{new Date(m.sent_at).toLocaleString("pt-BR")}</span></div>
+                  <div className="flex justify-between items-center text-xs text-muted-foreground gap-2">
+                    <span className="uppercase font-semibold text-brand">{m.channel}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{new Date(m.sent_at).toLocaleString("pt-BR")}</span>
+                      <button
+                        type="button"
+                        onClick={() => deleteMsg(m.id)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        aria-label="Apagar mensagem"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
                   <div className="mt-1 text-sm">{m.body}</div>
+                  <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                    {m.status === "enviado" && <><Check className="h-3 w-3" /> Enviado</>}
+                    {m.status === "entregue" && <><CheckCheck className="h-3 w-3" /> Entregue</>}
+                    {m.status === "lido" && <><CheckCheck className="h-3 w-3 text-sky-500" /> <span className="text-sky-500">Lido</span></>}
+                    {!["enviado", "entregue", "lido"].includes(m.status) && <><Clock className="h-3 w-3" /> {m.status}</>}
+                  </div>
                 </li>
               ))}</ul>
             )}
