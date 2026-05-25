@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  Send, Search, Plus, UserPlus, RefreshCw, Check, CheckCheck, Clock, ArrowRight,
+  Send, Search, Plus, UserPlus, RefreshCw, Check, CheckCheck, Clock, ArrowRight, X,
 } from "lucide-react";
 import { User, Phone, MessageSquare } from "lucide-react";
 
@@ -192,6 +192,23 @@ export default function Messages() {
     : selectedContact?.phone ?? "";
   const recipientRelation = sendRecipient === "patient" ? "Paciente" : selectedContact?.relation ?? "";
   const canSend = !!sendPatientId && !!sendBody.trim() && !!recipientPhoneSend && !sending;
+
+  const patientLabel = patients.find((p) => p.id === patientFilter)?.full_name;
+  const activeFilters: { key: string; label: string; value: string; clear: () => void }[] = [
+    ...(q ? [{ key: "q", label: "Busca", value: q, clear: () => setQ("") }] : []),
+    ...(patientFilter !== "todos" && patientLabel
+      ? [{ key: "p", label: "Paciente", value: patientLabel, clear: () => setPatientFilter("todos") }]
+      : []),
+    ...(channelFilter !== "todos"
+      ? [{ key: "c", label: "Canal", value: channelFilter, clear: () => setChannelFilter("todos") }]
+      : []),
+    ...(statusFilter !== "todos"
+      ? [{ key: "s", label: "Status", value: statusFilter, clear: () => setStatusFilter("todos") }]
+      : []),
+  ];
+  const clearAllFilters = () => {
+    setQ(""); setPatientFilter("todos"); setChannelFilter("todos"); setStatusFilter("todos");
+  };
 
   return (
     <div className="space-y-6">
