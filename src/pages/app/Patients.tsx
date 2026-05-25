@@ -424,13 +424,36 @@ export default function Patients() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase text-muted-foreground">
-              Cadastrados ({contactList.length})
-            </div>
-            <div className="max-h-48 overflow-y-auto rounded-xl border border-border bg-muted/30 divide-y divide-border">
-              {contactList.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground text-center">Nenhum contato cadastrado.</div>
-              ) : contactList.map((c: any) => (
+            <button
+              type="button"
+              onClick={() => setContactExpanded((v) => !v)}
+              className="flex w-full items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+            >
+              <div className="flex items-center gap-3">
+                {contactOpen?.relation === "medico"
+                  ? <Stethoscope className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                  : <Users className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />}
+                <div>
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">
+                    Cadastrados ({contactList.length})
+                  </div>
+                  {contactList.length > 1 && (
+                    <div className="text-[11px] text-muted-foreground">
+                      Clique para {contactExpanded ? "recolher" : "expandir"}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {contactList.length > 1 && (
+                <div className="shrink-1 transition-transform duration-300 ease-out">
+                  {contactExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                </div>
+              )}
+            </button>
+            <div
+              className={`overflow-hidden rounded-xl border border-border bg-muted/30 divide-y divide-border transition-all duration-300 ease-out ${contactExpanded ? "max-h-48 opacity-100" : "max-h-0 opacity-0 border-transparent"}`}
+            >
+              {contactList.map((c: any) => (
                 <div key={c.id} className="flex items-center gap-3 p-3">
                   {contactOpen?.relation === "medico"
                     ? <Stethoscope className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
@@ -447,6 +470,28 @@ export default function Patients() {
                 </div>
               ))}
             </div>
+            {/* Quando recolhido mostra apenas o primeiro contato */}
+            {!contactExpanded && contactList.length > 0 && (
+              <div className="rounded-xl border border-border bg-muted/30">
+                <div className="flex items-center gap-3 p-3">
+                  {contactOpen?.relation === "medico"
+                    ? <Stethoscope className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                    : <Users className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />}
+                  <div className="flex-1 min-w-1">
+                    <div className="text-sm font-medium truncate">{contactList[1]?.full_name ?? contactList[0]?.full_name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {(contactList[1]?.phone ?? contactList[0]?.phone)} · <span className="uppercase">{contactList[1]?.channel_pref ?? contactList[0]?.channel_pref}</span>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => removeContact(contactList[1]?.id ?? contactList[1]?.id)} aria-label="Remover" className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+            {contactList.length === 1 && !contactExpanded && (
+              <div className="p-4 text-sm text-muted-foreground text-center">Nenhum contato cadastrado.</div>
+            )}
           </div>
           <form onSubmit={addContact} className="space-y-3 pt-2 border-t border-border">
             <div className="space-y-2"><Label>Nome</Label><Input name="full_name" required /></div>
