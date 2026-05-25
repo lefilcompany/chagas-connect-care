@@ -26,7 +26,10 @@ export default function Segments() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<SegmentDef | null>(null);
   const [open, setOpen] = useState(false);
-  const { data: segments = [] } = useQuery({ queryKey: qk.segments, queryFn: fetchers.segments });
+  const { data: segments = [] } = useQuery<SegmentDef[]>({
+    queryKey: qk.segments,
+    queryFn: fetchers.segments as () => Promise<SegmentDef[]>,
+  });
 
   const openNew = () => {
     setEditing({
