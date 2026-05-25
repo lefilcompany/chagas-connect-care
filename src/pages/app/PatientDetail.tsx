@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -60,6 +60,18 @@ export default function PatientDetail() {
     institution: z.string().trim().max(160),
     notes: z.string().max(2000).optional(),
   });
+
+  const hasChanges = useMemo(() => {
+    if (!patient) return false;
+    return (
+      (patient.full_name ?? "") !== (form.full_name ?? "") ||
+      (patient.stage ?? "diagnostico") !== (form.stage ?? "diagnostico") ||
+      (patient.channel_pref ?? "whatsapp") !== (form.channel_pref ?? "whatsapp") ||
+      (patient.phone ?? "") !== (form.phone ?? "") ||
+      (patient.institution ?? "") !== (form.institution ?? "") ||
+      (patient.notes ?? "") !== (form.notes ?? "")
+    );
+  }, [patient, form]);
 
   const savePatient = async () => {
     const parsed = patientSchema.safeParse(form);
@@ -156,7 +168,7 @@ export default function PatientDetail() {
               {stageLabels[form.stage] ?? form.stage}
             </span>
           </div>
-          <Button size="sm" variant="hero" onClick={savePatient} disabled={saving}>
+          <Button size="sm" variant="hero" onClick={savePatient} disabled={saving || !hasChanges}>
             <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar alterações"}
           </Button>
         </div>
