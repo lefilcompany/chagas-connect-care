@@ -117,48 +117,61 @@ export default function Dashboard() {
       <section>
         <h2 className="font-display text-lg font-bold text-brand">Próximos passos</h2>
         <p className="text-sm text-muted-foreground mt-1">Siga a jornada na ordem para preparar o cuidado conectado.</p>
-        <div className="mt-4 flex flex-col gap-4">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 relative">
           {steps.map((s, i) => {
             const isDone = s.done;
             const isActive = !isDone && i === currentStepIndex;
             const isLocked = !isDone && !isActive;
+            const isLast = i === steps.length - 1;
+            const prevDone = i > 0 && steps[i - 1].done;
             return (
               <div
                 key={s.title}
                 className={cn(
-                  "rounded-2xl border p-5 shadow-card flex items-start gap-4 transition-smooth",
+                  "relative rounded-2xl border p-5 shadow-card flex flex-col gap-4 transition-smooth",
                   isDone && "border-brand/30 bg-primary/30",
                   isActive && "border-brand bg-card ring-2 ring-brand/20",
                   isLocked && "border-border bg-muted/60 opacity-70",
                 )}
               >
+                {!isLast && (
+                  <div
+                    aria-hidden
+                    className={cn(
+                      "hidden lg:block absolute top-10 -right-4 h-0.5 w-8 z-10",
+                      isDone ? "bg-brand" : "bg-border",
+                    )}
+                  />
+                )}
+                <div className="flex items-center gap-3">
                 <div className={cn(
                   "h-11 w-11 shrink-0 rounded-xl flex items-center justify-center",
                   isDone ? "bg-brand text-brand-foreground" : isActive ? "bg-primary text-brand" : "bg-muted text-muted-foreground",
                 )}>
                   {isDone ? <Check className="h-5 w-5" /> : isLocked ? <Lock className="h-5 w-5" /> : <s.icon className="h-5 w-5" />}
                 </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Passo {i + 1}</span>
+                  {isDone && <span className="text-xs font-semibold text-brand">Concluído</span>}
+                  {isActive && <span className="text-xs font-semibold text-brand">Em andamento</span>}
+                  {isLocked && <span className="text-xs font-semibold text-muted-foreground">Bloqueado</span>}
+                </div>
+                </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Passo {i + 1}</span>
-                    {isDone && <span className="text-xs font-semibold text-brand">Concluído</span>}
-                    {isActive && <span className="text-xs font-semibold text-brand">Em andamento</span>}
-                    {isLocked && <span className="text-xs font-semibold text-muted-foreground">Bloqueado</span>}
-                  </div>
-                  <h3 className="mt-1 font-display text-base font-bold text-brand">{s.title}</h3>
+                  <h3 className="font-display text-base font-bold text-brand">{s.title}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{s.description}</p>
                 </div>
-                <div className="shrink-0">
+                <div className="mt-auto">
                   {isLocked ? (
-                    <Button variant="outline" size="sm" disabled className="gap-2">
+                    <Button variant="outline" size="sm" disabled className="w-full gap-2">
                       <Lock className="h-4 w-4" /> Bloqueado
                     </Button>
                   ) : isDone ? (
-                    <Button asChild variant="outline" size="sm" className="gap-2">
+                    <Button asChild variant="outline" size="sm" className="w-full gap-2">
                       <Link to={s.to}>Revisar</Link>
                     </Button>
                   ) : (
-                    <Button asChild size="sm" className="gap-2 bg-brand text-brand-foreground hover:bg-brand/90">
+                    <Button asChild size="sm" className="w-full gap-2 bg-brand text-brand-foreground hover:bg-brand/90">
                       <Link to={s.to}>{s.cta} <ArrowRight className="h-4 w-4" /></Link>
                     </Button>
                   )}
