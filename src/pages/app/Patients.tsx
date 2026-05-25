@@ -94,6 +94,10 @@ export default function Patients() {
     if (user) supabase.from("profiles").select("institution").eq("id", user.id).maybeSingle().then(({ data }) => setInstitution(data?.institution ?? ""));
   }, [user]);
 
+  useEffect(() => {
+    if (contactOpen) setContactExpanded(false);
+  }, [contactOpen?.p.id, contactOpen?.relation]);
+
   const onCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.currentTarget));
