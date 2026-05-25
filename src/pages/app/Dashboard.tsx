@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Users, MessageCircle, Activity, Pill } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 
 type Stats = { patients: number; messagesToday: number; adherence30: number; meds: number };
 
@@ -38,6 +39,15 @@ export default function Dashboard() {
         <h1 className="font-display text-3xl font-bold text-brand">Painel</h1>
         <p className="text-muted-foreground mt-1">Visão geral do cuidado conectado da sua equipe.</p>
       </header>
+      <div role="alert" className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+        <div>
+          <div className="font-semibold">Atenção clínica</div>
+          <p className="mt-1 text-destructive/90">
+            Pacientes com Doença de Chagas têm risco aumentado de morte súbita sem controle adequado da dieta. Mantenha o envio de orientações nutricionais consistente para o paciente e seus familiares.
+          </p>
+        </div>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => (
           <Link key={c.label} to={c.to} className="rounded-2xl border border-border bg-card p-6 shadow-card hover:shadow-soft hover:-translate-y-0.5 transition-smooth">
@@ -54,7 +64,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4">
         <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
           <h2 className="font-display text-lg font-bold text-brand">Próximos passos</h2>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground list-disc pl-5">
@@ -63,12 +73,6 @@ export default function Dashboard() {
             <li>Envie a primeira mensagem educativa via WhatsApp ou SMS.</li>
             <li>Acompanhe a adesão nos relatórios.</li>
           </ul>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h2 className="font-display text-lg font-bold text-brand">Atenção clínica</h2>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Pacientes com Doença de Chagas têm risco aumentado de morte súbita sem controle adequado da dieta. Mantenha o envio de orientações nutricionais consistente para o paciente e seus familiares.
-          </p>
         </div>
       </div>
     </div>
