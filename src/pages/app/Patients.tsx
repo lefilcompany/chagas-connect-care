@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
   Plus, Search, Pill, Users, Stethoscope, LayoutGrid, List,
-  Phone, ArrowRight, Trash2,
+  Phone, ArrowRight, Trash2, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { z } from "zod";
 
