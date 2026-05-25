@@ -249,6 +249,30 @@ export default function PatientDetail() {
             <Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} maxLength={20} />
           </div>
           <div className="space-y-1.5">
+            <Label>Email</Label>
+            <Input type="email" value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@exemplo.com" maxLength={160} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Data de nascimento</Label>
+            <Input type="date" value={form.birth_date ?? ""} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>CPF</Label>
+            <Input value={form.cpf ?? ""} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" maxLength={14} />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Endereço</Label>
+            <Input value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Rua, número, complemento" maxLength={240} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Cidade</Label>
+            <Input value={form.city ?? ""} onChange={(e) => setForm({ ...form, city: e.target.value })} maxLength={120} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Estado</Label>
+            <Input value={form.state ?? ""} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} placeholder="SP" maxLength={2} className="uppercase" />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
             <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Instituição</Label>
             <Input value={form.institution ?? ""} onChange={(e) => setForm({ ...form, institution: e.target.value })} maxLength={160} />
           </div>
@@ -270,6 +294,16 @@ export default function PatientDetail() {
               <SelectContent>
                 <SelectItem value="whatsapp">WhatsApp</SelectItem>
                 <SelectItem value="sms">SMS</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Status</Label>
+            <Select value={form.status ?? "ativo"} onValueChange={(v) => setForm({ ...form, status: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ativo">Ativo</SelectItem>
+                <SelectItem value="inativo">Inativo</SelectItem>
               </SelectContent>
             </Select>
           </div>
