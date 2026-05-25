@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { fetchers, qk } from "@/lib/queries";
 import {
   Users, MessageCircle, Activity, Pill,
   AlertTriangle, UserPlus, Bell, Send, BarChart3,
@@ -9,35 +9,9 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type Stats = { patients: number; messagesToday: number; adherence30: number; meds: number; messagesTotal: number; adherenceEvents: number };
-
 export default function Dashboard() {
-  const [stats, setStats] = useState<Stats>({ patients: 0, messagesToday: 0, adherence30: 0, meds: 0, messagesTotal: 0, adherenceEvents: 0 });
-
-  useEffect(() => {
-    (async () => {
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const thirty = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-      const [p, m, mt, ad, mTotal] = await Promise.all([
-        supabase.from("patients").select("id", { count: "exact", head: true }),
-        supabase.from("medications").select("id", { count: "exact", head: true }),
-        supabase.from("messages").select("id", { count: "exact", head: true }).gte("sent_at", today.toISOString()),
-        supabase.from("adherence_events").select("event_type").gte("occurred_at", thirty),
-        supabase.from("messages").select("id", { count: "exact", head: true }),
-      ]);
-      const events = ad.data ?? [];
-      const ok = events.filter((e) => e.event_type === "confirmado").length;
-      const adh = events.length ? Math.round((ok / events.length) * 100) : 0;
-      setStats({
-        patients: p.count ?? 0,
-        messagesToday: mt.count ?? 0,
-        adherence30: adh,
-        meds: m.count ?? 0,
-        messagesTotal: mTotal.count ?? 0,
-        adherenceEvents: events.length,
-      });
-    })();
-  }, []);
+  const { data: stats = { patients: 0, messagesToday: 0, adherence30: 0, meds: 0, messagesTotal: 0, adherenceEvents: 0 } } =
+    useQuery({ queryKey: qk.dashboard, queryFn: fetchers.dashboard });
 
   const cards = [
     { label: "Pacientes ativos", value: stats.patients, icon: Users, to: "/app/pacientes" },

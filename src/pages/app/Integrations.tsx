@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchers, qk } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Plug, RefreshCw } from "lucide-react";
@@ -11,11 +13,9 @@ const CRMS = [
 ];
 
 export default function Integrations() {
-  const [logs, setLogs] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+  const { data: logs = [] } = useQuery({ queryKey: qk.integrationsLog, queryFn: fetchers.integrationsLog });
   const [syncing, setSyncing] = useState<string | null>(null);
-
-  const load = () => supabase.from("crm_sync_log").select("*").order("created_at", { ascending: false }).limit(20).then(({ data }) => setLogs(data ?? []));
-  useEffect(() => { load(); }, []);
 
   const sync = async (crm: string) => {
     setSyncing(crm);
@@ -27,7 +27,7 @@ export default function Integrations() {
     setSyncing(null);
     if (error) return toast.error(error.message);
     toast.success(`${patients?.length ?? 0} pacientes sincronizados com ${crm} (mock)`);
-    load();
+    queryClient.invalidateQueries({ queryKey: qk.integrationsLog });
   };
 
   return (
