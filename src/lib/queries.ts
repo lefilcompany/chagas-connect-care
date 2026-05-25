@@ -14,6 +14,7 @@ export const qk = {
   reports: ["reports"] as const,
   integrationsLog: ["crm-log"] as const,
   profile: (id: string) => ["profile", id] as const,
+  segments: ["segments"] as const,
 };
 
 export const fetchers = {
@@ -80,6 +81,13 @@ export const fetchers = {
     const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
     return data;
   },
+  segments: async () => {
+    const { data } = await supabase
+      .from("audience_segments")
+      .select("*")
+      .order("created_at", { ascending: false });
+    return (data ?? []) as any[];
+  },
 };
 
 const routeMap: Record<string, (qc: QueryClient) => void> = {
@@ -89,6 +97,7 @@ const routeMap: Record<string, (qc: QueryClient) => void> = {
   "/app/conteudos": (qc) => qc.prefetchQuery({ queryKey: qk.content, queryFn: fetchers.content }),
   "/app/relatorios": (qc) => qc.prefetchQuery({ queryKey: qk.reports, queryFn: fetchers.reports }),
   "/app/integracoes": (qc) => qc.prefetchQuery({ queryKey: qk.integrationsLog, queryFn: fetchers.integrationsLog }),
+  "/app/segmentos": (qc) => qc.prefetchQuery({ queryKey: qk.segments, queryFn: fetchers.segments }),
 };
 
 export const prefetchRoute = (qc: QueryClient, path: string) => {
