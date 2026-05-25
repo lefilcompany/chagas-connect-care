@@ -230,91 +230,92 @@ export default function Messages() {
       </header>
 
       {/* Filters */}
-      <div className="rounded-2xl border border-border bg-card p-3 md:p-4 space-y-3">
-        <div className="flex flex-col md:flex-row md:items-center gap-3">
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-9 pr-9 h-10 bg-background"
-              placeholder="Buscar por texto, paciente ou contato..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-            {q && (
-              <button
-                type="button"
-                onClick={() => setQ("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-md"
-                aria-label="Limpar busca"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+      <div className="rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+          <div className="flex flex-col gap-1 lg:col-span-5 sm:col-span-2">
+            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Buscar</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                className="pl-9 pr-9 h-10 bg-background w-full"
+                placeholder="Texto, paciente ou contato..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+              {q && (
+                <button
+                  type="button"
+                  onClick={() => setQ("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-md"
+                  aria-label="Limpar busca"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:flex md:flex-nowrap gap-2 md:gap-3">
-            <div className="flex flex-col gap-1 min-w-0 md:min-w-[200px]">
-              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Paciente</Label>
-              <Select value={patientFilter} onValueChange={setPatientFilter}>
-                <SelectTrigger className="h-10 bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os pacientes</SelectItem>
-                  {patients.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1 min-w-0 md:min-w-[150px]">
-              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Canal</Label>
-              <Select value={channelFilter} onValueChange={setChannelFilter}>
-                <SelectTrigger className="h-10 bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os canais</SelectItem>
-                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  <SelectItem value="sms">SMS</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1 min-w-0 md:min-w-[150px]">
-              <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-10 bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os status</SelectItem>
-                  <SelectItem value="enviado">Enviado</SelectItem>
-                  <SelectItem value="entregue">Entregue</SelectItem>
-                  <SelectItem value="lido">Lido</SelectItem>
-                  <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="falhou">Falhou</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex flex-col gap-1 min-w-0 lg:col-span-3">
+            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Paciente</Label>
+            <Select value={patientFilter} onValueChange={setPatientFilter}>
+              <SelectTrigger className="h-10 bg-background w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os pacientes</SelectItem>
+                {patients.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-0 lg:col-span-2">
+            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Canal</Label>
+            <Select value={channelFilter} onValueChange={setChannelFilter}>
+              <SelectTrigger className="h-10 bg-background w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                <SelectItem value="sms">SMS</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-0 lg:col-span-2">
+            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Status</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-10 bg-background w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="enviado">Enviado</SelectItem>
+                <SelectItem value="entregue">Entregue</SelectItem>
+                <SelectItem value="lido">Lido</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="falhou">Falhou</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <span className="text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/60">
+          <span className="text-xs text-muted-foreground pt-2">
             {filtered.length} de {msgs.length} mensagens
           </span>
           {activeFilters.length > 0 && (
             <>
-              <span className="text-muted-foreground/50">·</span>
+              <span className="text-muted-foreground/50 pt-2 hidden sm:inline">·</span>
               {activeFilters.map((f) => (
                 <button
                   key={f.key}
                   type="button"
                   onClick={f.clear}
-                  className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs hover:bg-muted transition-colors"
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs hover:bg-muted transition-colors max-w-[220px]"
                 >
-                  <span className="text-muted-foreground">{f.label}:</span>
-                  <span className="font-medium">{f.value}</span>
-                  <X className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground shrink-0">{f.label}:</span>
+                  <span className="font-medium truncate">{f.value}</span>
+                  <X className="h-3 w-3 text-muted-foreground shrink-0" />
                 </button>
               ))}
               <button
                 type="button"
                 onClick={clearAllFilters}
-                className="ml-auto text-xs text-brand hover:underline font-medium"
+                className="sm:ml-auto text-xs text-brand hover:underline font-medium"
               >
                 Limpar filtros
               </button>
