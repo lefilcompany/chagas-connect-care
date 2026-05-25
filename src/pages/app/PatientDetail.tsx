@@ -61,6 +61,18 @@ export default function PatientDetail() {
     notes: z.string().max(2000).optional(),
   });
 
+  const hasChanges = useMemo(() => {
+    if (!patient) return false;
+    return (
+      (patient.full_name ?? "") !== (form.full_name ?? "") ||
+      (patient.stage ?? "diagnostico") !== (form.stage ?? "diagnostico") ||
+      (patient.channel_pref ?? "whatsapp") !== (form.channel_pref ?? "whatsapp") ||
+      (patient.phone ?? "") !== (form.phone ?? "") ||
+      (patient.institution ?? "") !== (form.institution ?? "") ||
+      (patient.notes ?? "") !== (form.notes ?? "")
+    );
+  }, [patient, form]);
+
   const savePatient = async () => {
     const parsed = patientSchema.safeParse(form);
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
