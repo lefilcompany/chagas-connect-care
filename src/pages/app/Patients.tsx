@@ -29,12 +29,26 @@ const schema = z.object({
   channel_pref: z.enum(["whatsapp", "sms"]),
   institution: z.string().trim().max(160),
   notes: z.string().max(2000).optional(),
+  email: z.string().trim().email("Email inválido").max(160).or(z.literal("")).optional(),
+  birth_date: z.string().optional(),
+  cpf: z.string().trim().max(20).optional(),
+  address: z.string().trim().max(240).optional(),
+  city: z.string().trim().max(120).optional(),
+  state: z.string().trim().max(2).optional(),
+  status: z.enum(["ativo", "inativo"]).optional(),
 });
 
 const contactSchema = z.object({
   full_name: z.string().trim().min(2).max(160),
   phone: z.string().trim().regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, "Telefone deve ter 10 ou 11 dígitos"),
   channel_pref: z.enum(["whatsapp", "sms"]),
+  email: z.string().trim().email("Email inválido").max(160).or(z.literal("")).optional(),
+  birth_date: z.string().optional(),
+  cpf: z.string().trim().max(20).optional(),
+  address: z.string().trim().max(240).optional(),
+  city: z.string().trim().max(120).optional(),
+  state: z.string().trim().max(2).optional(),
+  status: z.enum(["ativo", "inativo"]).optional(),
 });
 
 const medicationSchema = z.object({
@@ -68,7 +82,10 @@ export default function Patients() {
   const [contactDir, setContactDir] = useState<1 | -1>(1);
   const [medDir, setMedDir] = useState<1 | -1>(1);
 
-  const [contactForm, setContactForm] = useState({ full_name: "", phone: "", channel_pref: "whatsapp" });
+  const [contactForm, setContactForm] = useState({
+    full_name: "", phone: "", channel_pref: "whatsapp",
+    email: "", birth_date: "", cpf: "", address: "", city: "", state: "", status: "ativo",
+  });
   const [medForm, setMedForm] = useState({ name: "", dose_value: "", schedule: "" });
 
   const { data: medList = [] } = useQuery({
@@ -141,7 +158,10 @@ export default function Patients() {
   }, [medOpen]);
 
   useEffect(() => {
-    if (contactOpen) setContactForm({ full_name: "", phone: "", channel_pref: "whatsapp" });
+    if (contactOpen) setContactForm({
+      full_name: "", phone: "", channel_pref: "whatsapp",
+      email: "", birth_date: "", cpf: "", address: "", city: "", state: "", status: "ativo",
+    });
   }, [contactOpen]);
 
   const onCreate = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -157,6 +177,13 @@ export default function Patients() {
       notes: parsed.data.notes ?? "",
       institution: parsed.data.institution || institution,
       owner_id: user!.id,
+      email: parsed.data.email ?? "",
+      birth_date: parsed.data.birth_date || null,
+      cpf: parsed.data.cpf ?? "",
+      address: parsed.data.address ?? "",
+      city: parsed.data.city ?? "",
+      state: (parsed.data.state ?? "").toUpperCase(),
+      status: parsed.data.status ?? "ativo",
     });
     if (error) return toast.error(error.message);
     toast.success("Paciente cadastrado");
@@ -200,10 +227,20 @@ export default function Patients() {
       full_name: parsed.data.full_name,
       phone: parsed.data.phone,
       channel_pref: parsed.data.channel_pref,
+      email: parsed.data.email ?? "",
+      birth_date: parsed.data.birth_date || null,
+      cpf: parsed.data.cpf ?? "",
+      address: parsed.data.address ?? "",
+      city: parsed.data.city ?? "",
+      state: (parsed.data.state ?? "").toUpperCase(),
+      status: parsed.data.status ?? "ativo",
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
-    setContactForm({ full_name: "", phone: "", channel_pref: "whatsapp" });
+    setContactForm({
+      full_name: "", phone: "", channel_pref: "whatsapp",
+      email: "", birth_date: "", cpf: "", address: "", city: "", state: "", status: "ativo",
+    });
     await queryClient.invalidateQueries({ queryKey: ["contacts", contactOpen.p.id, contactOpen.relation] });
   };
 
