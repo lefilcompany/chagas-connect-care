@@ -475,6 +475,23 @@ export default function PatientDetail() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!msgToDelete} onOpenChange={(o) => !o && setMsgToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar esta mensagem?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A mensagem será removida permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteMsg} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Apagar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
