@@ -14,6 +14,14 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 
+function formatPhone(v: string) {
+  const digits = v.replace(/\D/g, "");
+  if (digits.length <= 10) {
+    return digits.replace(/(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3").replace(/[-\s]$/, "");
+  }
+  return digits.replace(/(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3").replace(/[-\s]$/, "");
+}
+
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
