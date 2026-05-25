@@ -125,7 +125,8 @@ export default function Patients() {
   const addMedication = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!medOpen) return;
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     const name = String(fd.get("name") || "").trim();
     const doseValue = String(fd.get("dose_value") || "").trim();
     const schedule = String(fd.get("schedule") || "").trim();
@@ -136,14 +137,15 @@ export default function Patients() {
     if (error) return toast.error(error.message);
     toast.success(`Medicação adicionada para ${medOpen.full_name}`);
     setMedDoseUnit("mg");
-    (e.currentTarget as HTMLFormElement).reset();
-    queryClient.invalidateQueries({ queryKey: ["medications", medOpen.id] });
+    form.reset();
+    await queryClient.invalidateQueries({ queryKey: ["medications", medOpen.id] });
   };
 
   const addContact = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!contactOpen) return;
-    const fd = Object.fromEntries(new FormData(e.currentTarget));
+    const form = e.currentTarget;
+    const fd = Object.fromEntries(new FormData(form));
     const { error } = await supabase.from("contacts").insert({
       patient_id: contactOpen.p.id,
       relation: contactOpen.relation,
@@ -151,8 +153,8 @@ export default function Patients() {
     } as any);
     if (error) return toast.error(error.message);
     toast.success("Contato adicionado");
-    (e.currentTarget as HTMLFormElement).reset();
-    queryClient.invalidateQueries({ queryKey: ["contacts", contactOpen.p.id, contactOpen.relation] });
+    form.reset();
+    await queryClient.invalidateQueries({ queryKey: ["contacts", contactOpen.p.id, contactOpen.relation] });
   };
 
   const stageLabels: Record<string, string> = {
