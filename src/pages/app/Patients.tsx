@@ -41,6 +41,7 @@ export default function Patients() {
   const [view, setView] = useState<"table" | "cards">("cards");
   const [stageFilter, setStageFilter] = useState<"todos" | "diagnostico" | "agudo" | "cronico">("todos");
   const [medOpen, setMedOpen] = useState<Patient | null>(null);
+  const [medDoseUnit, setMedDoseUnit] = useState("mg");
   const [contactOpen, setContactOpen] = useState<{ p: Patient; relation: "familiar" | "cuidador" | "medico" } | null>(null);
 
   useEffect(() => {
