@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
-  Plus, Search, Pill, Users, Stethoscope, LayoutGrid, List, Columns,
+  Plus, Search, Pill, Users, Stethoscope, LayoutGrid, List,
   Phone, ArrowRight,
 } from "lucide-react";
 import { z } from "zod";
@@ -37,7 +37,7 @@ export default function Patients() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [institution, setInstitution] = useState("");
-  const [view, setView] = useState<"table" | "cards" | "kanban">("cards");
+  const [view, setView] = useState<"table" | "cards">("cards");
   const [stageFilter, setStageFilter] = useState<"todos" | "diagnostico" | "agudo" | "cronico">("todos");
   const [medOpen, setMedOpen] = useState<Patient | null>(null);
   const [contactOpen, setContactOpen] = useState<{ p: Patient; relation: "familiar" | "cuidador" | "medico" } | null>(null);
@@ -192,7 +192,6 @@ export default function Patients() {
           {[
             { v: "cards", icon: LayoutGrid, label: "Cards" },
             { v: "table", icon: List, label: "Tabela" },
-            { v: "kanban", icon: Columns, label: "Kanban" },
           ].map(({ v, icon: Icon, label }) => (
             <button
               key={v}
@@ -244,7 +243,7 @@ export default function Patients() {
             </tbody>
           </table>
         </div>
-      ) : view === "cards" ? (
+      ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p) => (
             <article key={p.id} className="rounded-2xl border border-border bg-card p-5 shadow-card flex flex-col gap-3">
@@ -272,33 +271,6 @@ export default function Patients() {
               </Link>
             </article>
           ))}
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-3">
-          {(["diagnostico", "agudo", "cronico"] as const).map((stage) => {
-            const list = filtered.filter((p) => p.stage === stage);
-            return (
-              <div key={stage} className="rounded-2xl border border-border bg-muted/30 p-3">
-                <div className="flex items-center justify-between px-1 pb-3">
-                  <h3 className="font-display font-bold text-brand text-sm">{stageLabels[stage]}</h3>
-                  <span className="text-xs text-muted-foreground">{list.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {list.length === 0 ? (
-                    <div className="text-xs text-muted-foreground text-center py-6">Vazio</div>
-                  ) : list.map((p) => (
-                    <div key={p.id} className="rounded-xl bg-card border border-border p-3 space-y-2">
-                      <Link to={`/app/pacientes/${p.id}`} className="font-medium text-sm text-brand hover:underline block truncate">
-                        {p.full_name}
-                      </Link>
-                      <div className="text-[11px] text-muted-foreground truncate">{p.phone}</div>
-                      <QuickActions p={p} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
         </div>
       )}
 
