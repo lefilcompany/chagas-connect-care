@@ -51,7 +51,10 @@ export default function Patients() {
   const [medOpen, setMedOpen] = useState<Patient | null>(null);
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
   const [contactOpen, setContactOpen] = useState<{ p: Patient; relation: "familiar" | "cuidador" | "medico" } | null>(null);
-  const [contactExpanded, setContactExpanded] = useState(false);
+  const [contactIndex, setContactIndex] = useState(0);
+  const [medIndex, setMedIndex] = useState(0);
+  const [contactDir, setContactDir] = useState<1 | -1>(1);
+  const [medDir, setMedDir] = useState<1 | -1>(1);
 
   const { data: medList = [] } = useQuery({
     queryKey: ["medications", medOpen?.id],
@@ -103,8 +106,20 @@ export default function Patients() {
   }, [user]);
 
   useEffect(() => {
-    if (contactOpen) setContactExpanded(false);
+    setContactIndex(0);
   }, [contactOpen?.p.id, contactOpen?.relation]);
+
+  useEffect(() => {
+    setMedIndex(0);
+  }, [medOpen?.id]);
+
+  useEffect(() => {
+    if (contactIndex >= contactList.length) setContactIndex(Math.max(0, contactList.length - 1));
+  }, [contactList.length, contactIndex]);
+
+  useEffect(() => {
+    if (medIndex >= medList.length) setMedIndex(Math.max(0, medList.length - 1));
+  }, [medList.length, medIndex]);
 
   const onCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -372,27 +387,61 @@ export default function Patients() {
             <DialogTitle>Medicações {medOpen ? `— ${medOpen.full_name}` : ""}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase text-muted-foreground">
-              Cadastradas ({medList.length})
-            </div>
-            <div className="max-h-48 overflow-y-auto rounded-xl border border-border bg-muted/30 divide-y divide-border">
-              {medList.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground text-center">Nenhuma medicação cadastrada.</div>
-              ) : medList.map((m: any) => (
-                <div key={m.id} className="flex items-center gap-3 p-3">
-                  <Pill className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{m.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {[m.dose, m.schedule].filter(Boolean).join(" · ") || "—"}
+            {medList.length === 0 ? (
+              <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground text-center">
+                Nenhuma medicação cadastrada.
+              </div>
+            ) : (
+              <div className="flex items-stretch gap-2">
+                <div className="flex-1 rounded-xl border border-border bg-muted/30 overflow-hidden">
+                  <div className="px-4 pt-2 flex items-center justify-between">
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">
+                      Cadastradas
+                    </div>
+                    <div className="text-[11px] text-muted-foreground tabular-nums">
+                      {Math.min(medIndex + 1, medList.length)} / {medList.length}
                     </div>
                   </div>
-                  <button type="button" onClick={() => removeMedication(m.id)} aria-label="Remover" className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
-                    <Trash2 className="h-4 w-4" />
+                  <div className="relative h-[64px] overflow-hidden">
+                    <div
+                      key={medList[medIndex]?.id ?? medIndex}
+                      className={`absolute inset-0 flex items-center gap-3 p-3 ${medDir === 1 ? "animate-slide-in-down" : "animate-slide-in-up"}`}
+                    >
+                      <Pill className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{medList[medIndex]?.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {[medList[medIndex]?.dose, medList[medIndex]?.schedule].filter(Boolean).join(" · ") || "—"}
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => removeMedication(medList[medIndex]?.id)} aria-label="Remover" className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    disabled={medList.length < 2}
+                    onClick={() => { setMedDir(-1); setMedIndex((i) => (i - 1 + medList.length) % medList.length); }}
+                    aria-label="Anterior"
+                    className="flex-1 rounded-xl border border-border bg-muted/30 px-2 hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronUp className="h-4 w-4 text-muted-foreground mx-auto" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={medList.length < 2}
+                    onClick={() => { setMedDir(1); setMedIndex((i) => (i + 1) % medList.length); }}
+                    aria-label="Próximo"
+                    className="flex-1 rounded-xl border border-border bg-muted/30 px-2 hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronDown className="h-4 w-4 text-muted-foreground mx-auto" />
                   </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
           <form onSubmit={addMedication} className="space-y-4 pt-2 border-t border-border">
             <div className="space-y-1.5">
@@ -447,73 +496,57 @@ export default function Patients() {
                 Nenhum contato cadastrado.
               </div>
             ) : (
-              <>
-                {/* Header com seta */}
-                <button
-                  type="button"
-                  onClick={() => setContactExpanded((v) => !v)}
-                  className="flex w-full items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3 text-left transition-colors hover:bg-muted/50"
-                >
-                  <div className="flex items-center gap-3">
-                    {contactOpen?.relation === "medico"
-                      ? <Stethoscope className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                      : <Users className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />}
-                    <div>
-                      <div className="text-xs font-semibold uppercase text-muted-foreground">
-                        Cadastrados ({contactList.length})
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        Clique para {contactExpanded ? "recolher" : "expandir"}
-                      </div>
+              <div className="flex items-stretch gap-2">
+                <div className="flex-1 rounded-xl border border-border bg-muted/30 overflow-hidden">
+                  <div className="px-4 pt-2 flex items-center justify-between">
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">
+                      Cadastrados
+                    </div>
+                    <div className="text-[11px] text-muted-foreground tabular-nums">
+                      {Math.min(contactIndex + 1, contactList.length)} / {contactList.length}
                     </div>
                   </div>
-                  <div className="transition-transform duration-300 ease-out">
-                    {contactExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                  </div>
-                </button>
-
-                {/* Lista expandida com animação */}
-                <div
-                  className={`overflow-hidden rounded-xl border border-border bg-muted/30 divide-y divide-border transition-all duration-300 ease-out ${contactExpanded ? "max-h-48 opacity-100" : "max-h-0 opacity-0 border-transparent"}`}
-                >
-                  {contactList.map((c: any) => (
-                    <div key={c.id} className="flex items-center gap-3 p-3">
+                  <div className="relative h-[64px] overflow-hidden">
+                    <div
+                      key={contactList[contactIndex]?.id ?? contactIndex}
+                      className={`absolute inset-0 flex items-center gap-3 p-3 ${contactDir === 1 ? "animate-slide-in-down" : "animate-slide-in-up"}`}
+                    >
                       {contactOpen?.relation === "medico"
                         ? <Stethoscope className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
                         : <Users className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />}
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{c.full_name}</div>
+                        <div className="text-sm font-medium truncate">{contactList[contactIndex]?.full_name}</div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {c.phone} · <span className="uppercase">{c.channel_pref}</span>
+                          {contactList[contactIndex]?.phone} · <span className="uppercase">{contactList[contactIndex]?.channel_pref}</span>
                         </div>
                       </div>
-                      <button type="button" onClick={() => removeContact(c.id)} aria-label="Remover" className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
+                      <button type="button" onClick={() => removeContact(contactList[contactIndex]?.id)} aria-label="Remover" className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                  ))}
+                  </div>
                 </div>
-
-                {/* Quando recolhido mostra apenas o primeiro contato */}
-                {!contactExpanded && (
-                  <div className="rounded-xl border border-border bg-muted/30">
-                    <div className="flex items-center gap-3 p-3">
-                      {contactOpen?.relation === "medico"
-                        ? <Stethoscope className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                        : <Users className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{contactList[0]?.full_name}</div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {contactList[0]?.phone} · <span className="uppercase">{contactList[0]?.channel_pref}</span>
-                        </div>
-                      </div>
-                      <button type="button" onClick={() => removeContact(contactList[0]?.id)} aria-label="Remover" className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    disabled={contactList.length < 2}
+                    onClick={() => { setContactDir(-1); setContactIndex((i) => (i - 1 + contactList.length) % contactList.length); }}
+                    aria-label="Anterior"
+                    className="flex-1 rounded-xl border border-border bg-muted/30 px-2 hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronUp className="h-4 w-4 text-muted-foreground mx-auto" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={contactList.length < 2}
+                    onClick={() => { setContactDir(1); setContactIndex((i) => (i + 1) % contactList.length); }}
+                    aria-label="Próximo"
+                    className="flex-1 rounded-xl border border-border bg-muted/30 px-2 hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronDown className="h-4 w-4 text-muted-foreground mx-auto" />
+                  </button>
+                </div>
+              </div>
             )}
           </div>
           <form onSubmit={addContact} className="space-y-3 pt-2 border-t border-border">
