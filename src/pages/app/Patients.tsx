@@ -41,6 +41,7 @@ export default function Patients() {
   const [view, setView] = useState<"table" | "cards">("cards");
   const [stageFilter, setStageFilter] = useState<"todos" | "diagnostico" | "agudo" | "cronico">("todos");
   const [medOpen, setMedOpen] = useState<Patient | null>(null);
+  const [medDoseUnit, setMedDoseUnit] = useState("mg");
   const [contactOpen, setContactOpen] = useState<{ p: Patient; relation: "familiar" | "cuidador" | "medico" } | null>(null);
 
   useEffect(() => {
@@ -79,10 +80,17 @@ export default function Patients() {
   const addMedication = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!medOpen) return;
-    const fd = Object.fromEntries(new FormData(e.currentTarget));
-    const { error } = await supabase.from("medications").insert({ patient_id: medOpen.id, ...fd } as any);
+    const fd = new FormData(e.currentTarget);
+    const name = String(fd.get("name") || "").trim();
+    const doseValue = String(fd.get("dose_value") || "").trim();
+    const schedule = String(fd.get("schedule") || "").trim();
+    const dose = doseValue ? `${doseValue} ${medDoseUnit}` : "";
+    const { error } = await supabase
+      .from("medications")
+      .insert({ patient_id: medOpen.id, name, dose, schedule } as any);
     if (error) return toast.error(error.message);
     toast.success(`Medicação adicionada para ${medOpen.full_name}`);
+    setMedDoseUnit("mg");
     setMedOpen(null);
   };
 
@@ -295,11 +303,36 @@ export default function Patients() {
           <DialogHeader>
             <DialogTitle>Nova medicação {medOpen ? `— ${medOpen.full_name}` : ""}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={addMedication} className="space-y-3">
-            <div className="space-y-2"><Label>Medicamento</Label><Input name="name" placeholder="Ex: Benznidazol" required /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Dose</Label><Input name="dose" placeholder="Ex: 100mg" /></div>
-              <div className="space-y-2"><Label>Horários</Label><Input name="schedule" placeholder="8h, 14h, 20h" /></div>
+          <form onSubmit={addMedication} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="med_name_dlg">Medicamento</Label>
+              <Input id="med_name_dlg" name="name" placeholder="Ex: Benznidazol" required />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="med_dose_value_dlg">Dose</Label>
+                <Input id="med_dose_value_dlg" name="dose_value" type="number" min="0" step="any" placeholder="Ex: 100" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="med_dose_unit_dlg">Unidade</Label>
+                <Select value={medDoseUnit} onValueChange={setMedDoseUnit}>
+                  <SelectTrigger id="med_dose_unit_dlg"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mg">mg</SelectItem>
+                    <SelectItem value="g">g</SelectItem>
+                    <SelectItem value="mcg">mcg</SelectItem>
+                    <SelectItem value="mL">mL</SelectItem>
+                    <SelectItem value="UI">UI</SelectItem>
+                    <SelectItem value="comprimido">comprimido</SelectItem>
+                    <SelectItem value="cápsula">cápsula</SelectItem>
+                    <SelectItem value="gotas">gotas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="med_schedule_dlg">Horários</Label>
+                <Input id="med_schedule_dlg" name="schedule" placeholder="Ex: 8h, 14h, 20h" />
+              </div>
             </div>
             <Button type="submit" variant="hero" className="w-full">Adicionar medicação</Button>
           </form>
