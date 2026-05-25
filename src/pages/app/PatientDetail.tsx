@@ -195,7 +195,7 @@ export default function PatientDetail() {
           </div>
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> Telefone</Label>
-            <Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} maxLength={20} />
+            <Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} maxLength={20} />
           </div>
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Instituição</Label>
