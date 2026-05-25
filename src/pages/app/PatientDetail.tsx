@@ -322,11 +322,38 @@ export default function PatientDetail() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
             <h3 className="font-display font-bold text-brand mb-4">Nova medicação</h3>
-            <form onSubmit={addMed} className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-              <Input name="name" placeholder="Ex: Benznidazol" required />
-              <Input name="dose" placeholder="Ex: 100mg" />
-              <Input name="schedule" placeholder="Ex: 8h, 14h, 20h" />
-              <Button type="submit" variant="hero"><Plus className="h-4 w-4" /> Adicionar</Button>
+            <form onSubmit={addMed} className="grid gap-4 sm:grid-cols-2 md:grid-cols-5">
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="med_name">Medicamento</Label>
+                <Input id="med_name" name="name" placeholder="Ex: Benznidazol" required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="med_dose_value">Dose</Label>
+                <Input id="med_dose_value" type="number" min="0" step="any" placeholder="Ex: 100" value={medDoseValue} onChange={(e) => setMedDoseValue(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="med_dose_unit">Unidade</Label>
+                <Select value={medDoseUnit} onValueChange={(v) => setMedDoseUnit(v)}>
+                  <SelectTrigger id="med_dose_unit"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mg">mg</SelectItem>
+                    <SelectItem value="g">g</SelectItem>
+                    <SelectItem value="mcg">mcg</SelectItem>
+                    <SelectItem value="mL">mL</SelectItem>
+                    <SelectItem value="UI">UI</SelectItem>
+                    <SelectItem value="comprimido">comprimido</SelectItem>
+                    <SelectItem value="cápsula">cápsula</SelectItem>
+                    <SelectItem value="gotas">gotas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="med_schedule">Horários</Label>
+                <Input id="med_schedule" name="schedule" placeholder="Ex: 8h, 14h, 20h" />
+              </div>
+              <div className="flex items-end md:col-span-5">
+                <Button type="submit" variant="hero" className="w-full sm:w-auto"><Plus className="h-4 w-4" /> Adicionar medicação</Button>
+              </div>
             </form>
           </div>
           <div className="rounded-2xl border border-border bg-card overflow-x-auto">
