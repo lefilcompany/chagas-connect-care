@@ -59,6 +59,13 @@ export default function PatientDetail() {
       phone: p.data.phone ?? "",
       institution: p.data.institution ?? "",
       notes: p.data.notes ?? "",
+      email: p.data.email ?? "",
+      birth_date: p.data.birth_date ?? "",
+      cpf: p.data.cpf ?? "",
+      address: p.data.address ?? "",
+      city: p.data.city ?? "",
+      state: p.data.state ?? "",
+      status: p.data.status ?? "ativo",
     });
     setContacts(c.data ?? []);
     setMeds(m.data ?? []);
@@ -75,6 +82,13 @@ export default function PatientDetail() {
     channel_pref: z.enum(["whatsapp", "sms"]),
     institution: z.string().trim().max(160),
     notes: z.string().max(2000).optional(),
+    email: z.string().trim().email("Email inválido").max(160).or(z.literal("")).optional(),
+    birth_date: z.string().optional(),
+    cpf: z.string().trim().max(20).optional(),
+    address: z.string().trim().max(240).optional(),
+    city: z.string().trim().max(120).optional(),
+    state: z.string().trim().max(2).optional(),
+    status: z.enum(["ativo", "inativo"]).optional(),
   });
 
   const hasChanges = useMemo(() => {
@@ -85,7 +99,14 @@ export default function PatientDetail() {
       (patient.channel_pref ?? "whatsapp") !== (form.channel_pref ?? "whatsapp") ||
       (patient.phone ?? "") !== (form.phone ?? "") ||
       (patient.institution ?? "") !== (form.institution ?? "") ||
-      (patient.notes ?? "") !== (form.notes ?? "")
+      (patient.notes ?? "") !== (form.notes ?? "") ||
+      (patient.email ?? "") !== (form.email ?? "") ||
+      ((patient.birth_date ?? "") !== (form.birth_date ?? "")) ||
+      (patient.cpf ?? "") !== (form.cpf ?? "") ||
+      (patient.address ?? "") !== (form.address ?? "") ||
+      (patient.city ?? "") !== (form.city ?? "") ||
+      (patient.state ?? "") !== (form.state ?? "") ||
+      (patient.status ?? "ativo") !== (form.status ?? "ativo")
     );
   }, [patient, form]);
 
@@ -93,7 +114,9 @@ export default function PatientDetail() {
     const parsed = patientSchema.safeParse(form);
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
     setSaving(true);
-    const { error } = await supabase.from("patients").update(parsed.data).eq("id", id!);
+    const payload: any = { ...parsed.data, state: (parsed.data.state ?? "").toUpperCase() };
+    if (!payload.birth_date) payload.birth_date = null;
+    const { error } = await supabase.from("patients").update(payload).eq("id", id!);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Paciente atualizado");
