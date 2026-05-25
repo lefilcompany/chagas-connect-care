@@ -1,54 +1,84 @@
-## Tela de Conteúdos — Padronização e edição
+## Segmentação de pacientes, familiares e cuidadores
 
-Atualizar `src/pages/app/Conteúdos` (`Content.tsx`) para padronizar todos os cards, adicionar filtros, ações de envio e permitir editar.
+Vamos permitir que conteúdos sejam enviados para públicos segmentados usando os dados já cadastrados (etapa, cidade/estado, idade, status, canal, instituição, relação).
 
-### 1. Filtros no topo
+### 1. Segmentos salvos (audiências reutilizáveis)
 
-Acima da grade de conteúdos:
-- Campo de busca por título.
-- Select **Categoria**: Todos, Medicação, Alimentação, Sono, Atividade física, Família, Geral.
-- Select **Público**: Todos, Paciente, Família, Ambos.
-- Botão "Limpar filtros" quando algum estiver ativo.
+Nova tela **Segmentos** (rota `/app/segmentos`, item no menu lateral) onde a equipe cria audiências nomeadas tipo "Crônicos do Recife" ou "Cuidadores ativos via WhatsApp".
 
-Filtragem feita no cliente sobre `useQuery(qk.content)`.
+Cada segmento tem:
+- Nome + descrição curta.
+- **Tipo de público:** Pacientes / Familiares / Cuidadores / Médicos (multi-seleção).
+- **Filtros** (todos opcionais, combinados por E lógico):
+  - Etapa do paciente (diagnóstico, agudo, crônico) — aplica ao paciente ou ao paciente do contato.
+  - Cidade (texto livre, busca contém).
+  - Estado (UF, 2 letras).
+  - Faixa etária: idade mínima / máxima (calculada a partir de `birth_date`).
+  - Status: ativo / inativo / todos.
+  - Canal: WhatsApp / SMS / todos.
+  - Instituição (texto livre, busca contém).
+- Contador em tempo real: "X destinatários correspondem agora".
+- Lista os nomes que entram no segmento, com paginação.
 
-### 2. Card padronizado
+Botões: **Salvar**, **Excluir**, **Duplicar**.
 
-Todos os cards seguem o mesmo layout:
-- Cabeçalho: badge da categoria + badge do público.
-- Título (truncado em 2 linhas).
-- Trecho do corpo (clamp 3 linhas).
-- Rodapé com 2 botões padrão em todos:
-  - **Enviar** (ícone Send) → abre modal "Enviar conteúdo".
-  - **Para quem** já fica embutido dentro do modal de envio (ver passo 3).
-- Card inteiro clicável → abre modal de visualização/edição.
+### 2. Filtros ad-hoc no envio de conteúdo
 
-### 3. Modal "Enviar conteúdo"
+No modal **Enviar conteúdo** (já existente em `/app/conteudos`), uma terceira aba além de "Em massa" e "Paciente específico":
 
-Acionado pelo botão Enviar do card:
-- Mostra título + prévia do conteúdo.
-- Select **Paciente** (busca em `patients`).
-- Após escolher paciente, lista os **contatos** dele (`contacts` filtrados por `patient_id`) com checkboxes — "Para quem enviar" (paciente, familiar, cuidador, médico). Pelo menos um obrigatório.
-- Select **Canal**: WhatsApp / SMS (default `channel_pref` do contato).
-- Botão "Enviar" insere linhas em `messages` (uma por destinatário) com `body` = corpo do conteúdo, `direction='outbound'`, `status='sent'`, `sent_at=now()`.
+**Aba "Segmentado"** com dois modos:
+- **Usar segmento salvo:** select com os segmentos criados; mostra o nome e o total atual.
+- **Montar filtros agora:** mesmos campos do segmento salvo, sem salvar.
 
-### 4. Modal "Ver / editar conteúdo"
+Em ambos os casos, antes de confirmar o envio aparece a **prévia completa**: lista de cada destinatário (nome, grupo, telefone, canal) com checkbox para desmarcar individualmente, e o contador "Enviando para N de M".
 
-Acionado ao clicar no card:
-- Mesma estrutura do modal "Novo conteúdo" mas pré-preenchido.
-- Campos: Título, Categoria, Público, Conteúdo.
-- Validação Zod (título min 2, body min 5).
-- Botões: **Salvar** (UPDATE em `content_library`), **Excluir** (DELETE com confirm), **Fechar**.
-- Botão Salvar desabilitado até o schema validar.
+### 3. Como a segmentação é resolvida
+
+Para cada combinação de filtros, o sistema:
+1. Busca pacientes ativos na instituição (RLS já cobre).
+2. Para públicos "paciente": aplica os filtros direto na tabela `patients`.
+3. Para públicos "familiar/cuidador/médico": junta `contacts` com `patients` e aplica os filtros (etapa vem do paciente; cidade/estado/idade/status/canal podem vir do contato).
+4. Resultado é a lista de destinatários da prévia.
+
+Idade é calculada como `date_part('year', age(birth_date))`.
+
+### 4. Envio
+
+Botão "Enviar agora" insere uma linha em `messages` por destinatário (mesmo padrão atual): `body` = corpo do conteúdo, `patient_id`, `contact_id` (quando aplicável), `channel` = canal do destinatário (ou override escolhido), `direction='outbound'`, `status='sent'`, `sent_at=now()`.
+
+Toast de sucesso mostra "Enviado para N destinatários".
 
 ### 5. Detalhes técnicos
 
-- Reaproveitar `Dialog`, `Select`, `Input`, `Textarea`, `Badge`, `Button` já existentes.
-- Estado local: `filters {q, category, audience}`, `sendOpen`, `editOpen`.
-- Invalidar `qk.content` após create/update/delete; invalidar `qk.messages` após envio.
-- Manter todas as cores via tokens semânticos (sem cores hardcoded).
-- Sem mudanças de schema no banco — `content_library`, `patients`, `contacts`, `messages` já cobrem o necessário.
+**Schema novo (migração):**
+- Tabela `audience_segments`: `id`, `name`, `description`, `audience_types text[]` (paciente/familiar/cuidador/medico), `filters jsonb` (estrutura: `{stages, city, state, age_min, age_max, status, channel, institution}`), `owner_id`, `institution`, `created_at`, `updated_at`.
+- RLS: leitura/escrita pela instituição do usuário (mesmo padrão de `patients`); exclusão pelo dono ou admin.
+- Trigger `set_updated_at`.
 
-### Arquivos alterados
+**Frontend:**
+- Novo arquivo `src/pages/app/Segments.tsx` (lista + form lateral/modal).
+- Componente compartilhado `src/components/app/SegmentFilters.tsx` (campos de filtro + preview) reusado em Segments.tsx e no modal de envio em `Content.tsx`.
+- Componente `src/components/app/RecipientPreview.tsx` (lista com checkboxes, total, busca).
+- Query helper `resolveSegment(filters, audienceTypes)` em `src/lib/segments.ts` que retorna `Array<{ kind: 'patient'|'contact', id, patient_id, contact_id?, name, phone, channel, relation? }>`.
+- Adicionar `qk.segments` em `src/lib/queries.ts` e fetcher correspondente; prefetch na rota.
+- Rota nova em `src/App.tsx` e item no menu (`src/components/app/AppLayout.tsx`).
+- Atualizar `SendContentDialog` em `src/pages/app/Content.tsx` com aba "Segmentado" usando os dois componentes acima.
 
-- `src/pages/app/Content.tsx` — reescrita do componente.
+**UX:**
+- Filtros vazios = sem filtro (não restringe).
+- Estado/UF normalizado em maiúsculas.
+- Contador de prévia com debounce de 300ms.
+- Tokens semânticos (sem cores hardcoded).
+- Validação Zod nos nomes de segmento (min 2, max 80).
+
+### Arquivos alterados / criados
+
+- novo: `src/pages/app/Segments.tsx`
+- novo: `src/components/app/SegmentFilters.tsx`
+- novo: `src/components/app/RecipientPreview.tsx`
+- novo: `src/lib/segments.ts`
+- editado: `src/pages/app/Content.tsx` (nova aba no modal de envio)
+- editado: `src/App.tsx` (rota)
+- editado: `src/components/app/AppLayout.tsx` (item de menu)
+- editado: `src/lib/queries.ts` (qk + fetcher + prefetch)
+- migração: criar tabela `audience_segments` + RLS + trigger
