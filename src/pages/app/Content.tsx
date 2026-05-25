@@ -231,9 +231,23 @@ function ContentFormDialog({
 }) {
   const isEdit = !!initial;
   const [form, setForm] = useState({
-    title: "", category: "medicacao", audience: "ambos", body: "",
+    title: "",
+    category: "medicacao",
+    audience: "ambos",
+    body: "",
+    targeting_mode: "all" as TargetingMode,
+    audience_types: [] as AudienceType[],
+    segment_id: null as string | null,
+    filters: emptyFilters(),
   });
   const [saving, setSaving] = useState(false);
+  const [previewKeys, setPreviewKeys] = useState<Set<string>>(new Set());
+
+  const { data: segments = [] } = useQuery<SegmentDef[]>({
+    queryKey: qk.segments,
+    queryFn: fetchers.segments as () => Promise<SegmentDef[]>,
+    enabled: open,
+  });
 
   useEffect(() => {
     if (open) {
@@ -242,19 +256,65 @@ function ContentFormDialog({
         category: initial?.category ?? "medicacao",
         audience: initial?.audience ?? "ambos",
         body: initial?.body ?? "",
+        targeting_mode: (initial?.targeting_mode ?? "all") as TargetingMode,
+        audience_types: (initial?.audience_types ?? []) as AudienceType[],
+        segment_id: initial?.segment_id ?? null,
+        filters: { ...emptyFilters(), ...(initial?.filters ?? {}) },
       });
+      setPreviewKeys(new Set());
     }
   }, [open, initial]);
 
-  const valid = contentSchema.safeParse(form).success;
+  const parsed = contentSchema.safeParse(form);
+  const valid = parsed.success;
+
+  // Live recipient preview
+  const previewAudiences = useMemo<AudienceType[]>(() => {
+    if (form.targeting_mode === "all") return ALL_AUDIENCES;
+    if (form.targeting_mode === "audiences" || form.targeting_mode === "filters") return form.audience_types;
+    if (form.targeting_mode === "segment") {
+      const s = (segments as SegmentDef[]).find((x) => x.id === form.segment_id);
+      return (s?.audience_types ?? []) as AudienceType[];
+    }
+    return [];
+  }, [form, segments]);
+  const previewFilters = useMemo<SegmentFilters>(() => {
+    if (form.targeting_mode === "filters") return form.filters;
+    if (form.targeting_mode === "segment") {
+      const s = (segments as SegmentDef[]).find((x) => x.id === form.segment_id);
+      return (s?.filters ?? emptyFilters()) as SegmentFilters;
+    }
+    return emptyFilters();
+  }, [form, segments]);
+
+  const { data: previewRecipients = [], isLoading: previewLoading } = useQuery<Recipient[]>({
+    queryKey: ["content-targeting-preview", previewAudiences, previewFilters],
+    queryFn: () => resolveRecipients(previewAudiences, previewFilters),
+    enabled: open && previewAudiences.length > 0,
+  });
 
   const save = async () => {
-    const parsed = contentSchema.safeParse(form);
-    if (!parsed.success) return toast.error("Verifique os campos");
+    if (!parsed.success) return toast.error(parsed.error.issues[0]?.message ?? "Verifique os campos");
     setSaving(true);
+    // Derive legacy `audience` for back-compat
+    const aud = form.targeting_mode === "all"
+      ? "ambos"
+      : form.audience_types.length === 1
+        ? (form.audience_types[0] === "familiar" ? "familia" : form.audience_types[0])
+        : "ambos";
+    const payload = {
+      title: form.title.trim(),
+      category: form.category,
+      audience: aud,
+      body: form.body.trim(),
+      targeting_mode: form.targeting_mode,
+      audience_types: form.targeting_mode === "all" ? [] : form.audience_types,
+      segment_id: form.targeting_mode === "segment" ? form.segment_id : null,
+      filters: form.targeting_mode === "filters" ? form.filters : {},
+    };
     const { error } = isEdit
-      ? await supabase.from("content_library").update(parsed.data).eq("id", initial!.id)
-      : await supabase.from("content_library").insert(parsed.data as any);
+      ? await supabase.from("content_library").update(payload as any).eq("id", initial!.id)
+      : await supabase.from("content_library").insert(payload as any);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success(isEdit ? "Conteúdo atualizado" : "Conteúdo adicionado");
@@ -274,7 +334,7 @@ function ContentFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar conteúdo" : "Adicionar conteúdo"}</DialogTitle>
         </DialogHeader>
@@ -287,25 +347,14 @@ function ContentFormDialog({
               placeholder="Ex: Como tomar o medicamento corretamente"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Público</Label>
-              <Select value={form.audience} onValueChange={(v) => setForm({ ...form, audience: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {AUDIENCES.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Categoria</Label>
+            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>Conteúdo</Label>
@@ -315,6 +364,109 @@ function ContentFormDialog({
               onChange={(e) => setForm({ ...form, body: e.target.value })}
               placeholder="Escreva a orientação completa..."
             />
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+            <div className="space-y-1">
+              <Label className="text-sm font-semibold text-brand">Segmentação</Label>
+              <p className="text-xs text-muted-foreground">Direcione este conteúdo para o público certo.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { v: "all", label: "Todos" },
+                { v: "audiences", label: "Tipos de público" },
+                { v: "segment", label: "Segmento salvo" },
+                { v: "filters", label: "Filtros personalizados" },
+              ].map((opt) => (
+                <button
+                  key={opt.v}
+                  type="button"
+                  onClick={() => setForm({ ...form, targeting_mode: opt.v as TargetingMode })}
+                  className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+                    form.targeting_mode === opt.v
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {form.targeting_mode === "audiences" && (
+              <div className="space-y-2">
+                <Label>Tipos de público</Label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(Object.keys(AUDIENCE_LABELS) as AudienceType[]).map((a) => (
+                    <label key={a} className="flex items-center gap-2 rounded-lg border border-border bg-card p-2 text-sm cursor-pointer hover:bg-muted/50">
+                      <Checkbox
+                        checked={form.audience_types.includes(a)}
+                        onCheckedChange={(v) =>
+                          setForm({
+                            ...form,
+                            audience_types: v
+                              ? Array.from(new Set([...form.audience_types, a]))
+                              : form.audience_types.filter((x) => x !== a),
+                          })
+                        }
+                      />
+                      <span>{AUDIENCE_LABELS[a]}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {form.targeting_mode === "segment" && (
+              <div className="space-y-2">
+                <Label>Segmento</Label>
+                <Select
+                  value={form.segment_id ?? ""}
+                  onValueChange={(v) => setForm({ ...form, segment_id: v || null })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione um segmento" /></SelectTrigger>
+                  <SelectContent>
+                    {(segments as SegmentDef[]).length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        Nenhum segmento salvo. Crie em Segmentos.
+                      </div>
+                    ) : (
+                      (segments as SegmentDef[]).map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <a
+                  href="/app/segmentos"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block text-xs text-brand hover:underline"
+                >
+                  Criar novo segmento →
+                </a>
+              </div>
+            )}
+
+            {form.targeting_mode === "filters" && (
+              <SegmentFiltersForm
+                audienceTypes={form.audience_types}
+                onAudienceChange={(v) => setForm({ ...form, audience_types: v })}
+                filters={form.filters}
+                onFiltersChange={(f) => setForm({ ...form, filters: f })}
+              />
+            )}
+
+            {form.targeting_mode !== "all" && previewAudiences.length > 0 && (
+              <RecipientPreview
+                recipients={previewRecipients}
+                loading={previewLoading}
+                selectedKeys={previewKeys}
+                onChange={setPreviewKeys}
+                readOnly
+              />
+            )}
           </div>
         </div>
         <DialogFooter className="gap-2">
