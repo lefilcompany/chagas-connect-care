@@ -96,8 +96,8 @@ export default function AuthPage() {
 
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2"><Label htmlFor="li-email">E-mail</Label><Input id="li-email" name="email" type="email" required /></div>
-                <div className="space-y-2"><Label htmlFor="li-pass">Senha</Label><Input id="li-pass" name="password" type="password" required /></div>
+                <div className="space-y-2"><Label htmlFor="li-email">E-mail</Label><Input id="li-email" name="email" type="email" placeholder="seu@email.com" required /></div>
+                <div className="space-y-2"><Label htmlFor="li-pass">Senha</Label><Input id="li-pass" name="password" type="password" placeholder="Digite sua senha" required /></div>
                 <Button type="submit" variant="hero" className="w-full" disabled={loading}>{loading ? "Entrando..." : "Entrar"}</Button>
               </form>
             </TabsContent>
