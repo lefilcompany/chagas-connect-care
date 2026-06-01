@@ -17,6 +17,7 @@ import Reports from "./pages/app/Reports";
 import Integrations from "./pages/app/Integrations";
 import Profile from "./pages/app/Profile";
 import Segments from "./pages/app/Segments";
+import SegmentEditor from "./pages/app/SegmentEditor";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,9 @@ const App = () => (
               <Route path="mensagens" element={<Messages />} />
               <Route path="conteudos" element={<Content />} />
               <Route path="segmentos" element={<Segments />} />
+              <Route path="segmentos/novo" element={<SegmentEditor />} />
+              <Route path="segmentos/:id/editar" element={<SegmentEditor />} />
+              <Route path="segmentos/:id/duplicar" element={<SegmentEditor />} />
               <Route path="relatorios" element={<Reports />} />
               <Route path="integracoes" element={<Integrations />} />
               <Route path="perfil" element={<Profile />} />
