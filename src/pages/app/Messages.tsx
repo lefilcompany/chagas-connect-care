@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import {
   Send, Search, Plus, UserPlus, RefreshCw, Check, CheckCheck, Clock, ArrowRight, X,
 } from "lucide-react";
-import { User, Phone, MessageSquare } from "lucide-react";
+import { User, Phone, MessageSquare, History } from "lucide-react";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
@@ -78,6 +78,9 @@ export default function Messages() {
 
   // Detail dialog
   const [detail, setDetail] = useState<any | null>(null);
+
+  // Patient history dialog
+  const [historyPatientId, setHistoryPatientId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -181,6 +184,12 @@ export default function Messages() {
     m.contact ? `${m.contact.full_name} (${m.contact.relation})` : m.patients?.full_name ?? "—";
 
   const recipientPhone = (m: any) => m.contact?.phone ?? m.patients?.phone ?? "—";
+
+  const historyPatient = patients.find((p) => p.id === historyPatientId);
+  const historyMessages = useMemo(
+    () => (historyPatientId ? msgs.filter((m: any) => m.patient_id === historyPatientId) : []),
+    [msgs, historyPatientId],
+  );
 
   const selectedPatient = patients.find((p) => p.id === sendPatientId);
   const selectedContact = patientContacts.find((c) => c.id === sendRecipient);
@@ -352,9 +361,22 @@ export default function Messages() {
                       <span className="uppercase font-semibold text-brand">{m.channel}</span>
                       <span>→</span>
                       <span className="text-foreground font-medium">{recipientLabel(m)}</span>
-                      {m.contact && (
-                        <span className="text-muted-foreground">
-                          via {m.patients?.full_name}
+                      {m.patients?.full_name && (
+                        <span
+                          role="link"
+                          tabIndex={0}
+                          onClick={(e) => { e.stopPropagation(); setHistoryPatientId(m.patient_id); }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setHistoryPatientId(m.patient_id);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 text-brand hover:underline cursor-pointer"
+                        >
+                          <History className="h-3 w-3" />
+                          {m.contact ? `via ${m.patients.full_name}` : m.patients.full_name}
                         </span>
                       )}
                     </span>
