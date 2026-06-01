@@ -69,14 +69,6 @@ export default function AuthPage() {
     navigate("/app");
   };
 
-  const handleGoogle = async () => {
-    setLoading(true);
-    const res = await lovable.auth.signInWithOAuth("google", { redirect_uri: `${window.location.origin}/app` });
-    if (res.error) {
-      setLoading(false);
-      toast.error("Não foi possível entrar com Google");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-soft flex items-center justify-center px-4 py-12">
@@ -116,13 +108,6 @@ export default function AuthPage() {
               </form>
             </TabsContent>
 
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">ou</span></div>
-            </div>
-            <Button type="button" variant="outlineBrand" className="w-full" onClick={handleGoogle} disabled={loading}>
-              Continuar com Google
-            </Button>
           </Tabs>
         </div>
         <p className="mt-6 text-center text-sm text-muted-foreground">
