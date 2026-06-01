@@ -102,9 +102,26 @@ export const AppLayout = () => {
             <div className="font-semibold text-brand truncate">{profileName}</div>
             <div className="text-muted-foreground truncate">{user.email}</div>
           </div>
-          <Button variant="ghost" className="w-full justify-start text-foreground/70" onClick={async () => { await signOut(); navigate("/"); }}>
+          <Button variant="ghost" className="w-full justify-start text-foreground/70" onClick={() => setLogoutOpen(true)}>
             <LogOut className="h-4 w-4" /> Sair
           </Button>
+
+          <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar saída</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja sair da sua conta?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={async () => { await signOut(); navigate("/"); }}>
+                  Sair
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </aside>
 
