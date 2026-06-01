@@ -38,6 +38,7 @@ export const AppLayout = () => {
   const queryClient = useQueryClient();
   const [profileName, setProfileName] = useState<string>("");
   const [open, setOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
