@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import {
   Send, Search, Plus, UserPlus, RefreshCw, Check, CheckCheck, Clock, ArrowRight, X,
 } from "lucide-react";
-import { User, Phone, MessageSquare } from "lucide-react";
+import { User, Phone, MessageSquare, History } from "lucide-react";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
@@ -78,6 +78,9 @@ export default function Messages() {
 
   // Detail dialog
   const [detail, setDetail] = useState<any | null>(null);
+
+  // Patient history dialog
+  const [historyPatientId, setHistoryPatientId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -181,6 +184,12 @@ export default function Messages() {
     m.contact ? `${m.contact.full_name} (${m.contact.relation})` : m.patients?.full_name ?? "—";
 
   const recipientPhone = (m: any) => m.contact?.phone ?? m.patients?.phone ?? "—";
+
+  const historyPatient = patients.find((p) => p.id === historyPatientId);
+  const historyMessages = useMemo(
+    () => (historyPatientId ? msgs.filter((m: any) => m.patient_id === historyPatientId) : []),
+    [msgs, historyPatientId],
+  );
 
   const selectedPatient = patients.find((p) => p.id === sendPatientId);
   const selectedContact = patientContacts.find((c) => c.id === sendRecipient);
@@ -351,10 +360,26 @@ export default function Messages() {
                     <span className="flex items-center gap-2">
                       <span className="uppercase font-semibold text-brand">{m.channel}</span>
                       <span>→</span>
-                      <span className="text-foreground font-medium">{recipientLabel(m)}</span>
-                      {m.contact && (
-                        <span className="text-muted-foreground">
-                          via {m.patients?.full_name}
+                      {m.contact ? (
+                        <span className="text-foreground font-medium">{recipientLabel(m)}</span>
+                      ) : null}
+                      {m.patients?.full_name && (
+                        <span
+                          role="link"
+                          tabIndex={0}
+                          onClick={(e) => { e.stopPropagation(); setHistoryPatientId(m.patient_id); }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setHistoryPatientId(m.patient_id);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 text-brand hover:underline cursor-pointer font-medium"
+                          title="Ver histórico do paciente"
+                        >
+                          <History className="h-3 w-3" />
+                          {m.contact ? `via ${m.patients.full_name}` : m.patients.full_name}
                         </span>
                       )}
                     </span>
@@ -550,6 +575,62 @@ export default function Messages() {
                 <RefreshCw className="h-4 w-4" /> Reenviar
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Patient history dialog */}
+      <Dialog open={!!historyPatientId} onOpenChange={(o) => !o && setHistoryPatientId(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Histórico de mensagens — {historyPatient?.full_name ?? ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{historyMessages.length} mensagem(ns) registradas</span>
+              {historyPatientId && (
+                <Link
+                  to={`/app/pacientes/${historyPatientId}`}
+                  className="text-brand hover:underline inline-flex items-center gap-1"
+                  onClick={() => setHistoryPatientId(null)}
+                >
+                  Abrir ficha do paciente <ArrowRight className="h-3 w-3" />
+                </Link>
+              )}
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-border divide-y divide-border">
+              {historyMessages.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">
+                  Nenhuma mensagem registrada para este paciente.
+                </div>
+              ) : (
+                historyMessages.map((m: any) => (
+                  <div key={m.id} className="p-3 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-2">
+                        <span className="uppercase font-semibold text-brand">{m.channel}</span>
+                        <span>→</span>
+                        <span className="text-foreground font-medium">{recipientLabel(m)}</span>
+                        <span className="text-muted-foreground">· {recipientPhone(m)}</span>
+                      </span>
+                      <span>{m.sent_at ? new Date(m.sent_at).toLocaleString("pt-BR") : "—"}</span>
+                    </div>
+                    <div className="text-sm whitespace-pre-wrap">{m.body}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <StatusBadge status={m.status} />
+                      <Button size="sm" variant="outline" onClick={() => resendMessage(m)}>
+                        <RefreshCw className="h-4 w-4" /> Reenviar
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHistoryPatientId(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
