@@ -360,7 +360,9 @@ export default function Messages() {
                     <span className="flex items-center gap-2">
                       <span className="uppercase font-semibold text-brand">{m.channel}</span>
                       <span>→</span>
-                      <span className="text-foreground font-medium">{recipientLabel(m)}</span>
+                      {m.contact ? (
+                        <span className="text-foreground font-medium">{recipientLabel(m)}</span>
+                      ) : null}
                       {m.patients?.full_name && (
                         <span
                           role="link"
@@ -373,7 +375,8 @@ export default function Messages() {
                               setHistoryPatientId(m.patient_id);
                             }
                           }}
-                          className="inline-flex items-center gap-1 text-brand hover:underline cursor-pointer"
+                          className="inline-flex items-center gap-1 text-brand hover:underline cursor-pointer font-medium"
+                          title="Ver histórico do paciente"
                         >
                           <History className="h-3 w-3" />
                           {m.contact ? `via ${m.patients.full_name}` : m.patients.full_name}
