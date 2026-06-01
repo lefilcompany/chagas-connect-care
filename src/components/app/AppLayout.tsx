@@ -10,6 +10,16 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const nav = [
   { to: "/app", end: true, label: "Painel", icon: LayoutDashboard },
@@ -28,6 +38,7 @@ export const AppLayout = () => {
   const queryClient = useQueryClient();
   const [profileName, setProfileName] = useState<string>("");
   const [open, setOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
@@ -91,9 +102,26 @@ export const AppLayout = () => {
             <div className="font-semibold text-brand truncate">{profileName}</div>
             <div className="text-muted-foreground truncate">{user.email}</div>
           </div>
-          <Button variant="ghost" className="w-full justify-start text-foreground/70" onClick={async () => { await signOut(); navigate("/"); }}>
+          <Button variant="ghost" className="w-full justify-start text-foreground/70" onClick={() => setLogoutOpen(true)}>
             <LogOut className="h-4 w-4" /> Sair
           </Button>
+
+          <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar saída</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja sair da sua conta?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={async () => { await signOut(); navigate("/"); }}>
+                  Sair
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </aside>
 
