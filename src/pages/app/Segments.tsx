@@ -57,8 +57,8 @@ export default function Segments() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      <header className="flex flex-wrap md:flex-nowrap items-start md:items-center justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="font-display text-3xl font-bold text-brand">Segmentos</h1>
           <p className="text-muted-foreground mt-1">
             Crie audiências reutilizáveis combinando filtros sobre pacientes, familiares, cuidadores e médicos.
