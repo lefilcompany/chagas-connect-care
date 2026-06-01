@@ -96,22 +96,22 @@ export default function AuthPage() {
 
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2"><Label htmlFor="li-email">E-mail</Label><Input id="li-email" name="email" type="email" required /></div>
-                <div className="space-y-2"><Label htmlFor="li-pass">Senha</Label><Input id="li-pass" name="password" type="password" required /></div>
+                <div className="space-y-2"><Label htmlFor="li-email">E-mail</Label><Input id="li-email" name="email" type="email" placeholder="seu@email.com" required /></div>
+                <div className="space-y-2"><Label htmlFor="li-pass">Senha</Label><Input id="li-pass" name="password" type="password" placeholder="Digite sua senha" required /></div>
                 <Button type="submit" variant="hero" className="w-full" disabled={loading}>{loading ? "Entrando..." : "Entrar"}</Button>
               </form>
             </TabsContent>
 
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
-                <div className="space-y-2"><Label htmlFor="full_name">Nome completo</Label><Input id="full_name" name="full_name" required /></div>
+                <div className="space-y-2"><Label htmlFor="full_name">Nome completo</Label><Input id="full_name" name="full_name" placeholder="Seu nome completo" required /></div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2"><Label htmlFor="role_label">Função</Label><Input id="role_label" name="role_label" placeholder="Médico, Enfermeiro..." required /></div>
                   <div className="space-y-2"><Label htmlFor="professional_registry">CRM/COREN</Label><Input id="professional_registry" name="professional_registry" placeholder="Opcional" /></div>
                 </div>
-                <div className="space-y-2"><Label htmlFor="institution">Instituição</Label><Input id="institution" name="institution" required /></div>
-                <div className="space-y-2"><Label htmlFor="su-email">E-mail</Label><Input id="su-email" name="email" type="email" required /></div>
-                <div className="space-y-2"><Label htmlFor="su-pass">Senha</Label><Input id="su-pass" name="password" type="password" minLength={8} required /></div>
+                <div className="space-y-2"><Label htmlFor="institution">Instituição</Label><Input id="institution" name="institution" placeholder="Nome da instituição" required /></div>
+                <div className="space-y-2"><Label htmlFor="su-email">E-mail</Label><Input id="su-email" name="email" type="email" placeholder="seu@email.com" required /></div>
+                <div className="space-y-2"><Label htmlFor="su-pass">Senha</Label><Input id="su-pass" name="password" type="password" placeholder="Mínimo 8 caracteres" minLength={8} required /></div>
                 <Button type="submit" variant="hero" className="w-full" disabled={loading}>{loading ? "Criando..." : "Criar conta"}</Button>
               </form>
             </TabsContent>
