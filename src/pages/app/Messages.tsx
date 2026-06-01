@@ -212,14 +212,14 @@ export default function Messages() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
+      <header className="flex flex-wrap md:flex-nowrap items-start md:items-center justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="font-display text-3xl font-bold text-brand">Mensagens</h1>
           <p className="text-muted-foreground mt-1">
             Histórico de comunicações enviadas a pacientes, famílias e cuidadores.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap md:flex-nowrap items-center gap-2 shrink-0">
           <Button variant="outline" onClick={() => setNewPatientOpen(true)}>
             <UserPlus className="h-4 w-4" /> Novo paciente
           </Button>
