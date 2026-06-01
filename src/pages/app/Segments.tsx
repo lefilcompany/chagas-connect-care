@@ -1,51 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchers, qk } from "@/lib/queries";
-import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Copy, Trash2, Pencil, Users } from "lucide-react";
-import { z } from "zod";
-import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
-import { RecipientPreview } from "@/components/app/RecipientPreview";
 import {
   AUDIENCE_LABELS, AudienceType, SegmentDef, SegmentFilters,
-  emptyFilters, resolveRecipients,
+  resolveRecipients,
 } from "@/lib/segments";
 
-const nameSchema = z.string().trim().min(2, "Nome muito curto").max(80);
-
 export default function Segments() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState<SegmentDef | null>(null);
-  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { data: segments = [] } = useQuery<SegmentDef[]>({
     queryKey: qk.segments,
     queryFn: fetchers.segments as () => Promise<SegmentDef[]>,
   });
 
-  const openNew = () => {
-    setEditing({
-      id: "",
-      name: "",
-      description: "",
-      audience_types: ["paciente"],
-      filters: emptyFilters(),
-    });
-    setOpen(true);
-  };
-
-  const duplicate = (s: SegmentDef) => {
-    setEditing({ ...s, id: "", name: `${s.name} (cópia)` });
-    setOpen(true);
-  };
+  const openNew = () => navigate("/app/segmentos/novo");
+  const edit = (s: SegmentDef) => navigate(`/app/segmentos/${s.id}/editar`);
+  const duplicate = (s: SegmentDef) => navigate(`/app/segmentos/${s.id}/duplicar`);
 
   const remove = async (id: string) => {
     if (!confirm("Excluir este segmento?")) return;
@@ -89,7 +65,7 @@ export default function Segments() {
               <SegmentChips filters={s.filters} />
               <SegmentCount audience_types={s.audience_types} filters={s.filters} />
               <div className="mt-auto flex items-center gap-2 pt-3 border-t border-border">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => { setEditing(s); setOpen(true); }}>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => edit(s)}>
                   <Pencil className="h-4 w-4" /> Editar
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => duplicate(s)} aria-label="Duplicar">
@@ -103,14 +79,6 @@ export default function Segments() {
           ))}
         </div>
       )}
-
-      <SegmentDialog
-        open={open}
-        onOpenChange={(v) => { setOpen(v); if (!v) setEditing(null); }}
-        initial={editing}
-        ownerId={user?.id ?? null}
-        onSaved={() => queryClient.invalidateQueries({ queryKey: qk.segments })}
-      />
     </div>
   );
 }
@@ -144,115 +112,5 @@ function SegmentCount({ audience_types, filters }: { audience_types: AudienceTyp
       <Users className="h-3.5 w-3.5" />
       {isLoading ? "..." : `${data.length} destinatário${data.length === 1 ? "" : "s"}`}
     </div>
-  );
-}
-
-function SegmentDialog({
-  open, onOpenChange, initial, ownerId, onSaved,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  initial: SegmentDef | null;
-  ownerId: string | null;
-  onSaved: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [audienceTypes, setAudienceTypes] = useState<AudienceType[]>(["paciente"]);
-  const [filters, setFilters] = useState<SegmentFilters>(emptyFilters());
-  const [saving, setSaving] = useState(false);
-  const [institution, setInstitution] = useState("");
-
-  useEffect(() => {
-    if (open) {
-      setName(initial?.name ?? "");
-      setDescription(initial?.description ?? "");
-      setAudienceTypes(initial?.audience_types?.length ? initial.audience_types : ["paciente"]);
-      setFilters(initial?.filters ?? emptyFilters());
-    }
-  }, [open, initial]);
-
-  useEffect(() => {
-    if (!ownerId) return;
-    supabase.from("profiles").select("institution").eq("id", ownerId).maybeSingle()
-      .then(({ data }) => setInstitution(data?.institution ?? ""));
-  }, [ownerId]);
-
-  const { data: recipients = [], isLoading } = useQuery({
-    queryKey: ["segment-resolve-edit", audienceTypes, filters, open],
-    queryFn: () => resolveRecipients(audienceTypes, filters),
-    enabled: open,
-  });
-
-  const isEdit = !!initial?.id;
-  const valid = nameSchema.safeParse(name).success && audienceTypes.length > 0;
-
-  const save = async () => {
-    const parsed = nameSchema.safeParse(name);
-    if (!parsed.success) return toast.error(parsed.error.issues[0].message);
-    if (!audienceTypes.length) return toast.error("Selecione ao menos um tipo de público.");
-    setSaving(true);
-    const payload = {
-      name: parsed.data,
-      description,
-      audience_types: audienceTypes,
-      filters: filters as any,
-      institution,
-      owner_id: ownerId,
-    };
-    const { error } = isEdit
-      ? await supabase.from("audience_segments").update(payload).eq("id", initial!.id)
-      : await supabase.from("audience_segments").insert(payload as any);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success(isEdit ? "Segmento atualizado" : "Segmento criado");
-    onOpenChange(false);
-    onSaved();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar segmento" : "Novo segmento"}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-5">
-          <div className="grid gap-3 sm:grid-cols-[1fr_2fr]">
-            <div className="space-y-1.5">
-              <Label>Nome *</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Crônicos do Recife" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Descrição</Label>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Como esse segmento será usado" />
-            </div>
-          </div>
-
-          <SegmentFiltersForm
-            audienceTypes={audienceTypes}
-            onAudienceChange={setAudienceTypes}
-            filters={filters}
-            onFiltersChange={setFilters}
-          />
-
-          <div className="space-y-2">
-            <Label>Prévia de destinatários</Label>
-            <RecipientPreview
-              recipients={recipients}
-              loading={isLoading}
-              selectedKeys={new Set(recipients.map((r) => r.key))}
-              onChange={() => { /* read-only preview here */ }}
-            />
-            <p className="text-xs text-muted-foreground">A seleção individual fica disponível no momento do envio do conteúdo.</p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button variant="hero" onClick={save} disabled={!valid || saving}>
-            {isEdit ? "Salvar" : "Criar segmento"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
