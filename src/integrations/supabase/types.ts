@@ -261,8 +261,147 @@ export type Database = {
           },
         ]
       }
+      message_batches: {
+        Row: {
+          audience_types: string[]
+          body: string
+          channel: string
+          content_id: string | null
+          created_at: string
+          created_by: string | null
+          filters: Json
+          finished_at: string | null
+          id: string
+          institution: string
+          last_error: string | null
+          name: string
+          segment_id: string | null
+          started_at: string | null
+          status: string
+          targeting_mode: string
+          template_id: string | null
+          total_recipients: number
+        }
+        Insert: {
+          audience_types?: string[]
+          body?: string
+          channel?: string
+          content_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          filters?: Json
+          finished_at?: string | null
+          id?: string
+          institution?: string
+          last_error?: string | null
+          name?: string
+          segment_id?: string | null
+          started_at?: string | null
+          status?: string
+          targeting_mode?: string
+          template_id?: string | null
+          total_recipients?: number
+        }
+        Update: {
+          audience_types?: string[]
+          body?: string
+          channel?: string
+          content_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          filters?: Json
+          finished_at?: string | null
+          id?: string
+          institution?: string
+          last_error?: string | null
+          name?: string
+          segment_id?: string | null
+          started_at?: string | null
+          status?: string
+          targeting_mode?: string
+          template_id?: string | null
+          total_recipients?: number
+        }
+        Relationships: []
+      }
+      message_templates: {
+        Row: {
+          audience_types: string[]
+          body: string
+          category: string
+          channel: string
+          created_at: string
+          created_by: string | null
+          description: string
+          filters: Json
+          id: string
+          institution: string
+          is_active: boolean
+          meta_category: string | null
+          meta_language: string
+          meta_status: string
+          meta_template_id: string | null
+          meta_template_name: string | null
+          name: string
+          segment_id: string | null
+          targeting_mode: string
+          template_kind: string
+          updated_at: string
+          variables: Json
+        }
+        Insert: {
+          audience_types?: string[]
+          body: string
+          category?: string
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          filters?: Json
+          id?: string
+          institution?: string
+          is_active?: boolean
+          meta_category?: string | null
+          meta_language?: string
+          meta_status?: string
+          meta_template_id?: string | null
+          meta_template_name?: string | null
+          name: string
+          segment_id?: string | null
+          targeting_mode?: string
+          template_kind?: string
+          updated_at?: string
+          variables?: Json
+        }
+        Update: {
+          audience_types?: string[]
+          body?: string
+          category?: string
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          filters?: Json
+          id?: string
+          institution?: string
+          is_active?: boolean
+          meta_category?: string | null
+          meta_language?: string
+          meta_status?: string
+          meta_template_id?: string | null
+          meta_template_name?: string | null
+          name?: string
+          segment_id?: string | null
+          targeting_mode?: string
+          template_kind?: string
+          updated_at?: string
+          variables?: Json
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
+          batch_id: string | null
           body: string
           channel: Database["public"]["Enums"]["message_channel"]
           contact_id: string | null
@@ -283,10 +422,12 @@ export type Database = {
           send_attempts: number
           sent_at: string | null
           status: string
+          template_id: string | null
           template_name: string | null
           template_variables: Json
         }
         Insert: {
+          batch_id?: string | null
           body: string
           channel?: Database["public"]["Enums"]["message_channel"]
           contact_id?: string | null
@@ -307,10 +448,12 @@ export type Database = {
           send_attempts?: number
           sent_at?: string | null
           status?: string
+          template_id?: string | null
           template_name?: string | null
           template_variables?: Json
         }
         Update: {
+          batch_id?: string | null
           body?: string
           channel?: Database["public"]["Enums"]["message_channel"]
           contact_id?: string | null
@@ -331,6 +474,7 @@ export type Database = {
           send_attempts?: number
           sent_at?: string | null
           status?: string
+          template_id?: string | null
           template_name?: string | null
           template_variables?: Json
         }

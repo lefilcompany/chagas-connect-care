@@ -20,6 +20,9 @@ import {
 } from "lucide-react";
 import { User, Phone, MessageSquare, History } from "lucide-react";
 import { queueAndSend } from "@/lib/whatsapp";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import TemplatesTab from "@/components/app/messages/TemplatesTab";
+import CampaignTab from "@/components/app/messages/CampaignTab";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
@@ -233,6 +236,14 @@ export default function Messages() {
         </div>
       </header>
 
+      <Tabs defaultValue="historico">
+        <TabsList>
+          <TabsTrigger value="historico">Histórico</TabsTrigger>
+          <TabsTrigger value="modelos">Modelos</TabsTrigger>
+          <TabsTrigger value="campanha">Envio segmentado</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="historico" className="space-y-6">
       {/* Filters */}
       <div className="rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
@@ -393,6 +404,17 @@ export default function Messages() {
           </ul>
         )}
       </div>
+
+        </TabsContent>
+
+        <TabsContent value="modelos">
+          <TemplatesTab />
+        </TabsContent>
+
+        <TabsContent value="campanha">
+          <CampaignTab />
+        </TabsContent>
+      </Tabs>
 
       {/* Send dialog */}
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>

@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
   // Fetch the message
   const { data: msg, error: msgErr } = await admin
     .from("messages")
-    .select("id, patient_id, contact_id, channel, body, status")
+    .select("id, patient_id, contact_id, channel, body, status, template_id, template_variables, send_attempts")
     .eq("id", body.message_id)
     .maybeSingle();
 
@@ -107,6 +107,43 @@ Deno.serve(async (req) => {
     .update({ send_attempts: ((msg as any).send_attempts ?? 0) + 1 })
     .eq("id", msg.id);
 
+  // Build payload: prefer Meta template when message references an approved one
+  let metaPayload: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+    to,
+    type: "text",
+    text: { body: msg.body, preview_url: false },
+  };
+
+  if ((msg as any).template_id) {
+    const { data: tpl } = await admin
+      .from("message_templates")
+      .select("template_kind, meta_template_name, meta_language, meta_status")
+      .eq("id", (msg as any).template_id)
+      .maybeSingle();
+    if (
+      tpl &&
+      tpl.template_kind === "meta" &&
+      tpl.meta_status === "approved" &&
+      tpl.meta_template_name
+    ) {
+      const vars = ((msg as any).template_variables ?? {}) as Record<string, string>;
+      const params = Object.values(vars).map((v) => ({ type: "text", text: String(v ?? "") }));
+      metaPayload = {
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: {
+          name: tpl.meta_template_name,
+          language: { code: tpl.meta_language || "pt_BR" },
+          ...(params.length
+            ? { components: [{ type: "body", parameters: params }] }
+            : {}),
+        },
+      };
+    }
+  }
+
   // Call Meta Cloud API
   let metaRes: Response;
   try {
@@ -116,12 +153,7 @@ Deno.serve(async (req) => {
         Authorization: `Bearer ${WHATSAPP_TOKEN}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to,
-        type: "text",
-        text: { body: msg.body, preview_url: false },
-      }),
+      body: JSON.stringify(metaPayload),
     });
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
