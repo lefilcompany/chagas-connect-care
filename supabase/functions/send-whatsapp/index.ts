@@ -1,0 +1,177 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+
+const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
+const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
+const META_API = `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function normalizeBRPhone(input: string): string | null {
+  const digits = (input ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  let p = digits;
+  if (!p.startsWith("55")) p = "55" + p;
+  if (p.length < 12 || p.length > 13) return null;
+  return p;
+}
+
+type SendBody = { message_id?: string };
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json(405, { error: "Method not allowed" });
+
+  // Auth: require valid JWT from app
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "Unauthorized" });
+  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const token = authHeader.replace("Bearer ", "");
+  const { data: claims, error: authErr } = await authClient.auth.getClaims(token);
+  if (authErr || !claims?.claims) return json(401, { error: "Unauthorized" });
+
+  let body: SendBody;
+  try {
+    body = await req.json();
+  } catch {
+    return json(400, { error: "Invalid JSON" });
+  }
+  if (!body.message_id || typeof body.message_id !== "string") {
+    return json(400, { error: "message_id is required" });
+  }
+
+  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+    return json(500, { error: "WhatsApp credentials not configured" });
+  }
+
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  // Fetch the message
+  const { data: msg, error: msgErr } = await admin
+    .from("messages")
+    .select("id, patient_id, contact_id, channel, body, status")
+    .eq("id", body.message_id)
+    .maybeSingle();
+
+  if (msgErr || !msg) return json(404, { error: "Message not found" });
+  if (msg.channel !== "whatsapp") {
+    return json(400, { error: "Message channel is not whatsapp" });
+  }
+
+  // Resolve destination
+  let toRaw = "";
+  if (msg.contact_id) {
+    const { data: c } = await admin
+      .from("contacts")
+      .select("phone")
+      .eq("id", msg.contact_id)
+      .maybeSingle();
+    toRaw = c?.phone ?? "";
+  } else {
+    const { data: p } = await admin
+      .from("patients")
+      .select("phone")
+      .eq("id", msg.patient_id)
+      .maybeSingle();
+    toRaw = p?.phone ?? "";
+  }
+
+  const to = normalizeBRPhone(toRaw);
+  if (!to) {
+    await admin
+      .from("messages")
+      .update({
+        status: "failed",
+        failed_at: new Date().toISOString(),
+        last_error: "Telefone destinatário inválido",
+        send_attempts: ((msg as any).send_attempts ?? 0) + 1,
+      })
+      .eq("id", msg.id);
+    return json(400, { error: "Invalid destination phone" });
+  }
+
+  // Increment attempts upfront
+  await admin.rpc("noop_just_in_case").catch(() => {});
+  await admin
+    .from("messages")
+    .update({ send_attempts: ((msg as any).send_attempts ?? 0) + 1 })
+    .eq("id", msg.id);
+
+  // Call Meta Cloud API
+  let metaRes: Response;
+  try {
+    metaRes = await fetch(META_API, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: msg.body, preview_url: false },
+      }),
+    });
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : String(e);
+    await admin
+      .from("messages")
+      .update({
+        status: "failed",
+        failed_at: new Date().toISOString(),
+        last_error: `Network error: ${errMsg}`,
+      })
+      .eq("id", msg.id);
+    return json(502, { ok: false, error: errMsg });
+  }
+
+  const metaJson = await metaRes.json().catch(() => ({}));
+
+  if (!metaRes.ok) {
+    const errText =
+      metaJson?.error?.message ??
+      metaJson?.error?.error_user_msg ??
+      `Meta API error (${metaRes.status})`;
+    await admin
+      .from("messages")
+      .update({
+        status: "failed",
+        failed_at: new Date().toISOString(),
+        last_error: String(errText).slice(0, 1000),
+      })
+      .eq("id", msg.id);
+    return json(502, { ok: false, error: errText });
+  }
+
+  const externalId: string | undefined = metaJson?.messages?.[0]?.id;
+  const nowIso = new Date().toISOString();
+
+  const { error: updErr } = await admin
+    .from("messages")
+    .update({
+      status: "sent",
+      sent_at: nowIso,
+      external_message_id: externalId ?? null,
+      provider: "meta_whatsapp_cloud",
+      last_error: null,
+    })
+    .eq("id", msg.id);
+
+  if (updErr) {
+    return json(500, { ok: false, error: updErr.message });
+  }
+
+  return json(200, { ok: true, external_message_id: externalId ?? null });
+});
