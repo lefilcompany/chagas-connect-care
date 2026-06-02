@@ -145,8 +145,27 @@ Deno.serve(async (req) => {
     type: "text",
     text: { body: msg.body, preview_url: false },
   };
+  let sendKind: "text" | "template" = "text";
+  let usedTemplateName: string | null = null;
+  let usedTemplateLanguage: string | null = null;
 
-  if ((msg as any).template_id) {
+  // Test mode: always send the configured test template (e.g. hello_world)
+  if (WHATSAPP_TEST_MODE) {
+    sendKind = "template";
+    usedTemplateName = WHATSAPP_TEST_TEMPLATE_NAME;
+    usedTemplateLanguage = WHATSAPP_TEST_TEMPLATE_LANGUAGE;
+    metaPayload = {
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: WHATSAPP_TEST_TEMPLATE_NAME,
+        language: { code: WHATSAPP_TEST_TEMPLATE_LANGUAGE },
+      },
+    };
+  }
+
+  if (!WHATSAPP_TEST_MODE && (msg as any).template_id) {
     const { data: tpl } = await admin
       .from("message_templates")
       .select("template_kind, meta_template_name, meta_language, meta_status")
@@ -160,6 +179,9 @@ Deno.serve(async (req) => {
     ) {
       const vars = ((msg as any).template_variables ?? {}) as Record<string, string>;
       const params = Object.values(vars).map((v) => ({ type: "text", text: String(v ?? "") }));
+      sendKind = "template";
+      usedTemplateName = tpl.meta_template_name;
+      usedTemplateLanguage = tpl.meta_language || "pt_BR";
       metaPayload = {
         messaging_product: "whatsapp",
         to,
