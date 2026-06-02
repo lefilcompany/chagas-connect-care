@@ -337,6 +337,7 @@ export type Database = {
           id: string
           institution: string
           is_active: boolean
+          is_default: boolean
           meta_category: string | null
           meta_language: string
           meta_status: string
@@ -361,6 +362,7 @@ export type Database = {
           id?: string
           institution?: string
           is_active?: boolean
+          is_default?: boolean
           meta_category?: string | null
           meta_language?: string
           meta_status?: string
@@ -385,6 +387,7 @@ export type Database = {
           id?: string
           institution?: string
           is_active?: boolean
+          is_default?: boolean
           meta_category?: string | null
           meta_language?: string
           meta_status?: string

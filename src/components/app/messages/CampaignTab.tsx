@@ -6,28 +6,38 @@ import { fetchers, qk } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Send, AlertTriangle } from "lucide-react";
+import {
+  Send, AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2,
+} from "lucide-react";
 import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
 import { RecipientPreview } from "@/components/app/RecipientPreview";
 import {
   ALL_AUDIENCES, AUDIENCE_LABELS, AudienceType, Recipient, SegmentDef,
   SegmentFilters, TargetingMode, emptyFilters, resolveRecipients,
 } from "@/lib/segments";
-import { extractVariables, renderTemplate, type MessageTemplate } from "@/lib/templates";
+import {
+  extractVariables, renderTemplate, type MessageTemplate,
+} from "@/lib/templates";
 import { createBatch } from "@/lib/whatsapp";
+import { TemplateCard, StartBlankCard } from "./TemplateCard";
+import { WhatsAppPreview } from "./WhatsAppPreview";
 
-export default function CampaignTab() {
+const STEPS = ["Modelo", "Público", "Destinatários", "Revisar", "Enviar"] as const;
+
+export default function CampaignTab({
+  initialTemplateId,
+  onConsumeInitial,
+}: {
+  initialTemplateId?: string | null;
+  onConsumeInitial?: () => void;
+} = {}) {
   const { user } = useAuth();
   const qc = useQueryClient();
+
   const { data: templates = [] } = useQuery<MessageTemplate[]>({
     queryKey: qk.templates,
     queryFn: fetchers.templates as () => Promise<MessageTemplate[]>,
@@ -37,16 +47,18 @@ export default function CampaignTab() {
     queryFn: fetchers.segments as () => Promise<SegmentDef[]>,
   });
 
+  const [step, setStep] = useState(0);
   const [templateId, setTemplateId] = useState<string>("");
-  const [name, setName] = useState("");
-  const [body, setBody] = useState("");
+  const [freeBody, setFreeBody] = useState("");
+  const [campaignName, setCampaignName] = useState("");
   const [vars, setVars] = useState<Record<string, string>>({});
+
   const [mode, setMode] = useState<TargetingMode>("audiences");
   const [aud, setAud] = useState<AudienceType[]>(["paciente"]);
   const [segmentId, setSegmentId] = useState<string | null>(null);
   const [filters, setFilters] = useState<SegmentFilters>(emptyFilters());
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [institution, setInstitution] = useState("");
 
@@ -57,6 +69,16 @@ export default function CampaignTab() {
     }
   }, [user]);
 
+  // Apply preselected template (when navigated from "Usar modelo > Segmento")
+  useEffect(() => {
+    if (initialTemplateId) {
+      setTemplateId(initialTemplateId);
+      setStep(1);
+      onConsumeInitial?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTemplateId]);
+
   const activeTemplates = useMemo(
     () => templates.filter((t) => t.is_active),
     [templates],
@@ -66,21 +88,27 @@ export default function CampaignTab() {
     [activeTemplates, templateId],
   );
 
-  // Apply template selection
+  // When template changes, reset body/vars
   useEffect(() => {
     if (!selectedTemplate) return;
-    setBody(selectedTemplate.body);
+    if (!campaignName) setCampaignName(selectedTemplate.name);
     const detected = extractVariables(selectedTemplate.body);
-    const next: Record<string, string> = {};
-    detected.forEach((v) => (next[v] = vars[v] ?? ""));
-    setVars(next);
-    if (!name) setName(selectedTemplate.name);
+    setVars((cur) => {
+      const next: Record<string, string> = {};
+      detected.forEach((v) => (next[v] = cur[v] ?? ""));
+      return next;
+    });
+    // Apply default segmentation from template, if any
+    if (selectedTemplate.targeting_mode && selectedTemplate.targeting_mode !== "all") {
+      setMode(selectedTemplate.targeting_mode as TargetingMode);
+      if (selectedTemplate.audience_types?.length) {
+        setAud(selectedTemplate.audience_types as AudienceType[]);
+      }
+      if (selectedTemplate.filters) setFilters(selectedTemplate.filters as SegmentFilters);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId]);
 
-  const detectedVars = useMemo(() => extractVariables(body), [body]);
-
-  // Resolve audience/filters
   const previewAud = useMemo<AudienceType[]>(() => {
     if (mode === "all") return ALL_AUDIENCES;
     if (mode === "audiences" || mode === "filters") return aud;
@@ -103,9 +131,11 @@ export default function CampaignTab() {
   const { data: recipients = [], isLoading: previewLoading } = useQuery<Recipient[]>({
     queryKey: ["campaign-recipients", previewAud, previewFilters],
     queryFn: () => resolveRecipients(previewAud, previewFilters),
-    enabled: previewAud.length > 0,
+    enabled: previewAud.length > 0 && step >= 2,
   });
 
+  const body = selectedTemplate?.body ?? freeBody;
+  const detectedVars = useMemo(() => extractVariables(body), [body]);
   const renderedBody = useMemo(() => renderTemplate(body, vars), [body, vars]);
 
   const finalRecipients = useMemo(
@@ -113,13 +143,19 @@ export default function CampaignTab() {
     [recipients, selected],
   );
 
-  const canSend = !sending && finalRecipients.length > 0 && renderedBody.trim().length >= 3;
+  const stepValid = (i: number): boolean => {
+    if (i === 0) return !!selectedTemplate || freeBody.trim().length >= 3;
+    if (i === 1) return previewAud.length > 0;
+    if (i === 2) return finalRecipients.length > 0;
+    if (i === 3) return renderedBody.trim().length >= 3;
+    return true;
+  };
 
   const handleSend = async () => {
-    if (!canSend) return;
+    if (finalRecipients.length === 0) return toast.error("Sem destinatários");
     setSending(true);
     const result = await createBatch({
-      name: name.trim() || (selectedTemplate?.name ?? "Campanha"),
+      name: campaignName.trim() || (selectedTemplate?.name ?? "Campanha"),
       body: renderedBody,
       recipients: finalRecipients,
       template: selectedTemplate
@@ -140,91 +176,80 @@ export default function CampaignTab() {
       created_by: user?.id ?? null,
     });
     setSending(false);
-    setConfirmOpen(false);
     qc.invalidateQueries({ queryKey: qk.messages });
     qc.invalidateQueries({ queryKey: qk.batches });
-    if (!result.ok) {
-      toast.error(result.error ?? "Falha ao enviar campanha");
-      return;
-    }
+    if (!result.ok) return toast.error(result.error ?? "Falha ao disparar campanha");
     toast.success(
       `Campanha disparada: ${result.ok_count ?? finalRecipients.length} enviadas` +
         (result.failed_count ? `, ${result.failed_count} falharam` : ""),
     );
+    // Reset
+    setStep(0);
+    setTemplateId("");
+    setFreeBody("");
+    setCampaignName("");
+    setVars({});
+    setSelected(new Set());
   };
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
-        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-        <span>
-          Em saúde, sempre revise a mensagem e a prévia dos destinatários antes de disparar.
-          Cada destinatário receberá uma mensagem individual com registro próprio.
-        </span>
-      </div>
+      <Stepper step={step} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {step === 0 && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Escolha um modelo pronto para padronizar a mensagem ou comece em branco.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <StartBlankCard onClick={() => { setTemplateId(""); setStep(1); }} />
+            {activeTemplates.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => { setTemplateId(t.id); setStep(1); }}
+                className={`text-left rounded-2xl transition-all ${
+                  templateId === t.id ? "ring-2 ring-primary" : ""
+                }`}
+              >
+                <TemplateCard
+                  template={t}
+                  onUse={() => { setTemplateId(t.id); setStep(1); }}
+                  onEdit={() => { setTemplateId(t.id); setStep(1); }}
+                  onDuplicate={() => { setTemplateId(t.id); setStep(1); }}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step === 1 && (
         <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Modelo (opcional)</Label>
-            <Select value={templateId || "_none"} onValueChange={(v) => setTemplateId(v === "_none" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Texto livre" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">Texto livre (sem modelo)</SelectItem>
-                {activeTemplates.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name} {t.template_kind === "meta" ? "(Meta)" : "(Interno)"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Nome da campanha</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Lembrete consulta - março" />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Mensagem</Label>
-            <Textarea
-              rows={6}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Texto da mensagem..."
-              disabled={selectedTemplate?.template_kind === "meta"}
-            />
-            {selectedTemplate?.template_kind === "meta" && (
-              <p className="text-[11px] text-muted-foreground">
-                Texto fixo pelo template aprovado da Meta. Apenas as variáveis podem ser editadas.
-              </p>
-            )}
-          </div>
-
-          {detectedVars.length > 0 && (
-            <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
-              <Label className="text-xs uppercase">Variáveis</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {detectedVars.map((v) => (
-                  <div key={v} className="space-y-1">
-                    <Label className="text-xs font-mono">{`{${v}}`}</Label>
-                    <Input
-                      value={vars[v] ?? ""}
-                      onChange={(e) => setVars({ ...vars, [v]: e.target.value })}
-                      placeholder={v}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="rounded-md border border-border bg-card p-2 text-xs whitespace-pre-wrap">
-                <span className="font-semibold text-muted-foreground">Preview: </span>
-                {renderedBody}
-              </div>
+          {!selectedTemplate && (
+            <div className="space-y-1.5">
+              <Label>Mensagem (texto livre)</Label>
+              <textarea
+                rows={4}
+                value={freeBody}
+                onChange={(e) => setFreeBody(e.target.value)}
+                placeholder="Escreva a mensagem. Use {variavel} para campos dinâmicos."
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
             </div>
           )}
 
+          <div className="space-y-1.5">
+            <Label>Nome da campanha</Label>
+            <Input
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+              placeholder="Ex: Lembrete consulta — março"
+            />
+          </div>
+
           <div className="space-y-2">
-            <Label className="text-xs uppercase">Segmentação</Label>
+            <Label className="text-xs uppercase">Público</Label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[
                 { v: "all", label: "Todos" },
@@ -248,7 +273,7 @@ export default function CampaignTab() {
             </div>
 
             {mode === "audiences" && (
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex flex-wrap gap-2 pt-2">
                 {(Object.keys(AUDIENCE_LABELS) as AudienceType[]).map((a) => {
                   const on = aud.includes(a);
                   return (
@@ -292,59 +317,133 @@ export default function CampaignTab() {
             )}
           </div>
         </div>
+      )}
 
+      {step === 2 && (
         <div className="space-y-3">
-          <Label className="text-xs uppercase">Destinatários</Label>
+          <p className="text-sm text-muted-foreground">
+            Confira a lista de destinatários e remova quem não deve receber.
+          </p>
           <RecipientPreview
             recipients={recipients}
             loading={previewLoading}
             selectedKeys={selected}
             onChange={setSelected}
           />
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-4">
+          {detectedVars.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+              <Label className="text-xs uppercase">Variáveis</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {detectedVars.map((v) => (
+                  <div key={v} className="space-y-1">
+                    <Label className="font-mono text-xs">{`{${v}}`}</Label>
+                    <Input
+                      value={vars[v] ?? ""}
+                      onChange={(e) => setVars({ ...vars, [v]: e.target.value })}
+                      placeholder={v.replace(/_/g, " ")}
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Estes valores serão aplicados a todos os destinatários selecionados.
+              </p>
+            </div>
+          )}
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2 text-sm">
+              <h4 className="font-semibold text-brand">Resumo</h4>
+              <p><span className="text-muted-foreground">Campanha:</span> {campaignName || "—"}</p>
+              <p><span className="text-muted-foreground">Modelo:</span> {selectedTemplate?.name ?? "Texto livre"}</p>
+              <p><span className="text-muted-foreground">Destinatários:</span> {finalRecipients.length}</p>
+            </div>
+            <WhatsAppPreview body={renderedBody} recipientName="Destinatário" highlightVars={false} />
+          </div>
+
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              Cada destinatário receberá uma mensagem individual, registrada no histórico.
+              Revise o texto antes de continuar.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="space-y-4 text-center py-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Send className="h-7 w-7" />
+          </div>
+          <h3 className="font-display text-xl font-bold text-brand">
+            Confirmar disparo para {finalRecipients.length} destinatário(s)?
+          </h3>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Ao confirmar, as mensagens entram na fila e são enviadas pelo WhatsApp.
+            Você poderá acompanhar o status no Histórico.
+          </p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">
+        <Button
+          variant="ghost"
+          onClick={() => setStep((s) => Math.max(0, s - 1))}
+          disabled={step === 0 || sending}
+        >
+          <ChevronLeft className="h-4 w-4" /> Voltar
+        </Button>
+        {step < STEPS.length - 1 ? (
           <Button
             variant="hero"
-            className="w-full"
-            disabled={!canSend}
-            onClick={() => setConfirmOpen(true)}
+            onClick={() => setStep((s) => s + 1)}
+            disabled={!stepValid(step)}
           >
-            <Send className="h-4 w-4" /> Disparar para {finalRecipients.length} destinatário(s)
+            Avançar <ChevronRight className="h-4 w-4" />
           </Button>
-          {recipients.length > 0 && finalRecipients.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              Nenhum destinatário válido (telefone WhatsApp e seleção).
-            </p>
-          )}
-        </div>
+        ) : (
+          <Button variant="hero" onClick={handleSend} disabled={sending || finalRecipients.length === 0}>
+            <CheckCircle2 className="h-4 w-4" />
+            {sending ? "Disparando..." : "Confirmar e enviar"}
+          </Button>
+        )}
       </div>
-
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar disparo</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-sm">
-            <p>
-              Você vai disparar uma mensagem para{" "}
-              <strong>{finalRecipients.length}</strong> destinatário(s).
-            </p>
-            <div className="rounded-md border border-border bg-muted/30 p-3 whitespace-pre-wrap text-xs">
-              {renderedBody}
-            </div>
-            {selectedTemplate && (
-              <Badge variant="outline">
-                Modelo: {selectedTemplate.name}
-                {selectedTemplate.template_kind === "meta" ? " · Meta" : " · Interno"}
-              </Badge>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
-            <Button variant="hero" onClick={handleSend} disabled={sending}>
-              {sending ? "Disparando..." : "Confirmar e enviar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
+  );
+}
+
+function Stepper({ step }: { step: number }) {
+  return (
+    <ol className="flex items-center gap-2">
+      {STEPS.map((label, i) => {
+        const active = i === step;
+        const done = i < step;
+        return (
+          <li key={label} className="flex flex-1 items-center gap-2">
+            <div
+              className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : done
+                    ? "bg-emerald-500 text-white"
+                    : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {i + 1}
+            </div>
+            <span className={`text-xs font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}>
+              {label}
+            </span>
+            {i < STEPS.length - 1 && <div className="ml-1 h-px flex-1 bg-border" />}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
