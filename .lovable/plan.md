@@ -1,120 +1,137 @@
-## Integração WhatsApp Cloud API (Meta) — chagas-connect-care
+## Templates de mensagem + envio individual e segmentado
 
-Integração real de envio via WhatsApp Cloud API, substituindo o envio simulado. Tudo passa por Edge Functions no backend; o token da Meta nunca aparece no front-end.
+Evolução da integração WhatsApp em `/app/mensagens` com modelos reutilizáveis, envio segmentado controlado e separação clara entre **modelo interno** e **template aprovado pela Meta**.
 
-### Etapa 1 — Schema: ampliar `messages`
+---
 
-Migration adicionando colunas (sem quebrar dados existentes):
+### 1. Banco de dados (migração)
 
-- `external_message_id text`
-- `provider text default 'meta_whatsapp_cloud'`
-- `message_type text default 'manual'`
-- `template_name text`
-- `template_variables jsonb default '{}'::jsonb`
-- `queued_at timestamptz`
-- `delivered_at timestamptz`
-- `read_at timestamptz`
-- `failed_at timestamptz`
-- `last_error text`
-- `send_attempts int default 0`
+**`message_templates`** — modelos criados no sistema.
+- Campos: `id`, `name`, `description`, `category`, `body`, `variables jsonb default '[]'`, `targeting_mode`, `audience_types text[]`, `segment_id`, `filters jsonb`, `channel default 'whatsapp'`, `template_kind default 'internal'` (`internal` | `meta`), `meta_template_name`, `meta_template_id`, `meta_language default 'pt_BR'`, `meta_category`, `meta_status default 'not_submitted'`, `institution`, `created_by`, `is_active default true`, `created_at`, `updated_at`.
+- GRANTs para `authenticated` e `service_role`.
+- RLS: leitura/edição por instituição (padrão dos demais `audience_segments`); admin acessa tudo.
+- Trigger `set_updated_at`.
 
-Atualizar enum/check de `status` (atualmente texto livre) para aceitar: `queued`, `sent`, `delivered`, `read`, `failed`, `received`. Índice em `external_message_id` para lookup do webhook.
+**`message_batches`** — lotes de envio segmentado.
+- Campos: `id`, `template_id`, `content_id`, `name`, `body`, `targeting_mode`, `audience_types`, `segment_id`, `filters`, `channel`, `total_recipients`, `status default 'draft'`, `created_by`, `institution`, `created_at`, `started_at`, `finished_at`, `last_error`.
+- GRANTs idem. RLS por instituição/owner.
 
-### Etapa 2 — Secrets
+**`messages` (alterações)** — adicionar somente o que falta:
+- `template_id uuid`, `batch_id uuid`.
+- (`external_message_id`, `provider`, `message_type`, `template_name`, `template_variables`, `queued_at`, `delivered_at`, `read_at`, `failed_at`, `last_error`, `send_attempts` já existem.)
+- Ampliar `message_type` para incluir `template`, `educational`, `medication_reminder`, `campaign` (texto livre, sem CHECK).
+- Índices em `template_id`, `batch_id`.
 
-Solicitar via tool de secrets:
-- `WHATSAPP_TOKEN`
-- `WHATSAPP_PHONE_NUMBER_ID`
-- `WHATSAPP_BUSINESS_ACCOUNT_ID`
-- `WHATSAPP_VERIFY_TOKEN`
+---
 
-`SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já existem.
+### 2. Edge Functions
 
-### Etapa 3 — Edge Function `send-whatsapp`
+**`send-whatsapp` (atualizar)**
+- Receber `{ message_id }` (já hoje).
+- Carregar `template_id` quando houver; se `template_kind = 'meta'` e `meta_status = 'approved'`, montar payload `type: "template"` com `name = meta_template_name`, `language.code`, e `components` derivados de `template_variables` da mensagem.
+- Caso contrário, manter `type: "text"` com `body` atual.
+- Manter atualização de `sent` / `failed` / `external_message_id` / `last_error` / `send_attempts`.
 
-`supabase/functions/send-whatsapp/index.ts`
+**`process-message-batch` (novo)**
+- Receber `{ batch_id }`. JWT obrigatório.
+- Marca lote como `processing`, busca todas as mensagens `queued` desse `batch_id`, dispara `send-whatsapp` internamente (chamando a mesma função via `fetch` com `service_role` ou refatorando a lógica de envio para função compartilhada `sendOne(messageId)` dentro de `_shared/send.ts`).
+- Concorrência limitada (pool de 3) e backoff simples em 429.
+- Ao final: `sent` (tudo ok), `partial_failed` (alguns falharam), `failed` (todos falharam). Preenche `finished_at` e `last_error` agregado.
 
-- CORS + validação JWT do chamador (`getClaims`) — só usuários autenticados disparam.
-- Body: `{ message_id: string }` validado com Zod.
-- Usa `service_role` internamente para ler/atualizar `messages` ignorando RLS.
-- Busca a mensagem, faz JOIN lógico com `patients` e (se houver) `contacts`.
-- Valida `channel === 'whatsapp'` e `status === 'queued'` (evita reenvio acidental).
-- Telefone destino: `contact.phone` se houver `contact_id`, senão `patient.phone`.
-- Normalização BR: remove tudo que não é dígito; garante prefixo `55`; valida tamanho 12–13 dígitos.
-- Incrementa `send_attempts`.
-- POST `https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages` com `{ messaging_product: "whatsapp", to, type: "text", text: { body } }` e header `Authorization: Bearer {TOKEN}`.
-- Sucesso → update: `status='sent'`, `sent_at=now()`, `external_message_id`, `provider='meta_whatsapp_cloud'`.
-- Erro → update: `status='failed'`, `failed_at=now()`, `last_error=<mensagem Meta>`; retorna 502 com detalhe.
-- Retorno tipado: `{ ok: true, external_message_id }` ou `{ ok: false, error }`.
+**`whatsapp-webhook` (já existe)** — sem mudanças funcionais; confirma que `delivered_at` / `read_at` / `failed_at` / `last_error` são populados pelos `external_message_id`.
 
-### Etapa 4 — Edge Function `whatsapp-webhook`
+---
 
-`supabase/functions/whatsapp-webhook/index.ts` — config em `supabase/config.toml` com `verify_jwt = false` (webhook público da Meta).
+### 3. Helpers de frontend (`src/lib/whatsapp.ts`)
 
-- `GET`: handshake Meta. Lê `hub.mode`, `hub.verify_token`, `hub.challenge`. Se token bate com `WHATSAPP_VERIFY_TOKEN`, devolve `challenge` em texto puro com 200; senão 403.
-- `POST`: parse do payload do Cloud API.
-  - Para cada `entry[].changes[].value.statuses[]`: localiza por `external_message_id` e atualiza:
-    - `delivered` → `status='delivered'`, `delivered_at=now()`
-    - `read` → `status='read'`, `read_at=now()`
-    - `failed` → `status='failed'`, `failed_at=now()`, `last_error=errors[0].title`
-    - `sent` → mantém `status='sent'` (idempotente)
-  - Para cada `entry[].changes[].value.messages[]` (inbound): normaliza `from`, tenta achar paciente por telefone (com/sem `55`), e insere `messages` com `channel='whatsapp'`, `direction='inbound'`, `body=text.body`, `status='received'`, `external_message_id=msg.id`. Se nenhum paciente bater, loga e ignora — nunca retorna 500 para a Meta (sempre 200 após processar) para evitar retries em loop.
+- Manter `queueAndSend` e `sendBatch`.
+- Adicionar `queueAndSendFromTemplate({ template_id, patient_id, contact_id, variables, created_by })` — resolve `body` aplicando `{variavel}` antes de inserir e propaga `template_id`, `template_name`, `template_variables`, `message_type`.
+- Adicionar `createBatch({ template_id?, content_id?, name, body, targeting, recipients, created_by })` — cria `message_batches`, insere todas as `messages` queued (com `batch_id`, `template_id`, `message_type`), invoca `process-message-batch`.
+- Detector utilitário `extractVariables(body) => string[]` baseado em regex `\{([a-zA-Z0-9_]+)\}` (reuso pelo form de templates e pelo envio individual).
 
-### Etapa 5 — Front-end: fluxo novo
+---
 
-Helper compartilhado `src/lib/whatsapp.ts`:
+### 4. `/app/mensagens` — UI com abas
 
-```ts
-queueAndSend({ patient_id, contact_id?, body, message_type? }): Promise<{ message_id, ok }>
+Refatorar `src/pages/app/Messages.tsx` para usar `Tabs` (`@/components/ui/tabs`) com 4 abas:
+
+**Histórico**
+- Mantém listagem atual.
+- Novos filtros: por `message_type` (manual / template / educational / campaign) e por modelo (`template_id`).
+- Mostra badge do tipo e do modelo quando existir; status passa a tratar `delivered` e `read` (já há mapeamento).
+
+**Novo envio**
+- Conteúdo do dialog atual transformado em painel da aba.
+- Seleção de paciente + destinatário (paciente / contato).
+- Modo de redação: `Texto livre` · `Modelo interno` · `Template Meta aprovado` (combo filtra `template_kind` e `meta_status`).
+- Ao escolher modelo: carregar `body`, listar variáveis detectadas com `Input` por variável; preview com substituição em tempo real; botão "Editar texto" só habilitado para `internal` (Meta é fixo).
+- Envia via `queueAndSendFromTemplate` ou `queueAndSend`.
+
+**Modelos**
+- Lista com busca, filtro por categoria/tipo, badge `Interno`/`Meta · status`.
+- CRUD: criar, editar, **duplicar**, **arquivar** (`is_active=false`), excluir.
+- Formulário: name, description, category, body (com detecção live de variáveis e preview), tipo (interno/meta), campos Meta (`meta_template_name`, `meta_language`, `meta_category`, `meta_status`) condicionais quando `template_kind=meta`.
+- Bloco "Segmentação padrão" reaproveitando `SegmentFiltersForm` + `RecipientPreview` (somente leitura).
+- Aviso visível: *"Modelos internos padronizam textos, mas apenas templates aprovados pela Meta podem iniciar conversas fora da janela de 24h."*
+
+**Envio segmentado**
+- Selecionar modelo (opcional) → preenche body + variáveis globais.
+- Seleção de segmentação: `all` / `audiences` / `segment` / `filters` (mesmos controles de `Content.tsx`).
+- `RecipientPreview` com seleção/desmarcação individual (não read-only).
+- Confirmação obrigatória ("Confirmar disparo para N destinatários") antes de criar o batch.
+- Ao confirmar: `createBatch` → toast com `batch_id` + link para histórico filtrado pelo lote.
+
+---
+
+### 5. Compatibilidade
+
+- `Content.tsx` continua usando `sendBatch` atual; opcionalmente passa a usar `createBatch` para registrar o disparo educativo como lote (mantém comportamento, adiciona rastreio). Mudança mínima, sem refatorar UI.
+- `PatientDetail.tsx` mantém envio livre via `queueAndSend`; ganha opcionalmente um seletor de modelo (fora deste escopo se preferir limitar o blast radius — fica fácil adicionar depois).
+- `content_library` e `audience_segments` permanecem intocados.
+
+---
+
+### 6. Segurança
+
+- `WHATSAPP_TOKEN` apenas em edge functions (já configurado).
+- RLS de `message_templates` / `message_batches` por instituição + admin, mesmo padrão de `audience_segments`.
+- Confirmação visual antes de qualquer envio segmentado.
+- Edge functions exigem JWT do app (exceto webhook).
+
+---
+
+### Detalhes técnicos
+
+```text
+src/
+├─ lib/
+│  ├─ whatsapp.ts            (+ queueAndSendFromTemplate, createBatch, extractVariables)
+│  └─ templates.ts            (helpers de render e validação Meta)
+├─ pages/app/Messages.tsx     (Tabs + 4 painéis)
+└─ components/app/
+   ├─ messages/HistoryTab.tsx
+   ├─ messages/SendTab.tsx
+   ├─ messages/TemplatesTab.tsx
+   └─ messages/CampaignTab.tsx
+
+supabase/
+├─ migrations/<ts>_message_templates_batches.sql
+└─ functions/
+   ├─ send-whatsapp/index.ts          (suporte a template Meta)
+   └─ process-message-batch/index.ts  (novo)
 ```
-
-Faz:
-1. `insert` em `messages` com `status='queued'`, `direction='outbound'`, `channel='whatsapp'`, `queued_at=now()`, `created_by=auth.uid()`.
-2. `supabase.functions.invoke('send-whatsapp', { body: { message_id }})`.
-3. Retorna resultado para a UI exibir toast.
-
-Aplicar em:
-
-- **`src/pages/app/Messages.tsx`** — substituir o insert direto pelo helper; toast de sucesso/erro; `queryClient.invalidateQueries` para mensagens e dashboard. Reenvio (botão já existente) faz nova insert `queued` + invoke (não reusa registro antigo).
-- **`src/pages/app/PatientDetail.tsx`** — mesma substituição no formulário de envio individual.
-- **`src/pages/app/Content.tsx`** — envio em massa:
-  - Insert em batch (uma query) de todas as mensagens com `status='queued'` e `message_type='content_broadcast'`.
-  - Helper `sendBatch(message_ids)` que invoca `send-whatsapp` com **concorrência limitada (ex.: 3 em paralelo)** usando um pequeno pool — evita travar o browser e respeita rate limit da Meta.
-  - Toast agregado: "X enviadas, Y falharam".
-
-### Etapa 6 — Segurança / RLS
-
-- Nenhuma mudança de RLS necessária: as Edge Functions usam `service_role`.
-- Front-end continua respeitando RLS atual de `messages` (insert via `can_access_patient`).
-- Confirmar que `WHATSAPP_TOKEN` nunca é importado em código `src/`.
-
-### Critérios de aceite mapeados
-
-| Critério | Onde |
-|---|---|
-| Envio cria `queued` | helper `queueAndSend` |
-| Edge Function chama Meta | `send-whatsapp` |
-| Sucesso → `sent` + `external_message_id` | `send-whatsapp` update |
-| Erro → `failed` + `last_error` | `send-whatsapp` update |
-| Token nunca no front | secrets only |
-| Tipado + erros tratados | Zod + try/catch + tipos de retorno |
-| Pronto para trocar número | só trocar `WHATSAPP_PHONE_NUMBER_ID` |
 
 ### Ordem de execução
 
-1. Migration (`messages` colunas + índice).
-2. Pedir secrets via tool (`add_secret`).
-3. Criar `send-whatsapp` + deploy.
-4. Criar `whatsapp-webhook` + `config.toml` + deploy. Te passo a URL pública para registrar no painel da Meta.
-5. Helper `src/lib/whatsapp.ts`.
-6. Refatorar `Messages.tsx`.
-7. Refatorar `PatientDetail.tsx`.
-8. Refatorar `Content.tsx` (com pool de concorrência).
-9. Teste end-to-end com número autorizado no sandbox da Meta.
+1. Migração (`message_templates`, `message_batches`, colunas `template_id`/`batch_id` em `messages`).
+2. Helpers `whatsapp.ts` + `templates.ts`.
+3. Edge `send-whatsapp` (template Meta) e `process-message-batch`.
+4. UI: refator de `Messages.tsx` para Tabs + 4 painéis.
+5. Teste e2e com número sandbox da Meta.
 
-### Fora do escopo (deixar para depois)
+### Fora do escopo
 
-- Templates HSM aprovados (necessário fora da janela de 24h) — estrutura `template_name`/`template_variables` já fica pronta.
-- Mídia (imagem/áudio/documento).
-- Retry automático com backoff (hoje: reenvio manual via UI).
-- Migração para número oficial (só troca de secret).
+- Submissão de templates à Meta a partir do app (apenas registro de status manual).
+- Envio de mídia (imagem/áudio/documento).
+- Janela 24h automatizada (apenas aviso textual).
+- Agendamento futuro de campanhas.
