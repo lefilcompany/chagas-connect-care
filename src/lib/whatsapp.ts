@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { renderTemplate } from "@/lib/templates";
+import type { Recipient } from "@/lib/segments";
 
 export type QueueAndSendInput = {
   patient_id: string;
@@ -7,6 +9,10 @@ export type QueueAndSendInput = {
   channel?: "whatsapp" | "sms";
   message_type?: string;
   created_by?: string | null;
+  template_id?: string | null;
+  template_name?: string | null;
+  template_variables?: Record<string, string> | null;
+  batch_id?: string | null;
 };
 
 export type QueueAndSendResult = {
@@ -37,6 +43,10 @@ export async function queueAndSend(input: QueueAndSendInput): Promise<QueueAndSe
       queued_at: nowIso,
       message_type: input.message_type ?? "manual",
       created_by: input.created_by ?? null,
+      template_id: input.template_id ?? null,
+      template_name: input.template_name ?? null,
+      template_variables: input.template_variables ?? {},
+      batch_id: input.batch_id ?? null,
     } as any)
     .select("id")
     .maybeSingle();
