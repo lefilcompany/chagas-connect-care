@@ -418,11 +418,14 @@ export default function Messages() {
         </TabsContent>
 
         <TabsContent value="modelos">
-          <TemplatesTab />
+          <TemplatesTab onGoToSegmented={openSegmentedWithTemplate} />
         </TabsContent>
 
         <TabsContent value="campanha">
-          <CampaignTab />
+          <CampaignTab
+            initialTemplateId={campaignTemplateId}
+            onConsumeInitial={() => setCampaignTemplateId(null)}
+          />
         </TabsContent>
       </Tabs>
 
