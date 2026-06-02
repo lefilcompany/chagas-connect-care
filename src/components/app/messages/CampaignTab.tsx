@@ -226,18 +226,31 @@ export default function CampaignTab({
 
       {step === 1 && (
         <div className="space-y-4">
-          {!selectedTemplate && (
+          <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Mensagem (texto livre)</Label>
+              <Label>{selectedTemplate ? "Mensagem do modelo" : "Mensagem (texto livre)"}</Label>
               <textarea
-                rows={4}
-                value={freeBody}
+                rows={6}
+                value={selectedTemplate ? selectedTemplate.body : freeBody}
                 onChange={(e) => setFreeBody(e.target.value)}
+                readOnly={!!selectedTemplate}
                 placeholder="Escreva a mensagem. Use {variavel} para campos dinâmicos."
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm disabled:opacity-70"
+              />
+              {selectedTemplate && (
+                <p className="text-[11px] text-muted-foreground">
+                  Este texto vem do modelo selecionado. Para editá-lo, duplique o modelo na biblioteca.
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase">Pré-visualização</Label>
+              <WhatsAppPreview
+                body={selectedTemplate ? selectedTemplate.body : freeBody}
+                recipientName="Destinatário"
               />
             </div>
-          )}
+          </div>
 
           <div className="space-y-1.5">
             <Label>Nome da campanha</Label>
