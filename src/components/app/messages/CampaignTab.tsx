@@ -143,6 +143,16 @@ export default function CampaignTab({
     [recipients, selected],
   );
 
+  // Normalize BR phone for preview (mirrors edge function logic)
+  const normalizeBR = (raw: string): string | null => {
+    const digits = (raw ?? "").replace(/\D/g, "");
+    if (!digits) return null;
+    let p = digits;
+    if (!p.startsWith("55")) p = "55" + p;
+    if (p.length < 12 || p.length > 13) return null;
+    return p;
+  };
+
   const stepValid = (i: number): boolean => {
     if (i === 0) return !!selectedTemplate || freeBody.trim().length >= 3;
     if (i === 1) return previewAud.length > 0;
@@ -382,10 +392,44 @@ export default function CampaignTab({
               <h4 className="font-semibold text-brand">Resumo</h4>
               <p><span className="text-muted-foreground">Campanha:</span> {campaignName || "—"}</p>
               <p><span className="text-muted-foreground">Modelo:</span> {selectedTemplate?.name ?? "Texto livre"}</p>
+              <p>
+                <span className="text-muted-foreground">Tipo de modelo:</span>{" "}
+                {selectedTemplate
+                  ? selectedTemplate.template_kind === "meta"
+                    ? `Template Meta (${selectedTemplate.meta_status ?? "não submetido"})`
+                    : "Interno"
+                  : "Texto livre"}
+              </p>
+              <p><span className="text-muted-foreground">Canal:</span> WhatsApp</p>
               <p><span className="text-muted-foreground">Destinatários:</span> {finalRecipients.length}</p>
+              {finalRecipients[0] && (
+                <div className="rounded-md border border-border bg-muted/30 p-2 text-xs space-y-0.5">
+                  <p className="text-muted-foreground">Exemplo do primeiro destinatário:</p>
+                  <p>
+                    <span className="text-muted-foreground">Original:</span>{" "}
+                    <span className="font-mono">{finalRecipients[0].phone}</span>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Normalizado:</span>{" "}
+                    <span className="font-mono">
+                      {normalizeBR(finalRecipients[0].phone) ?? "inválido"}
+                    </span>
+                  </p>
+                </div>
+              )}
             </div>
             <WhatsAppPreview body={renderedBody} recipientName="Destinatário" highlightVars={false} />
           </div>
+
+          {(!selectedTemplate || selectedTemplate.template_kind === "internal") && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                Modelos internos / texto livre podem falhar ao iniciar conversas fora da janela
+                de 24h. Para produção, use um Template Meta aprovado.
+              </span>
+            </div>
+          )}
 
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
