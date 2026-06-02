@@ -262,6 +262,9 @@ Deno.serve(async (req) => {
       test_mode: WHATSAPP_TEST_MODE,
       phone_original: toRaw,
       phone_normalized: to,
+      send_kind: sendKind,
+      template_name: usedTemplateName,
+      template_language: usedTemplateLanguage,
     });
   }
 
@@ -283,5 +286,14 @@ Deno.serve(async (req) => {
     return json(500, { ok: false, error: updErr.message });
   }
 
-  return json(200, { ok: true, external_message_id: externalId ?? null });
+  return json(200, {
+    ok: true,
+    external_message_id: externalId ?? null,
+    test_mode: WHATSAPP_TEST_MODE,
+    phone_original: toRaw,
+    phone_normalized: to,
+    send_kind: sendKind,
+    template_name: usedTemplateName,
+    template_language: usedTemplateLanguage,
+  });
 });
