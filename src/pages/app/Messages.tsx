@@ -23,8 +23,6 @@ import { queueAndSend } from "@/lib/whatsapp";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import TemplatesTab from "@/components/app/messages/TemplatesTab";
 import CampaignTab from "@/components/app/messages/CampaignTab";
-import { extractVariables, renderTemplate, type MessageTemplate } from "@/lib/templates";
-import { fetchers as f2 } from "@/lib/queries";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
