@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,9 +16,9 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  Send, Search, Plus, UserPlus, RefreshCw, Check, CheckCheck, Clock, ArrowRight, X,
+  Send, UserPlus, History,
 } from "lucide-react";
-import { User, Phone, MessageSquare, History } from "lucide-react";
+import { User, Phone, MessageSquare } from "lucide-react";
 import { queueAndSend } from "@/lib/whatsapp";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import TemplatesTab from "@/components/app/messages/TemplatesTab";
