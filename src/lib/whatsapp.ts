@@ -2,6 +2,49 @@ import { supabase } from "@/integrations/supabase/client";
 import { renderTemplate } from "@/lib/templates";
 import type { Recipient } from "@/lib/segments";
 
+/**
+ * Maps the structured error returned by the `send-whatsapp` edge function
+ * into a user-friendly message in Portuguese. Always logs the technical
+ * details to the console for debugging.
+ */
+export function friendlyWhatsAppError(payload: any): string {
+  // Log full technical payload for devs
+  // eslint-disable-next-line no-console
+  console.error("[send-whatsapp] error payload:", payload);
+
+  const code = payload?.error_code as string | undefined;
+  const meta = payload?.meta_error as
+    | { code?: number; error_subcode?: number; message?: string; type?: string }
+    | undefined;
+  const testMode = !!payload?.test_mode;
+  const testHint = testMode
+    ? " (modo de teste: confirme que o destinatário está autorizado em Testes de API da Meta)."
+    : "";
+
+  if (code === "MISSING_TOKEN") return "Token do WhatsApp não configurado. Avise o administrador.";
+  if (code === "MISSING_PHONE_ID") return "Phone Number ID do WhatsApp não configurado.";
+  if (code === "INVALID_RECIPIENT") return payload?.error ?? "Número do destinatário inválido.";
+
+  if (code === "META_API_ERROR" && meta) {
+    const mc = meta.code;
+    const sc = meta.error_subcode;
+    if (mc === 131005 || mc === 10 || mc === 200) {
+      return `A Meta recusou o envio (acesso negado). Verifique token, Phone Number ID e número de teste autorizado${testHint}`;
+    }
+    if (mc === 131026) return "Não foi possível entregar: o destinatário não tem WhatsApp ativo.";
+    if (mc === 131047)
+      return "Janela de 24h expirada. Use um Template Meta aprovado para reiniciar a conversa.";
+    if (mc === 131051 || sc === 2018001)
+      return `Destinatário não autorizado a receber mensagens${testHint}`;
+    if (mc === 132000 || mc === 132001 || mc === 132005)
+      return "Erro no template: nome, idioma ou variáveis não conferem com o aprovado pela Meta.";
+    if (mc === 100) return "Parâmetros inválidos enviados para a Meta. Revise o template e variáveis.";
+    return `Meta recusou o envio: ${meta.message ?? "erro desconhecido"}${testHint}`;
+  }
+
+  return payload?.error ?? "Falha no envio";
+}
+
 export type QueueAndSendInput = {
   patient_id: string;
   contact_id?: string | null;
@@ -68,12 +111,12 @@ export async function queueAndSend(input: QueueAndSendInput): Promise<QueueAndSe
       return {
         message_id: inserted.id,
         ok: false,
-        error: (data as any)?.error ?? error.message,
+        error: data ? friendlyWhatsAppError(data) : error.message,
       };
     }
     const payload = data as { ok?: boolean; error?: string; external_message_id?: string | null };
     if (payload?.ok === false) {
-      return { message_id: inserted.id, ok: false, error: payload.error ?? "Falha no envio" };
+      return { message_id: inserted.id, ok: false, error: friendlyWhatsAppError(payload) };
     }
     return {
       message_id: inserted.id,
@@ -113,7 +156,7 @@ export async function sendBatch(
         const payload = data as { ok?: boolean; error?: string } | null;
         if (error || payload?.ok === false) {
           failed++;
-          const msg = payload?.error ?? error?.message ?? "Falha no envio";
+          const msg = payload ? friendlyWhatsAppError(payload) : error?.message ?? "Falha no envio";
           if (errors.length < 3) errors.push(msg);
         } else {
           ok++;
