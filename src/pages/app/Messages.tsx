@@ -23,6 +23,7 @@ import { queueAndSend } from "@/lib/whatsapp";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import TemplatesTab from "@/components/app/messages/TemplatesTab";
 import CampaignTab from "@/components/app/messages/CampaignTab";
+import type { MessageTemplate } from "@/lib/templates";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
@@ -85,6 +86,15 @@ export default function Messages() {
 
   // Patient history dialog
   const [historyPatientId, setHistoryPatientId] = useState<string | null>(null);
+
+  // Tabs + cross-tab template handoff
+  const [tab, setTab] = useState<string>("historico");
+  const [campaignTemplateId, setCampaignTemplateId] = useState<string | null>(null);
+
+  const openSegmentedWithTemplate = (t: MessageTemplate) => {
+    setCampaignTemplateId(t.id);
+    setTab("campanha");
+  };
 
   useEffect(() => {
     if (user) {
@@ -236,7 +246,7 @@ export default function Messages() {
         </div>
       </header>
 
-      <Tabs defaultValue="historico">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
           <TabsTrigger value="modelos">Modelos</TabsTrigger>
