@@ -102,7 +102,6 @@ Deno.serve(async (req) => {
   }
 
   // Increment attempts upfront
-  await admin.rpc("noop_just_in_case").catch(() => {});
   await admin
     .from("messages")
     .update({ send_attempts: ((msg as any).send_attempts ?? 0) + 1 })
