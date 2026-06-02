@@ -3,6 +3,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
 const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
+const WHATSAPP_TEST_MODE = (Deno.env.get("WHATSAPP_TEST_MODE") ?? "").toLowerCase() === "true";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -23,6 +24,30 @@ function normalizeBRPhone(input: string): string | null {
   if (!p.startsWith("55")) p = "55" + p;
   if (p.length < 12 || p.length > 13) return null;
   return p;
+}
+
+/**
+ * Validates required env + recipient phone. Never returns the token itself.
+ * Returns { ok: true, to } on success or { ok: false, code, error } on failure.
+ */
+function validateWhatsAppConfig(rawPhone: string):
+  | { ok: true; to: string }
+  | { ok: false; code: "MISSING_TOKEN" | "MISSING_PHONE_ID" | "INVALID_RECIPIENT"; error: string } {
+  if (!WHATSAPP_TOKEN) {
+    return { ok: false, code: "MISSING_TOKEN", error: "WHATSAPP_TOKEN não configurado no servidor." };
+  }
+  if (!WHATSAPP_PHONE_NUMBER_ID) {
+    return { ok: false, code: "MISSING_PHONE_ID", error: "WHATSAPP_PHONE_NUMBER_ID não configurado no servidor." };
+  }
+  const to = normalizeBRPhone(rawPhone);
+  if (!to) {
+    return {
+      ok: false,
+      code: "INVALID_RECIPIENT",
+      error: `Telefone destinatário inválido: "${rawPhone}". Esperado 55 + DDD + número.`,
+    };
+  }
+  return { ok: true, to };
 }
 
 type SendBody = { message_id?: string };
@@ -49,10 +74,6 @@ Deno.serve(async (req) => {
   }
   if (!body.message_id || typeof body.message_id !== "string") {
     return json(400, { error: "message_id is required" });
-  }
-
-  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
-    return json(500, { error: "WhatsApp credentials not configured" });
   }
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -87,19 +108,27 @@ Deno.serve(async (req) => {
     toRaw = p?.phone ?? "";
   }
 
-  const to = normalizeBRPhone(toRaw);
-  if (!to) {
+  const cfg = validateWhatsAppConfig(toRaw);
+  if (!cfg.ok) {
     await admin
       .from("messages")
       .update({
         status: "failed",
         failed_at: new Date().toISOString(),
-        last_error: "Telefone destinatário inválido",
+        last_error: cfg.error,
         send_attempts: ((msg as any).send_attempts ?? 0) + 1,
       })
       .eq("id", msg.id);
-    return json(400, { error: "Invalid destination phone" });
+    return json(200, {
+      ok: false,
+      error: cfg.error,
+      error_code: cfg.code,
+      test_mode: WHATSAPP_TEST_MODE,
+      phone_original: toRaw,
+      phone_normalized: null,
+    });
   }
+  const to = cfg.to;
 
   // Increment attempts upfront
   await admin
@@ -171,19 +200,45 @@ Deno.serve(async (req) => {
   const metaJson = await metaRes.json().catch(() => ({}));
 
   if (!metaRes.ok) {
-    const errText =
-      metaJson?.error?.message ??
-      metaJson?.error?.error_user_msg ??
+    const metaErr = (metaJson as any)?.error ?? {};
+    const errText: string =
+      metaErr.message ??
+      metaErr.error_user_msg ??
       `Meta API error (${metaRes.status})`;
+    // Persist full Meta error JSON for diagnostics
+    const fullErr = JSON.stringify({
+      http_status: metaRes.status,
+      message: metaErr.message ?? null,
+      type: metaErr.type ?? null,
+      code: metaErr.code ?? null,
+      error_subcode: metaErr.error_subcode ?? null,
+      fbtrace_id: metaErr.fbtrace_id ?? null,
+      raw: metaJson,
+    });
     await admin
       .from("messages")
       .update({
         status: "failed",
         failed_at: new Date().toISOString(),
-        last_error: String(errText).slice(0, 1000),
+        last_error: fullErr.slice(0, 4000),
       })
       .eq("id", msg.id);
-    return json(200, { ok: false, error: String(errText) });
+    return json(200, {
+      ok: false,
+      error: String(errText),
+      error_code: "META_API_ERROR",
+      meta_error: {
+        message: metaErr.message ?? null,
+        type: metaErr.type ?? null,
+        code: metaErr.code ?? null,
+        error_subcode: metaErr.error_subcode ?? null,
+        fbtrace_id: metaErr.fbtrace_id ?? null,
+        http_status: metaRes.status,
+      },
+      test_mode: WHATSAPP_TEST_MODE,
+      phone_original: toRaw,
+      phone_normalized: to,
+    });
   }
 
   const externalId: string | undefined = metaJson?.messages?.[0]?.id;
