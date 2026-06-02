@@ -74,25 +74,6 @@ export default function Messages() {
     if (p?.channel_pref) setSendChannel(p.channel_pref);
   }, [sendPatientId, patients]);
 
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    return msgs.filter((m: any) => {
-      if (patientFilter !== "todos" && m.patient_id !== patientFilter) return false;
-      if (channelFilter !== "todos" && m.channel !== channelFilter) return false;
-      if (statusFilter !== "todos") {
-        const meta = statusMeta[m.status];
-        const normalized = meta?.label.toLowerCase() ?? m.status;
-        if (normalized !== statusFilter) return false;
-      }
-      if (!term) return true;
-      return (
-        (m.body ?? "").toLowerCase().includes(term) ||
-        (m.patients?.full_name ?? "").toLowerCase().includes(term) ||
-        (m.contact?.full_name ?? "").toLowerCase().includes(term)
-      );
-    });
-  }, [msgs, q, patientFilter, channelFilter, statusFilter]);
-
   const sendMessage = async () => {
     if (!sendPatientId) return toast.error("Selecione um paciente");
     if (!sendBody.trim()) return toast.error("Digite a mensagem");
@@ -126,7 +107,6 @@ export default function Messages() {
     qc.invalidateQueries({ queryKey: qk.messages });
     if (!result.ok) return toast.error(result.error ?? "Falha ao reenviar");
     toast.success("Mensagem reenviada");
-    setDetail(null);
   };
 
   const createPatient = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -151,17 +131,6 @@ export default function Messages() {
     }
   };
 
-  const recipientLabel = (m: any) =>
-    m.contact ? `${m.contact.full_name} (${m.contact.relation})` : m.patients?.full_name ?? "—";
-
-  const recipientPhone = (m: any) => m.contact?.phone ?? m.patients?.phone ?? "—";
-
-  const historyPatient = patients.find((p) => p.id === historyPatientId);
-  const historyMessages = useMemo(
-    () => (historyPatientId ? msgs.filter((m: any) => m.patient_id === historyPatientId) : []),
-    [msgs, historyPatientId],
-  );
-
   const selectedPatient = patients.find((p) => p.id === sendPatientId);
   const selectedContact = patientContacts.find((c) => c.id === sendRecipient);
   const recipientName = sendRecipient === "patient"
@@ -172,23 +141,6 @@ export default function Messages() {
     : selectedContact?.phone ?? "";
   const recipientRelation = sendRecipient === "patient" ? "Paciente" : selectedContact?.relation ?? "";
   const canSend = !!sendPatientId && !!sendBody.trim() && !!recipientPhoneSend && !sending;
-
-  const patientLabel = patients.find((p) => p.id === patientFilter)?.full_name;
-  const activeFilters: { key: string; label: string; value: string; clear: () => void }[] = [
-    ...(q ? [{ key: "q", label: "Busca", value: q, clear: () => setQ("") }] : []),
-    ...(patientFilter !== "todos" && patientLabel
-      ? [{ key: "p", label: "Paciente", value: patientLabel, clear: () => setPatientFilter("todos") }]
-      : []),
-    ...(channelFilter !== "todos"
-      ? [{ key: "c", label: "Canal", value: channelFilter, clear: () => setChannelFilter("todos") }]
-      : []),
-    ...(statusFilter !== "todos"
-      ? [{ key: "s", label: "Status", value: statusFilter, clear: () => setStatusFilter("todos") }]
-      : []),
-  ];
-  const clearAllFilters = () => {
-    setQ(""); setPatientFilter("todos"); setChannelFilter("todos"); setStatusFilter("todos");
-  };
 
   return (
     <div className="space-y-6">
