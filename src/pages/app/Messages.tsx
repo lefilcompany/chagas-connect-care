@@ -28,45 +28,14 @@ import type { MessageTemplate } from "@/lib/templates";
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
 
-const statusMeta: Record<string, { label: string; icon: any; tone: string }> = {
-  enviado: { label: "Enviado", icon: Check, tone: "text-muted-foreground" },
-  sent: { label: "Enviado", icon: Check, tone: "text-muted-foreground" },
-  entregue: { label: "Entregue", icon: CheckCheck, tone: "text-muted-foreground" },
-  delivered: { label: "Entregue", icon: CheckCheck, tone: "text-muted-foreground" },
-  lido: { label: "Lido", icon: CheckCheck, tone: "text-sky-500" },
-  read: { label: "Lido", icon: CheckCheck, tone: "text-sky-500" },
-  pendente: { label: "Pendente", icon: Clock, tone: "text-amber-500" },
-  pending: { label: "Pendente", icon: Clock, tone: "text-amber-500" },
-  queued: { label: "Pendente", icon: Clock, tone: "text-amber-500" },
-  falhou: { label: "Falhou", icon: Clock, tone: "text-destructive" },
-  failed: { label: "Falhou", icon: Clock, tone: "text-destructive" },
-  error: { label: "Falhou", icon: Clock, tone: "text-destructive" },
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const meta = statusMeta[status] ?? { label: status, icon: Clock, tone: "text-muted-foreground" };
-  const Icon = meta.icon;
-  return (
-    <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${meta.tone}`}>
-      <Icon className="h-3 w-3" /> {meta.label}
-    </span>
-  );
-}
-
 export default function Messages() {
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  const { data: msgs = [] } = useQuery({ queryKey: qk.messages, queryFn: fetchers.messages });
   const { data: patients = [] } = useQuery({
     queryKey: qk.patients,
     queryFn: fetchers.patients as () => Promise<Patient[]>,
   });
-
-  const [q, setQ] = useState("");
-  const [patientFilter, setPatientFilter] = useState<string>("todos");
-  const [channelFilter, setChannelFilter] = useState<string>("todos");
-  const [statusFilter, setStatusFilter] = useState<string>("todos");
 
   // Send dialog state
   const [sendOpen, setSendOpen] = useState(false);
@@ -81,14 +50,8 @@ export default function Messages() {
   const [newPatientOpen, setNewPatientOpen] = useState(false);
   const [institution, setInstitution] = useState("");
 
-  // Detail dialog
-  const [detail, setDetail] = useState<any | null>(null);
-
-  // Patient history dialog
-  const [historyPatientId, setHistoryPatientId] = useState<string | null>(null);
-
   // Tabs + cross-tab template handoff
-  const [tab, setTab] = useState<string>("historico");
+  const [tab, setTab] = useState<string>("modelos");
   const [campaignTemplateId, setCampaignTemplateId] = useState<string | null>(null);
 
   const openSegmentedWithTemplate = (t: MessageTemplate) => {
