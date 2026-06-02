@@ -407,6 +407,17 @@ export default function Messages() {
         )}
       </div>
 
+        </TabsContent>
+
+        <TabsContent value="modelos">
+          <TemplatesTab />
+        </TabsContent>
+
+        <TabsContent value="campanha">
+          <CampaignTab />
+        </TabsContent>
+      </Tabs>
+
       {/* Send dialog */}
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
         <DialogContent>
