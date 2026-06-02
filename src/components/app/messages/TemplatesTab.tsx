@@ -186,14 +186,7 @@ export default function TemplatesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2 flex-1 min-w-[260px]">
-          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>
-            Modelos internos ajudam a padronizar textos, mas apenas <strong>templates aprovados pela Meta</strong>{" "}
-            podem iniciar conversas fora da janela de atendimento de 24h.
-          </span>
-        </div>
+      <div className="flex items-start justify-end gap-3 flex-wrap">
         <Button variant="hero" onClick={() => { setEditing(null); setOpen(true); }}>
           <Plus className="h-4 w-4" /> Novo modelo
         </Button>
