@@ -15,6 +15,8 @@ export const qk = {
   integrationsLog: ["crm-log"] as const,
   profile: (id: string) => ["profile", id] as const,
   segments: ["segments"] as const,
+  templates: ["message-templates"] as const,
+  batches: ["message-batches"] as const,
 };
 
 export const fetchers = {
@@ -86,6 +88,21 @@ export const fetchers = {
       .from("audience_segments")
       .select("*")
       .order("created_at", { ascending: false });
+    return (data ?? []) as any[];
+  },
+  templates: async () => {
+    const { data } = await supabase
+      .from("message_templates")
+      .select("*")
+      .order("created_at", { ascending: false });
+    return (data ?? []) as any[];
+  },
+  batches: async () => {
+    const { data } = await supabase
+      .from("message_batches")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
     return (data ?? []) as any[];
   },
 };
