@@ -268,12 +268,23 @@ export type Database = {
           contact_id: string | null
           created_at: string
           created_by: string | null
+          delivered_at: string | null
           direction: string
+          external_message_id: string | null
+          failed_at: string | null
           id: string
+          last_error: string | null
+          message_type: string | null
           patient_id: string
+          provider: string | null
+          queued_at: string | null
+          read_at: string | null
           scheduled_for: string | null
+          send_attempts: number
           sent_at: string | null
           status: string
+          template_name: string | null
+          template_variables: Json
         }
         Insert: {
           body: string
@@ -281,12 +292,23 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
+          delivered_at?: string | null
           direction?: string
+          external_message_id?: string | null
+          failed_at?: string | null
           id?: string
+          last_error?: string | null
+          message_type?: string | null
           patient_id: string
+          provider?: string | null
+          queued_at?: string | null
+          read_at?: string | null
           scheduled_for?: string | null
+          send_attempts?: number
           sent_at?: string | null
           status?: string
+          template_name?: string | null
+          template_variables?: Json
         }
         Update: {
           body?: string
@@ -294,12 +316,23 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
+          delivered_at?: string | null
           direction?: string
+          external_message_id?: string | null
+          failed_at?: string | null
           id?: string
+          last_error?: string | null
+          message_type?: string | null
           patient_id?: string
+          provider?: string | null
+          queued_at?: string | null
+          read_at?: string | null
           scheduled_for?: string | null
+          send_attempts?: number
           sent_at?: string | null
           status?: string
+          template_name?: string | null
+          template_variables?: Json
         }
         Relationships: [
           {

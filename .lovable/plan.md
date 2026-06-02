@@ -1,86 +1,120 @@
-## Aplicar segmentação na criação de conteúdo
+## Integração WhatsApp Cloud API (Meta) — chagas-connect-care
 
-Hoje o segmento só aparece na hora de enviar. Vamos trazer a segmentação para dentro do cadastro/edição do conteúdo, garantindo que cada peça já nasça direcionada ao público certo — e que o envio respeite isso por padrão, sem erros.
+Integração real de envio via WhatsApp Cloud API, substituindo o envio simulado. Tudo passa por Edge Functions no backend; o token da Meta nunca aparece no front-end.
 
-### 1. O que muda no cadastro de conteúdo
+### Etapa 1 — Schema: ampliar `messages`
 
-No modal "Adicionar / Editar conteúdo" o campo único "Público" vira uma seção **Segmentação**, com 3 opções (rádio):
+Migration adicionando colunas (sem quebrar dados existentes):
 
-- **Todos os públicos** (comportamento atual padrão).
-- **Tipos de público** — multi-seleção: Pacientes / Familiares / Cuidadores / Médicos (substitui o atual "paciente/familia/cuidador/ambos" com algo mais preciso).
-- **Segmento salvo** — select com os segmentos criados em `/app/segmentos`. Mostra nome + contador atual de destinatários. Botão "Criar novo segmento" abre a tela de segmentos em nova aba.
-- **Filtros personalizados** — mesmos campos do `SegmentFiltersForm` (etapa, cidade/UF, idade, status, canal, instituição) + escolha dos tipos de público. Útil quando o conteúdo é específico (ex.: "Cuidadores de crônicos em Recife") mas não justifica salvar como segmento.
+- `external_message_id text`
+- `provider text default 'meta_whatsapp_cloud'`
+- `message_type text default 'manual'`
+- `template_name text`
+- `template_variables jsonb default '{}'::jsonb`
+- `queued_at timestamptz`
+- `delivered_at timestamptz`
+- `read_at timestamptz`
+- `failed_at timestamptz`
+- `last_error text`
+- `send_attempts int default 0`
 
-Abaixo da seleção aparece uma **prévia compacta**: "X destinatários correspondem agora" + lista colapsável (reaproveita `RecipientPreview` em modo somente-leitura, sem checkboxes). Isso valida visualmente o direcionamento antes de salvar.
+Atualizar enum/check de `status` (atualmente texto livre) para aceitar: `queued`, `sent`, `delivered`, `read`, `failed`, `received`. Índice em `external_message_id` para lookup do webhook.
 
-Validação: se o autor escolher "Filtros personalizados" sem nenhum tipo de público marcado, o salvar fica desabilitado com mensagem clara.
+### Etapa 2 — Secrets
 
-### 2. O que muda no envio
+Solicitar via tool de secrets:
+- `WHATSAPP_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
+- `WHATSAPP_BUSINESS_ACCOUNT_ID`
+- `WHATSAPP_VERIFY_TOKEN`
 
-O `SendContentDialog` passa a **pré-carregar** a segmentação do conteúdo:
+`SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já existem.
 
-- Se o conteúdo tem segmento salvo vinculado → abre direto na aba "Segmentado" / "Usar segmento salvo" com ele selecionado.
-- Se o conteúdo tem filtros personalizados → abre na aba "Segmentado" / "Montar filtros agora" com os filtros preenchidos.
-- Se o conteúdo tem só tipos de público (sem filtros) → abre na aba "Em massa" com esses grupos marcados.
-- Se é "Todos" → comportamento atual.
+### Etapa 3 — Edge Function `send-whatsapp`
 
-O usuário ainda pode alternar a aba se quiser sobrescrever no envio. A prévia com checkboxes individuais e o "Enviando para N de M" continuam iguais — nada de regressão.
+`supabase/functions/send-whatsapp/index.ts`
 
-### 3. Lista de conteúdos
+- CORS + validação JWT do chamador (`getClaims`) — só usuários autenticados disparam.
+- Body: `{ message_id: string }` validado com Zod.
+- Usa `service_role` internamente para ler/atualizar `messages` ignorando RLS.
+- Busca a mensagem, faz JOIN lógico com `patients` e (se houver) `contacts`.
+- Valida `channel === 'whatsapp'` e `status === 'queued'` (evita reenvio acidental).
+- Telefone destino: `contact.phone` se houver `contact_id`, senão `patient.phone`.
+- Normalização BR: remove tudo que não é dígito; garante prefixo `55`; valida tamanho 12–13 dígitos.
+- Incrementa `send_attempts`.
+- POST `https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages` com `{ messaging_product: "whatsapp", to, type: "text", text: { body } }` e header `Authorization: Bearer {TOKEN}`.
+- Sucesso → update: `status='sent'`, `sent_at=now()`, `external_message_id`, `provider='meta_whatsapp_cloud'`.
+- Erro → update: `status='failed'`, `failed_at=now()`, `last_error=<mensagem Meta>`; retorna 502 com detalhe.
+- Retorno tipado: `{ ok: true, external_message_id }` ou `{ ok: false, error }`.
 
-Cada card de conteúdo passa a mostrar um chip extra indicando a segmentação aplicada:
+### Etapa 4 — Edge Function `whatsapp-webhook`
 
-- "Todos" (igual hoje), ou
-- Lista dos tipos de público (ex.: "Pacientes + Cuidadores"), ou
-- "Segmento: Crônicos do Recife", ou
-- "Filtros personalizados (N destinatários)".
+`supabase/functions/whatsapp-webhook/index.ts` — config em `supabase/config.toml` com `verify_jwt = false` (webhook público da Meta).
 
-O filtro de público no topo da página passa a aceitar também "Com segmento salvo" e "Com filtros personalizados" para encontrar rapidamente conteúdos direcionados.
+- `GET`: handshake Meta. Lê `hub.mode`, `hub.verify_token`, `hub.challenge`. Se token bate com `WHATSAPP_VERIFY_TOKEN`, devolve `challenge` em texto puro com 200; senão 403.
+- `POST`: parse do payload do Cloud API.
+  - Para cada `entry[].changes[].value.statuses[]`: localiza por `external_message_id` e atualiza:
+    - `delivered` → `status='delivered'`, `delivered_at=now()`
+    - `read` → `status='read'`, `read_at=now()`
+    - `failed` → `status='failed'`, `failed_at=now()`, `last_error=errors[0].title`
+    - `sent` → mantém `status='sent'` (idempotente)
+  - Para cada `entry[].changes[].value.messages[]` (inbound): normaliza `from`, tenta achar paciente por telefone (com/sem `55`), e insere `messages` com `channel='whatsapp'`, `direction='inbound'`, `body=text.body`, `status='received'`, `external_message_id=msg.id`. Se nenhum paciente bater, loga e ignora — nunca retorna 500 para a Meta (sempre 200 após processar) para evitar retries em loop.
 
-### 4. Banco de dados
+### Etapa 5 — Front-end: fluxo novo
 
-Adicionar à tabela `content_library`:
+Helper compartilhado `src/lib/whatsapp.ts`:
 
-- `targeting_mode text not null default 'all'` — valores: `all`, `audiences`, `segment`, `filters`.
-- `audience_types text[] not null default '{}'` — usado quando `targeting_mode` é `audiences` ou `filters`.
-- `segment_id uuid` — FK lógica para `audience_segments(id)` (sem FK rígida, igual ao padrão atual do projeto); usado quando `targeting_mode = 'segment'`.
-- `filters jsonb not null default '{}'` — usado quando `targeting_mode = 'filters'`.
+```ts
+queueAndSend({ patient_id, contact_id?, body, message_type? }): Promise<{ message_id, ok }>
+```
 
-O campo legado `audience text` é mantido e populado por compatibilidade (ex.: "paciente", "familia", "cuidador", "ambos") — derivado a partir de `audience_types` quando aplicável — para não quebrar telas/relatórios que ainda leem ele.
+Faz:
+1. `insert` em `messages` com `status='queued'`, `direction='outbound'`, `channel='whatsapp'`, `queued_at=now()`, `created_by=auth.uid()`.
+2. `supabase.functions.invoke('send-whatsapp', { body: { message_id }})`.
+3. Retorna resultado para a UI exibir toast.
 
-RLS existente em `content_library` permanece (qualquer autenticado lê; admin gerencia; autenticado insere). Sem mudança de política.
+Aplicar em:
 
-### 5. Resolução de destinatários
+- **`src/pages/app/Messages.tsx`** — substituir o insert direto pelo helper; toast de sucesso/erro; `queryClient.invalidateQueries` para mensagens e dashboard. Reenvio (botão já existente) faz nova insert `queued` + invoke (não reusa registro antigo).
+- **`src/pages/app/PatientDetail.tsx`** — mesma substituição no formulário de envio individual.
+- **`src/pages/app/Content.tsx`** — envio em massa:
+  - Insert em batch (uma query) de todas as mensagens com `status='queued'` e `message_type='content_broadcast'`.
+  - Helper `sendBatch(message_ids)` que invoca `send-whatsapp` com **concorrência limitada (ex.: 3 em paralelo)** usando um pequeno pool — evita travar o browser e respeita rate limit da Meta.
+  - Toast agregado: "X enviadas, Y falharam".
 
-Reusamos `resolveRecipients(audience_types, filters)` de `src/lib/segments.ts`. Helper novo `resolveContentTargeting(content)` em `src/lib/segments.ts`:
+### Etapa 6 — Segurança / RLS
 
-- `targeting_mode = 'all'` → resolve com `['paciente','familiar','cuidador','medico']` e `emptyFilters()`.
-- `audiences` → usa `audience_types` + `emptyFilters()`.
-- `segment` → busca o segmento por id e usa seus `audience_types`/`filters`. Se o segmento foi excluído, mostra aviso "Segmento original removido" e cai para "Todos".
-- `filters` → usa `audience_types` + `filters` do próprio conteúdo.
+- Nenhuma mudança de RLS necessária: as Edge Functions usam `service_role`.
+- Front-end continua respeitando RLS atual de `messages` (insert via `can_access_patient`).
+- Confirmar que `WHATSAPP_TOKEN` nunca é importado em código `src/`.
 
-### 6. Detalhes técnicos
+### Critérios de aceite mapeados
 
-**Arquivos editados:**
-- `supabase/migrations/<novo>.sql` — alter `content_library`.
-- `src/lib/segments.ts` — adicionar `resolveContentTargeting`, tipo `ContentTargeting`.
-- `src/lib/queries.ts` — fetcher de `content` passa a selecionar as novas colunas; reusa `qk.segments`.
-- `src/pages/app/Content.tsx`:
-  - `ContentFormDialog` ganha a seção de segmentação com `SegmentFiltersForm` e prévia.
-  - `SendContentDialog` lê a segmentação do `item` e pré-configura abas/campos.
-  - Cards mostram chip de segmentação; filtro de público amplia opções.
-- `src/components/app/RecipientPreview.tsx` — aceitar prop `readOnly` para esconder checkboxes/busca quando usado como preview no cadastro.
+| Critério | Onde |
+|---|---|
+| Envio cria `queued` | helper `queueAndSend` |
+| Edge Function chama Meta | `send-whatsapp` |
+| Sucesso → `sent` + `external_message_id` | `send-whatsapp` update |
+| Erro → `failed` + `last_error` | `send-whatsapp` update |
+| Token nunca no front | secrets only |
+| Tipado + erros tratados | Zod + try/catch + tipos de retorno |
+| Pronto para trocar número | só trocar `WHATSAPP_PHONE_NUMBER_ID` |
 
-**Edge cases tratados:**
-- Conteúdo antigo (sem novas colunas) cai em `targeting_mode='all'` via default da migração.
-- Segmento salvo apagado depois de vinculado: UI mostra fallback e o envio cai em "Todos" só após confirmação explícita.
-- Filtros vazios em modo `filters` = mesmo efeito de "Todos" (sem restrição).
-- Validação Zod no form: se `targeting_mode in ('audiences','filters')` então `audience_types.length >= 1`; se `segment` então `segment_id` obrigatório.
+### Ordem de execução
 
-### Arquivos criados / editados
+1. Migration (`messages` colunas + índice).
+2. Pedir secrets via tool (`add_secret`).
+3. Criar `send-whatsapp` + deploy.
+4. Criar `whatsapp-webhook` + `config.toml` + deploy. Te passo a URL pública para registrar no painel da Meta.
+5. Helper `src/lib/whatsapp.ts`.
+6. Refatorar `Messages.tsx`.
+7. Refatorar `PatientDetail.tsx`.
+8. Refatorar `Content.tsx` (com pool de concorrência).
+9. Teste end-to-end com número autorizado no sandbox da Meta.
 
-- migração: alterar `content_library` (campos novos com defaults seguros)
-- editado: `src/lib/segments.ts`
-- editado: `src/lib/queries.ts`
-- editado: `src/pages/app/Content.tsx`
-- editado: `src/components/app/RecipientPreview.tsx`
+### Fora do escopo (deixar para depois)
+
+- Templates HSM aprovados (necessário fora da janela de 24h) — estrutura `template_name`/`template_variables` já fica pronta.
+- Mídia (imagem/áudio/documento).
+- Retry automático com backoff (hoje: reenvio manual via UI).
+- Migração para número oficial (só troca de secret).
