@@ -238,6 +238,14 @@ export default function Messages() {
         </div>
       </header>
 
+      <Tabs defaultValue="historico">
+        <TabsList>
+          <TabsTrigger value="historico">Histórico</TabsTrigger>
+          <TabsTrigger value="modelos">Modelos</TabsTrigger>
+          <TabsTrigger value="campanha">Envio segmentado</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="historico" className="space-y-6">
       {/* Filters */}
       <div className="rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
