@@ -4,6 +4,8 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
 const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
 const WHATSAPP_TEST_MODE = (Deno.env.get("WHATSAPP_TEST_MODE") ?? "").toLowerCase() === "true";
+const WHATSAPP_TEST_TEMPLATE_NAME = Deno.env.get("WHATSAPP_TEST_TEMPLATE_NAME") ?? "hello_world";
+const WHATSAPP_TEST_TEMPLATE_LANGUAGE = Deno.env.get("WHATSAPP_TEST_TEMPLATE_LANGUAGE") ?? "en_US";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -143,8 +145,27 @@ Deno.serve(async (req) => {
     type: "text",
     text: { body: msg.body, preview_url: false },
   };
+  let sendKind: "text" | "template" = "text";
+  let usedTemplateName: string | null = null;
+  let usedTemplateLanguage: string | null = null;
 
-  if ((msg as any).template_id) {
+  // Test mode: always send the configured test template (e.g. hello_world)
+  if (WHATSAPP_TEST_MODE) {
+    sendKind = "template";
+    usedTemplateName = WHATSAPP_TEST_TEMPLATE_NAME;
+    usedTemplateLanguage = WHATSAPP_TEST_TEMPLATE_LANGUAGE;
+    metaPayload = {
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: WHATSAPP_TEST_TEMPLATE_NAME,
+        language: { code: WHATSAPP_TEST_TEMPLATE_LANGUAGE },
+      },
+    };
+  }
+
+  if (!WHATSAPP_TEST_MODE && (msg as any).template_id) {
     const { data: tpl } = await admin
       .from("message_templates")
       .select("template_kind, meta_template_name, meta_language, meta_status")
@@ -158,6 +179,9 @@ Deno.serve(async (req) => {
     ) {
       const vars = ((msg as any).template_variables ?? {}) as Record<string, string>;
       const params = Object.values(vars).map((v) => ({ type: "text", text: String(v ?? "") }));
+      sendKind = "template";
+      usedTemplateName = tpl.meta_template_name;
+      usedTemplateLanguage = tpl.meta_language || "pt_BR";
       metaPayload = {
         messaging_product: "whatsapp",
         to,
@@ -238,6 +262,9 @@ Deno.serve(async (req) => {
       test_mode: WHATSAPP_TEST_MODE,
       phone_original: toRaw,
       phone_normalized: to,
+      send_kind: sendKind,
+      template_name: usedTemplateName,
+      template_language: usedTemplateLanguage,
     });
   }
 
@@ -259,5 +286,14 @@ Deno.serve(async (req) => {
     return json(500, { ok: false, error: updErr.message });
   }
 
-  return json(200, { ok: true, external_message_id: externalId ?? null });
+  return json(200, {
+    ok: true,
+    external_message_id: externalId ?? null,
+    test_mode: WHATSAPP_TEST_MODE,
+    phone_original: toRaw,
+    phone_normalized: to,
+    send_kind: sendKind,
+    template_name: usedTemplateName,
+    template_language: usedTemplateLanguage,
+  });
 });
