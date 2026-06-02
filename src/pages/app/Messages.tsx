@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -96,19 +96,6 @@ export default function Messages() {
     setSendRecipient("patient");
   };
 
-  const resendMessage = async (m: any) => {
-    const result = await queueAndSend({
-      patient_id: m.patient_id,
-      contact_id: m.contact_id,
-      channel: m.channel,
-      body: m.body,
-      created_by: user?.id,
-    });
-    qc.invalidateQueries({ queryKey: qk.messages });
-    if (!result.ok) return toast.error(result.error ?? "Falha ao reenviar");
-    toast.success("Mensagem reenviada");
-  };
-
   const createPatient = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
@@ -152,6 +139,11 @@ export default function Messages() {
           </p>
         </div>
         <div className="flex flex-wrap md:flex-nowrap items-center gap-2 shrink-0">
+          <Button variant="outline" asChild>
+            <Link to="/app/mensagens/historico">
+              <History className="h-4 w-4" /> Histórico
+            </Link>
+          </Button>
           <Button variant="outline" onClick={() => setNewPatientOpen(true)}>
             <UserPlus className="h-4 w-4" /> Novo paciente
           </Button>
