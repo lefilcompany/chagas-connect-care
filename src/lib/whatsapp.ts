@@ -129,3 +129,153 @@ export async function sendBatch(
   await Promise.all(workers);
   return { ok, failed, errors };
 }
+
+/**
+ * Queues a message derived from a template, applying `{var}` substitutions.
+ * Stores `template_id`, `template_name`, and `template_variables` on the row.
+ */
+export async function queueAndSendFromTemplate(input: {
+  template: {
+    id: string;
+    body: string;
+    template_kind: "internal" | "meta";
+    meta_template_name?: string | null;
+    channel?: "whatsapp" | "sms";
+  };
+  patient_id: string;
+  contact_id?: string | null;
+  variables: Record<string, string>;
+  created_by?: string | null;
+}): Promise<QueueAndSendResult> {
+  const body = renderTemplate(input.template.body, input.variables);
+  return queueAndSend({
+    patient_id: input.patient_id,
+    contact_id: input.contact_id ?? null,
+    channel: input.template.channel ?? "whatsapp",
+    body,
+    created_by: input.created_by,
+    message_type: "template",
+    template_id: input.template.id,
+    template_name:
+      input.template.template_kind === "meta" ? input.template.meta_template_name ?? null : null,
+    template_variables: input.variables,
+  });
+}
+
+export type CreateBatchInput = {
+  name: string;
+  body: string;
+  recipients: Recipient[];
+  template?: {
+    id: string;
+    body: string;
+    template_kind: "internal" | "meta";
+    meta_template_name?: string | null;
+  } | null;
+  variables?: Record<string, string>;
+  message_type?: string;
+  targeting_mode: string;
+  audience_types: string[];
+  segment_id?: string | null;
+  filters?: Record<string, unknown>;
+  institution?: string;
+  created_by?: string | null;
+};
+
+export type CreateBatchResult = {
+  batch_id: string | null;
+  ok: boolean;
+  error?: string;
+  ok_count?: number;
+  failed_count?: number;
+};
+
+/**
+ * Creates a `message_batches` row + one `messages` row per recipient (queued),
+ * then invokes `process-message-batch` to dispatch with controlled concurrency.
+ */
+export async function createBatch(input: CreateBatchInput): Promise<CreateBatchResult> {
+  if (!input.recipients.length) {
+    return { batch_id: null, ok: false, error: "Nenhum destinatário selecionado" };
+  }
+
+  const { data: batch, error: batchErr } = await supabase
+    .from("message_batches")
+    .insert({
+      name: input.name,
+      body: input.body,
+      template_id: input.template?.id ?? null,
+      targeting_mode: input.targeting_mode,
+      audience_types: input.audience_types,
+      segment_id: input.segment_id ?? null,
+      filters: input.filters ?? {},
+      channel: "whatsapp",
+      total_recipients: input.recipients.length,
+      status: "queued",
+      institution: input.institution ?? "",
+      created_by: input.created_by ?? null,
+    } as any)
+    .select("id")
+    .maybeSingle();
+
+  if (batchErr || !batch?.id) {
+    return { batch_id: null, ok: false, error: batchErr?.message ?? "Falha ao criar lote" };
+  }
+
+  const nowIso = new Date().toISOString();
+  const messageType = input.message_type ?? (input.template ? "campaign" : "campaign");
+  const templateName =
+    input.template?.template_kind === "meta" ? input.template?.meta_template_name ?? null : null;
+  const vars = input.variables ?? {};
+
+  const rows = input.recipients.map((r) => {
+    const body = input.template ? renderTemplate(input.template.body, vars) : input.body;
+    return {
+      patient_id: r.patient_id,
+      contact_id: r.contact_id ?? null,
+      channel: "whatsapp",
+      direction: "outbound",
+      status: "queued",
+      queued_at: nowIso,
+      body,
+      message_type: messageType,
+      template_id: input.template?.id ?? null,
+      template_name: templateName,
+      template_variables: vars,
+      batch_id: batch.id,
+      created_by: input.created_by ?? null,
+    };
+  });
+
+  const { error: insErr } = await supabase.from("messages").insert(rows as any);
+  if (insErr) {
+    await supabase
+      .from("message_batches")
+      .update({ status: "failed", last_error: insErr.message, finished_at: new Date().toISOString() })
+      .eq("id", batch.id);
+    return { batch_id: batch.id, ok: false, error: insErr.message };
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke("process-message-batch", {
+      body: { batch_id: batch.id },
+    });
+    if (error) {
+      return { batch_id: batch.id, ok: false, error: error.message };
+    }
+    const payload = data as { ok?: boolean; ok_count?: number; failed_count?: number; error?: string };
+    return {
+      batch_id: batch.id,
+      ok: payload?.ok !== false,
+      ok_count: payload?.ok_count,
+      failed_count: payload?.failed_count,
+      error: payload?.error,
+    };
+  } catch (e) {
+    return {
+      batch_id: batch.id,
+      ok: false,
+      error: e instanceof Error ? e.message : "Erro ao invocar processamento",
+    };
+  }
+}
