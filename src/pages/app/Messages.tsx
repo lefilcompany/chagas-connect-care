@@ -19,6 +19,7 @@ import {
   Send, Search, Plus, UserPlus, RefreshCw, Check, CheckCheck, Clock, ArrowRight, X,
 } from "lucide-react";
 import { User, Phone, MessageSquare, History } from "lucide-react";
+import { queueAndSend } from "@/lib/whatsapp";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
@@ -121,41 +122,35 @@ export default function Messages() {
     if (!sendBody.trim()) return toast.error("Digite a mensagem");
     setSending(true);
     const contactId = sendRecipient !== "patient" ? sendRecipient : null;
-    const { error } = await supabase.from("messages").insert({
+    const result = await queueAndSend({
       patient_id: sendPatientId,
       contact_id: contactId,
-      channel: sendChannel as any,
+      channel: sendChannel as "whatsapp" | "sms",
       body: sendBody.trim(),
-      direction: "outbound",
-      status: "enviado",
-      sent_at: new Date().toISOString(),
       created_by: user?.id,
-    } as any);
+    });
     setSending(false);
-    if (error) return toast.error(error.message);
-    toast.success("Mensagem disparada");
+    qc.invalidateQueries({ queryKey: qk.messages });
+    qc.invalidateQueries({ queryKey: qk.dashboard });
+    if (!result.ok) return toast.error(result.error ?? "Falha ao enviar");
+    toast.success("Mensagem enviada");
     setSendOpen(false);
     setSendBody("");
     setSendRecipient("patient");
-    qc.invalidateQueries({ queryKey: qk.messages });
-    qc.invalidateQueries({ queryKey: qk.dashboard });
   };
 
   const resendMessage = async (m: any) => {
-    const { error } = await supabase.from("messages").insert({
+    const result = await queueAndSend({
       patient_id: m.patient_id,
       contact_id: m.contact_id,
       channel: m.channel,
       body: m.body,
-      direction: "outbound",
-      status: "enviado",
-      sent_at: new Date().toISOString(),
       created_by: user?.id,
-    } as any);
-    if (error) return toast.error(error.message);
+    });
+    qc.invalidateQueries({ queryKey: qk.messages });
+    if (!result.ok) return toast.error(result.error ?? "Falha ao reenviar");
     toast.success("Mensagem reenviada");
     setDetail(null);
-    qc.invalidateQueries({ queryKey: qk.messages });
   };
 
   const createPatient = async (e: React.FormEvent<HTMLFormElement>) => {

@@ -17,6 +17,7 @@ import { Plus, Search, Send, Trash2, X } from "lucide-react";
 import { z } from "zod";
 import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
 import { RecipientPreview } from "@/components/app/RecipientPreview";
+import { sendBatch } from "@/lib/whatsapp";
 import {
   AudienceType, Recipient, SegmentDef, SegmentFilters,
   emptyFilters, resolveRecipients, resolveContentTargeting, TargetingMode,
@@ -636,21 +637,21 @@ function SendContentDialog({
 
     if (mode === "single") {
       if (sendToPatient) {
-        rows.push({ patient_id: patientId, channel, direction: "outbound", body, status: "sent", sent_at: now });
+        rows.push({ patient_id: patientId, channel, direction: "outbound", body, status: "queued", queued_at: now, message_type: "content_broadcast" });
       }
       for (const cid of selectedContactIds) {
-        rows.push({ patient_id: patientId, contact_id: cid, channel, direction: "outbound", body, status: "sent", sent_at: now });
+        rows.push({ patient_id: patientId, contact_id: cid, channel, direction: "outbound", body, status: "queued", queued_at: now, message_type: "content_broadcast" });
       }
     } else if (mode === "bulk") {
       if (bulkGroups.paciente) {
         for (const p of patients as any[]) {
-          rows.push({ patient_id: p.id, channel, direction: "outbound", body, status: "sent", sent_at: now });
+          rows.push({ patient_id: p.id, channel, direction: "outbound", body, status: "queued", queued_at: now, message_type: "content_broadcast" });
         }
       }
       const relations = ["familiar", "cuidador", "medico"].filter((r) => bulkGroups[r]);
       for (const c of allContacts as any[]) {
         if (relations.includes(c.relation)) {
-          rows.push({ patient_id: c.patient_id, contact_id: c.id, channel, direction: "outbound", body, status: "sent", sent_at: now });
+          rows.push({ patient_id: c.patient_id, contact_id: c.id, channel, direction: "outbound", body, status: "queued", queued_at: now, message_type: "content_broadcast" });
         }
       }
     } else {
@@ -663,17 +664,44 @@ function SendContentDialog({
           channel: channelOverride === "auto" ? r.channel : channelOverride,
           direction: "outbound",
           body,
-          status: "sent",
-          sent_at: now,
+          status: "queued",
+          queued_at: now,
+          message_type: "content_broadcast",
         });
       }
     }
 
     if (rows.length === 0) { setSending(false); return; }
-    const { error } = await supabase.from("messages").insert(rows);
+    const { data: inserted, error } = await supabase
+      .from("messages")
+      .insert(rows)
+      .select("id, channel");
+    if (error) {
+      setSending(false);
+      return toast.error(error.message);
+    }
+
+    const whatsappIds = (inserted ?? [])
+      .filter((r: any) => r.channel === "whatsapp")
+      .map((r: any) => r.id as string);
+    const otherCount = (inserted?.length ?? 0) - whatsappIds.length;
+
+    let okCount = 0;
+    let failCount = 0;
+    if (whatsappIds.length > 0) {
+      const res = await sendBatch(whatsappIds, 3);
+      okCount = res.ok;
+      failCount = res.failed;
+    }
     setSending(false);
-    if (error) return toast.error(error.message);
-    toast.success(`Conteúdo enviado (${rows.length} ${rows.length === 1 ? "destinatário" : "destinatários"})`);
+
+    if (failCount === 0) {
+      toast.success(
+        `Conteúdo enviado (${okCount + otherCount} ${okCount + otherCount === 1 ? "destinatário" : "destinatários"})`,
+      );
+    } else {
+      toast.error(`Enviadas: ${okCount} · Falhas: ${failCount}${otherCount ? ` · Pendentes (SMS): ${otherCount}` : ""}`);
+    }
     onOpenChange(false);
     onSent();
   };

@@ -17,6 +17,7 @@ import {
   Save, Trash2, Check, CheckCheck, Clock,
 } from "lucide-react";
 import { z } from "zod";
+import { queueAndSend } from "@/lib/whatsapp";
 
 function formatPhone(v: string) {
   const digits = v.replace(/\D/g, "");
@@ -157,33 +158,17 @@ export default function PatientDetail() {
     const channel = String(fd.get("channel") ?? "whatsapp");
     const contactId = String(fd.get("contact_id") ?? "").trim();
     if (!body) return toast.error("Mensagem vazia");
-    const { data: inserted, error } = await supabase.from("messages").insert({
-      patient_id: id,
+    const result = await queueAndSend({
+      patient_id: id!,
       contact_id: contactId && contactId !== "patient" ? contactId : null,
-      channel,
+      channel: channel as "whatsapp" | "sms",
       body,
-      status: "enviado",
-      sent_at: new Date().toISOString(),
       created_by: user!.id,
-    } as any).select().single();
-    if (error) return toast.error(error.message);
-    toast.success(`Mensagem enviada por ${channel.toUpperCase()} (simulado)`);
+    });
     (e.target as HTMLFormElement).reset();
     loadAll();
-    // Simulate delivery / read receipts (WhatsApp-like)
-    if (inserted?.id) {
-      const msgId = inserted.id;
-      setTimeout(async () => {
-        await supabase.from("messages").update({ status: "entregue" } as any).eq("id", msgId);
-        loadAll();
-      }, 1500);
-      if (channel === "whatsapp") {
-        setTimeout(async () => {
-          await supabase.from("messages").update({ status: "lido" } as any).eq("id", msgId);
-          loadAll();
-        }, 4000);
-      }
-    }
+    if (!result.ok) return toast.error(result.error ?? "Falha ao enviar");
+    toast.success(`Mensagem enviada por ${channel.toUpperCase()}`);
   };
 
   const confirmDeleteMsg = async () => {
