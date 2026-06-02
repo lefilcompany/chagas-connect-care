@@ -204,11 +204,19 @@ export default function CampaignTab({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <StartBlankCard onClick={() => { setTemplateId(""); setStep(1); }} />
             {activeTemplates.map((t) => (
-              <button
+              <div
                 key={t.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => { setTemplateId(t.id); setStep(1); }}
-                className={`text-left rounded-2xl transition-all ${
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setTemplateId(t.id);
+                    setStep(1);
+                  }
+                }}
+                className={`text-left rounded-2xl transition-all cursor-pointer ${
                   templateId === t.id ? "ring-2 ring-primary" : ""
                 }`}
               >
@@ -218,7 +226,7 @@ export default function CampaignTab({
                   onEdit={() => { setTemplateId(t.id); setStep(1); }}
                   onDuplicate={() => { setTemplateId(t.id); setStep(1); }}
                 />
-              </button>
+              </div>
             ))}
           </div>
         </div>

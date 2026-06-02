@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
         last_error: `Network error: ${errMsg}`,
       })
       .eq("id", msg.id);
-    return json(502, { ok: false, error: errMsg });
+    return json(200, { ok: false, error: errMsg });
   }
 
   const metaJson = await metaRes.json().catch(() => ({}));
@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
         last_error: String(errText).slice(0, 1000),
       })
       .eq("id", msg.id);
-    return json(502, { ok: false, error: errText });
+    return json(200, { ok: false, error: String(errText) });
   }
 
   const externalId: string | undefined = metaJson?.messages?.[0]?.id;
