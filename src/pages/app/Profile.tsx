@@ -19,7 +19,8 @@ export default function Profile() {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from("profiles").update(data).eq("id", user!.id);
+    const { institution: _institution, ...editable } = data;
+    const { error } = await supabase.from("profiles").update(editable).eq("id", user!.id);
     if (error) return toast.error(error.message);
     toast.success("Perfil atualizado");
   };
@@ -36,7 +37,11 @@ export default function Profile() {
           <div className="space-y-2"><Label>Função</Label><Input value={data.role_label} onChange={(e) => setData({ ...data, role_label: e.target.value })} /></div>
           <div className="space-y-2"><Label>CRM/COREN</Label><Input value={data.professional_registry} onChange={(e) => setData({ ...data, professional_registry: e.target.value })} /></div>
         </div>
-        <div className="space-y-2"><Label>Instituição</Label><Input value={data.institution} onChange={(e) => setData({ ...data, institution: e.target.value })} /></div>
+        <div className="space-y-2">
+          <Label>Instituição</Label>
+          <Input value={data.institution} disabled />
+          <p className="text-xs text-muted-foreground">A instituição é definida no cadastro e só pode ser alterada por um administrador.</p>
+        </div>
         <div className="space-y-2"><Label>E-mail</Label><Input value={user?.email ?? ""} disabled /></div>
         <Button type="submit" variant="hero">Salvar</Button>
       </form>
