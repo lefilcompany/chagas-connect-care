@@ -20,7 +20,7 @@ import {
   SegmentFilters, TargetingMode, emptyFilters, resolveRecipients,
 } from "@/lib/segments";
 import {
-  extractVariables, renderTemplate, type MessageTemplate,
+  extractVariables, renderTemplate, formatMedications, type MessageTemplate,
 } from "@/lib/templates";
 import { createBatch } from "@/lib/whatsapp";
 import { TemplateCard, StartBlankCard } from "./TemplateCard";
@@ -61,6 +61,7 @@ export default function CampaignTab({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
   const [institution, setInstitution] = useState("");
+  const [medicationMode, setMedicationMode] = useState<"all" | "first">("all");
 
   useEffect(() => {
     if (user) {
@@ -136,26 +137,104 @@ export default function CampaignTab({
 
   const body = selectedTemplate?.body ?? freeBody;
   const detectedVars = useMemo(() => extractVariables(body), [body]);
-  const AUTO_RECIPIENT_VARS = ["nome_destinatario", "nome_paciente", "nome_contato"] as const;
+  const AUTO_RECIPIENT_VARS = [
+    "nome_destinatario",
+    "nome_paciente",
+    "nome_contato",
+    "medicacao",
+    "medicacao_orientacao",
+  ] as const;
   const manualVars = useMemo(
     () => detectedVars.filter((v) => !AUTO_RECIPIENT_VARS.includes(v as any)),
     [detectedVars],
   );
   const hasRecipientVar = useMemo(
-    () => detectedVars.some((v) => AUTO_RECIPIENT_VARS.includes(v as any)),
+    () =>
+      detectedVars.some((v) =>
+        ["nome_destinatario", "nome_paciente", "nome_contato"].includes(v),
+      ),
     [detectedVars],
   );
-  const previewVars = useMemo(() => {
-    const out: Record<string, string> = { ...vars };
-    for (const v of AUTO_RECIPIENT_VARS) if (!out[v]) out[v] = "Destinatário";
-    return out;
-  }, [vars]);
-  const renderedBody = useMemo(() => renderTemplate(body, previewVars), [body, previewVars]);
+  const usesMedication = useMemo(
+    () =>
+      detectedVars.includes("medicacao") || detectedVars.includes("medicacao_orientacao"),
+    [detectedVars],
+  );
 
   const finalRecipients = useMemo(
     () => recipients.filter((r) => selected.has(r.key) && r.phone && r.channel === "whatsapp"),
     [recipients, selected],
   );
+
+  // Fetch medications for selected patients when the template references medication vars
+  const finalPatientIds = useMemo(
+    () => Array.from(new Set(finalRecipients.map((r) => r.patient_id))),
+    [finalRecipients],
+  );
+  const { data: medsByPatient = new Map<string, { name: string | null; dose: string | null; schedule: string | null }[]>() } =
+    useQuery({
+      queryKey: ["campaign-meds", finalPatientIds],
+      enabled: usesMedication && finalPatientIds.length > 0 && step >= 3,
+      queryFn: async () => {
+        const { data } = await supabase
+          .from("medications")
+          .select("patient_id, name, dose, schedule")
+          .in("patient_id", finalPatientIds);
+        const map = new Map<string, { name: string | null; dose: string | null; schedule: string | null }[]>();
+        for (const m of data ?? []) {
+          const list = map.get(m.patient_id as string) ?? [];
+          list.push({ name: m.name, dose: m.dose, schedule: m.schedule });
+          map.set(m.patient_id as string, list);
+        }
+        return map;
+      },
+    });
+
+  // Patients without medications (only relevant when template uses medication vars)
+  const patientsWithoutMeds = useMemo(() => {
+    if (!usesMedication) return [] as string[];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const r of finalRecipients) {
+      if (seen.has(r.patient_id)) continue;
+      seen.add(r.patient_id);
+      const list = medsByPatient.get(r.patient_id) ?? [];
+      if (list.length === 0) out.push(r.patient_name || r.name);
+    }
+    return out;
+  }, [usesMedication, finalRecipients, medsByPatient]);
+
+  // Build a representative preview per audience type present in finalRecipients
+  const previewsByAudience = useMemo(() => {
+    const order: AudienceType[] = ["paciente", "familiar", "cuidador", "medico"];
+    const seen: Partial<Record<AudienceType, Recipient>> = {};
+    for (const r of finalRecipients) if (!seen[r.relation]) seen[r.relation] = r;
+    return order
+      .filter((a) => seen[a])
+      .map((a) => {
+        const r = seen[a]!;
+        const meds = medsByPatient.get(r.patient_id) ?? [];
+        const medText = formatMedications(meds, medicationMode);
+        const perVars: Record<string, string> = { ...vars };
+        const rname = (r.name ?? "").trim() || "Destinatário";
+        perVars.nome_destinatario = rname;
+        if (!perVars.nome_paciente) perVars.nome_paciente = rname;
+        if (!perVars.nome_contato) perVars.nome_contato = rname;
+        if (usesMedication) {
+          const fallback = medText || "(sem medicação cadastrada)";
+          if (!perVars.medicacao) perVars.medicacao = fallback;
+          if (!perVars.medicacao_orientacao) perVars.medicacao_orientacao = fallback;
+        }
+        return {
+          audience: a,
+          recipient: r,
+          body: renderTemplate(body, perVars),
+        };
+      });
+  }, [finalRecipients, medsByPatient, medicationMode, vars, body, usesMedication]);
+
+  // First preview body is used as the "representative" rendered body for the send confirm step
+  const renderedBody = previewsByAudience[0]?.body ?? body;
 
   // Normalize BR phone for preview (mirrors edge function logic)
   const normalizeBR = (raw: string): string | null => {
@@ -171,7 +250,12 @@ export default function CampaignTab({
     if (i === 0) return !!selectedTemplate || freeBody.trim().length >= 3;
     if (i === 1) return previewAud.length > 0;
     if (i === 2) return finalRecipients.length > 0;
-    if (i === 3) return renderedBody.trim().length >= 3;
+    if (i === 3) {
+      if (renderedBody.trim().length < 3) return false;
+      // Block advancing if every selected patient lacks meds for a medication template
+      if (usesMedication && finalPatientIds.length > 0 && patientsWithoutMeds.length >= finalPatientIds.length) return false;
+      return true;
+    }
     return true;
   };
 
@@ -198,14 +282,17 @@ export default function CampaignTab({
       filters: mode === "filters" ? (filters as any) : {},
       institution,
       created_by: user?.id ?? null,
+      medication_mode: medicationMode,
     });
     setSending(false);
     qc.invalidateQueries({ queryKey: qk.messages });
     qc.invalidateQueries({ queryKey: qk.batches });
     if (!result.ok) return toast.error(result.error ?? "Falha ao disparar campanha");
+    const sentCount = result.ok_count ?? (finalRecipients.length - (result.skipped_count ?? 0));
     toast.success(
-      `Campanha disparada: ${result.ok_count ?? finalRecipients.length} enviadas` +
-        (result.failed_count ? `, ${result.failed_count} falharam` : ""),
+      `Campanha disparada: ${sentCount} enviadas` +
+        (result.failed_count ? `, ${result.failed_count} falharam` : "") +
+        (result.skipped_count ? `, ${result.skipped_count} pulado(s) por falta de medicação` : ""),
     );
     // Reset
     setStep(0);
@@ -387,6 +474,50 @@ export default function CampaignTab({
               cuidador ou médico).
             </div>
           )}
+          {usesMedication && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-900 dark:text-emerald-200">
+              As medicações vêm automaticamente do cadastro de cada paciente. Familiares,
+              cuidadores e médicos recebem a lista de medicações do paciente vinculado.
+            </div>
+          )}
+          {usesMedication && patientsWithoutMeds.length > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-medium">
+                  {patientsWithoutMeds.length} paciente(s) sem medicação cadastrada serão pulados no envio:
+                </p>
+                <p>{patientsWithoutMeds.slice(0, 8).join(", ")}{patientsWithoutMeds.length > 8 ? `, +${patientsWithoutMeds.length - 8}` : ""}.</p>
+                <p className="opacity-90">
+                  Cadastre as medicações desses pacientes ou remova-os no passo Destinatários.
+                </p>
+              </div>
+            </div>
+          )}
+          {usesMedication && (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs space-y-2">
+              <Label className="text-xs uppercase">Quando o paciente tiver várias medicações</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { v: "all", label: "Listar todas" },
+                  { v: "first", label: "Enviar só a primeira" },
+                ].map((opt) => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setMedicationMode(opt.v as "all" | "first")}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                      medicationMode === opt.v
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {manualVars.length > 0 && (
             <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
               <Label className="text-xs uppercase">Variáveis</Label>
@@ -408,9 +539,9 @@ export default function CampaignTab({
             </div>
           )}
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-2 text-sm">
-              <h4 className="font-semibold text-brand">Resumo</h4>
+          <div className="space-y-2 text-sm">
+            <h4 className="font-semibold text-brand">Resumo</h4>
+            <div className="grid gap-1 sm:grid-cols-2">
               <p><span className="text-muted-foreground">Campanha:</span> {campaignName || "—"}</p>
               <p><span className="text-muted-foreground">Modelo:</span> {selectedTemplate?.name ?? "Texto livre"}</p>
               <p>
@@ -422,25 +553,57 @@ export default function CampaignTab({
                   : "Texto livre"}
               </p>
               <p><span className="text-muted-foreground">Canal:</span> WhatsApp</p>
-              <p><span className="text-muted-foreground">Destinatários:</span> {finalRecipients.length}</p>
-              {finalRecipients[0] && (
-                <div className="rounded-md border border-border bg-muted/30 p-2 text-xs space-y-0.5">
-                  <p className="text-muted-foreground">Exemplo do primeiro destinatário:</p>
-                  <p>
-                    <span className="text-muted-foreground">Original:</span>{" "}
-                    <span className="font-mono">{finalRecipients[0].phone}</span>
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Normalizado:</span>{" "}
-                    <span className="font-mono">
-                      {normalizeBR(finalRecipients[0].phone) ?? "inválido"}
-                    </span>
-                  </p>
-                </div>
-              )}
+              <p>
+                <span className="text-muted-foreground">Destinatários:</span>{" "}
+                {finalRecipients.length}
+                {usesMedication && patientsWithoutMeds.length > 0 && (
+                  <span className="text-amber-700 dark:text-amber-300">
+                    {" "}({finalRecipients.filter((r) => (medsByPatient.get(r.patient_id) ?? []).length > 0).length} efetivos)
+                  </span>
+                )}
+              </p>
             </div>
-            <WhatsAppPreview body={renderedBody} recipientName="Destinatário" highlightVars={false} />
           </div>
+
+          {previewsByAudience.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs uppercase">Como cada tipo de público verá a mensagem</Label>
+              <div className="grid gap-3 md:grid-cols-2">
+                {previewsByAudience.map((p) => (
+                  <div key={p.audience} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-brand">{AUDIENCE_LABELS[p.audience]}</span>
+                      <span className="text-muted-foreground">
+                        Ex.: {p.recipient.name}
+                        {p.audience !== "paciente" && ` → paciente ${p.recipient.patient_name}`}
+                      </span>
+                    </div>
+                    <WhatsAppPreview
+                      body={p.body}
+                      recipientName={p.recipient.name}
+                      highlightVars={false}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {finalRecipients[0] && (
+            <div className="rounded-md border border-border bg-muted/30 p-2 text-xs space-y-0.5">
+              <p className="text-muted-foreground">Exemplo do primeiro destinatário:</p>
+              <p>
+                <span className="text-muted-foreground">Original:</span>{" "}
+                <span className="font-mono">{finalRecipients[0].phone}</span>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Normalizado:</span>{" "}
+                <span className="font-mono">
+                  {normalizeBR(finalRecipients[0].phone) ?? "inválido"}
+                </span>
+              </p>
+            </div>
+          )}
 
           {(!selectedTemplate || selectedTemplate.template_kind === "internal") && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">

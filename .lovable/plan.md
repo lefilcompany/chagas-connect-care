@@ -1,43 +1,87 @@
 ## Objetivo
 
-Renomear a variável `{nome_paciente}` para `{nome_destinatario}` (mais clara, pois pode representar paciente, familiar, cuidador ou médico) e garantir que, no envio, ela seja substituída automaticamente pelo nome do destinatário real de cada mensagem — em vez de um valor único definido manualmente para todos.
+Simplificar o disparo de campanha removendo a exposição de variáveis técnicas (`{medicacao_orientacao}`, `{medicacao}`, etc.). As medicações devem vir automaticamente dos pacientes cadastrados, e o passo "Revisar" deve mostrar prévias por tipo de público (paciente, familiar, cuidador, médico).
 
-## Mudanças
+## Comportamento desejado
 
-### 1. Modelos existentes no banco (migration nova)
-Atualizar todos os modelos pré-carregados na tabela `message_templates`:
-- Trocar `{nome_paciente}` por `{nome_destinatario}` no campo `body`.
-- Atualizar o array `variables` (jsonb) substituindo `"nome_paciente"` por `"nome_destinatario"`.
-- Aplica-se às 10 linhas inseridas em `20260602141755_*.sql` (boas-vindas, orientação, medicação, aviso, lembrete consulta, recebimento, alimentação, rotina, orientação família, check-in semanal).
+1. **Variáveis de medicação são automáticas**
+   - `{medicacao}` e `{medicacao_orientacao}` deixam de aparecer como campo manual no passo "Revisar".
+   - Para cada destinatário, a medicação é buscada da tabela `medications` do paciente vinculado:
+     - **Paciente** → medicações do próprio paciente.
+     - **Familiar / Cuidador / Médico** → medicações do paciente ao qual o contato está vinculado (mensagem fica do tipo "Lembrete: João está tomando…").
 
-### 2. Catálogo de variáveis (`src/lib/templates.ts`)
-- Substituir o item `nome_paciente` em `VARIABLE_SUGGESTIONS` por:
-  - `{ key: "nome_destinatario", hint: "Nome do destinatário (paciente, familiar, cuidador, etc.)" }`
-- Em `autofillVariables`, tratar `nome_destinatario` priorizando `ctx.contact?.full_name` e caindo para `ctx.patient?.full_name`.
+2. **Tratamento de múltiplas medicações**
+   - Se o paciente tiver **1 medicação** → preenche direto (`Nome — Dose — Horário`).
+   - Se tiver **várias** → lista todas formatadas em linhas separadas (`• Nome — Dose — Horário`).
+   - Adicionar um seletor opcional no passo "Revisar": "Como enviar quando houver várias medicações?" com duas opções:
+     - **Todas em lista** (padrão)
+     - **Apenas a primeira cadastrada**
+   - (Escolher uma medicação específica por paciente fica fora do escopo porque cada paciente pode ter um conjunto diferente — listar todas é o comportamento seguro.)
 
-### 3. Substituição por destinatário no envio (`src/lib/whatsapp.ts`)
-- Em `createBatch`, hoje o body é renderizado uma única vez com `vars` globais. Mudar para renderizar **uma vez por destinatário**, mesclando `vars` com valores derivados do `Recipient`:
-  - `nome_destinatario` ← `r.name` (já é o nome do paciente OU do contato selecionado, conforme o tipo).
-- Em `queueAndSendFromTemplate`, aplicar o mesmo merge antes de chamar `renderTemplate`, usando o nome carregado do paciente/contato (ou recebendo-o como parâmetro opcional).
-- O valor por-destinatário sempre vence o valor manual digitado na UI.
+3. **Aviso de pacientes sem medicação cadastrada**
+   - Quando o modelo usa variável de medicação e houver destinatários cujo paciente não tem medicação cadastrada, exibir um alerta amarelo no passo "Revisar" listando os nomes desses pacientes, com texto orientando "Cadastre as medicações desses pacientes antes de enviar, ou remova-os no passo Destinatários".
+   - Permitir prosseguir mesmo assim (mas a mensagem desses destinatários será pulada para evitar enviar texto com `{medicacao}` em branco).
 
-### 4. UI da campanha (`src/components/app/messages/CampaignTab.tsx`)
-- Na etapa "Revisar", esconder `nome_destinatario` da lista de inputs manuais (será preenchido automaticamente).
-- Exibir uma nota: "`{nome_destinatario}` será substituído automaticamente pelo nome de cada destinatário selecionado."
-- Atualizar a `WhatsAppPreview` para passar `vars` incluindo `nome_destinatario: "Destinatário"` apenas para a pré-visualização.
+4. **Prévia por tipo de público no passo "Revisar"**
+   - Substituir o card único de WhatsApp por **uma prévia por tipo de público presente nos destinatários selecionados** (Paciente, Familiar, Cuidador, Médico).
+   - Cada prévia usa um destinatário real daquele tipo (o primeiro da lista) para mostrar como o nome e as medicações serão renderizados.
+   - Se um tipo não tiver destinatários, não aparece.
 
-### 5. UI de uso de modelo (`src/components/app/messages/UseTemplateDialog.tsx`)
-- O `autofillVariables` atualizado já cobre `nome_destinatario`. Ajustar o input correspondente para usar o nome do destinatário escolhido (paciente ou contato) como valor padrão.
+5. **Esconder também as outras variáveis automáticas**
+   - Já é feito para `{nome_destinatario}`. Estender para `{medicacao}` e `{medicacao_orientacao}` no `manualVars` do `CampaignTab`.
 
-### 6. Placeholder do editor (`src/components/app/messages/TemplateEditorDialog.tsx`)
-- Atualizar o `placeholder` do textarea de `{nome_paciente}` para `{nome_destinatario}`.
+## Mudanças técnicas
 
-## Compatibilidade
+### `src/lib/templates.ts`
+- Adicionar helper `formatMedications(meds, mode: "all" | "first"): string` que devolve string formatada (lista com `•` para várias, ou linha única).
+- Remover `medicacao` e `medicacao_orientacao` de `VARIABLE_SUGGESTIONS` (continuam funcionando, só não são sugeridas como input manual).
 
-- `{nome_paciente}` continuará funcionando como alias (qualquer body que ainda tenha `{nome_paciente}` será preenchido com o nome do destinatário) para não quebrar modelos criados pelo usuário antes da renomeação. Mesma regra para `{nome_contato}`.
+### `src/lib/whatsapp.ts` — `createBatch`
+- Aceitar novo parâmetro opcional `medication_mode: "all" | "first"`.
+- Antes de gerar `rows`, fazer **uma** query `supabase.from("medications").select("patient_id, name, dose, schedule").in("patient_id", uniquePatientIds)` e agrupar por `patient_id`.
+- Para cada destinatário:
+  - Calcular `medText = formatMedications(medsByPatient[r.patient_id] ?? [], medication_mode)`.
+  - Injetar em `perVars.medicacao` e `perVars.medicacao_orientacao` se ainda não definidos.
+  - Se o template referencia `{medicacao}`/`{medicacao_orientacao}` e a lista estiver vazia, **pular** esse destinatário (não inserir em `messages`) e contabilizar em `skipped`.
+- Retornar `skipped_count` e `skipped_names: string[]` no resultado para o toast final.
 
-## Detalhes técnicos
+### `src/components/app/messages/CampaignTab.tsx`
+- Expandir `AUTO_RECIPIENT_VARS` para incluir `medicacao` e `medicacao_orientacao` → escondem do bloco "Variáveis".
+- Detectar se o body contém variáveis de medicação (`bodyUsesMedication`).
+- Quando `bodyUsesMedication`:
+  - Buscar medicações dos pacientes finais via `useQuery(["medications-by-patient", patientIds], ...)`.
+  - Calcular `patientsWithoutMeds: string[]` e mostrar alerta amarelo no passo Revisar.
+  - Mostrar um pequeno seletor "Quando o paciente tiver várias medicações: [Listar todas | Enviar só a primeira]".
+- Substituir o card único de `WhatsAppPreview` por um grid de prévias, uma por tipo de público presente em `finalRecipients`. Cada prévia rende o body usando um destinatário-exemplo daquele tipo + suas medicações (ou as do paciente vinculado).
+- Passar `medication_mode` para `createBatch`.
+- Atualizar toast final para mencionar `skipped_count` quando > 0.
 
-- A renderização por-destinatário em `createBatch` muda o `messages.body` armazenado para refletir o nome real de cada pessoa, o que já é o comportamento esperado no histórico.
-- `message_batches.body` continua armazenando o template bruto (com placeholders) para auditoria.
-- Nenhuma alteração em edge functions é necessária — a substituição acontece no cliente antes do `insert`.
+### Banco de dados
+- Nenhuma migração necessária. A tabela `medications` já existe com RLS por paciente.
+
+## Telas afetadas
+
+```text
+[Passo 4 – Revisar]
+┌──────────────────────────────────────────────┐
+│ Aviso: 2 pacientes selecionados não têm      │
+│ medicação cadastrada (Maria S., João P.).    │
+│ Eles serão pulados no envio.                 │
+└──────────────────────────────────────────────┘
+
+Quando houver várias medicações:  ( ) Listar todas  (•) Só a primeira
+
+┌─ Resumo ───────────────┐  ┌─ Prévia: Paciente ─────────┐
+│ Campanha: ...          │  │ Olá, Ana. Este é um lembrete│
+│ Modelo: ...            │  │ ... • Benzonidazol 100mg  │
+│ Destinatários: 6       │  │     • Vitamina D 1x/dia   │
+│ Pacientes sem med: 2   │  └────────────────────────────┘
+└────────────────────────┘  ┌─ Prévia: Familiar ─────────┐
+                            │ Olá, Carla. Este é um ...  │
+                            │ ... do paciente João: ...  │
+                            └────────────────────────────┘
+```
+
+## Riscos / observações
+- Per-recipient rendering passa a depender de uma query extra de medications — limitada por RLS já existente em `medications` (`can_access_patient`).
+- Pacientes sem medicação são silenciosamente pulados quando o template exige medicação — o usuário é avisado antes de confirmar e o toast final relata quantos foram pulados.
