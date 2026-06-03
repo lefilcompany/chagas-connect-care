@@ -10,9 +10,14 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   UserCircle, ShieldCheck, Bell, Settings2, ChevronRight, Save,
-  Mail, Phone, BadgeCheck, KeyRound, LogOut,
+  Mail, Phone, BadgeCheck, KeyRound, LogOut, Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type SectionId = "perfil" | "seguranca" | "preferencias" | "notificacoes" | "conta";
 
@@ -175,6 +180,7 @@ export default function Profile() {
             <AccountSection
               email={user?.email ?? ""}
               onLogout={async () => { await signOut(); navigate("/"); }}
+              onDeleted={() => navigate("/")}
             />
           )}
         </div>
@@ -341,7 +347,22 @@ function NotificationsSection() {
 
 /* ---------- Conta ---------- */
 
-function AccountSection({ email, onLogout }: { email: string; onLogout: () => void }) {
+function AccountSection({ email, onLogout, onDeleted }: { email: string; onLogout: () => void; onDeleted: () => void }) {
+  const [confirm, setConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    const { error } = await supabase.functions.invoke("delete-account");
+    if (error) {
+      setDeleting(false);
+      return toast.error(error.message || "Não foi possível excluir a conta");
+    }
+    await supabase.auth.signOut();
+    toast.success("Conta excluída");
+    onDeleted();
+  };
+
   return (
     <SectionShell icon={KeyRound} title="Conta" subtitle="Gerencie sua sessão e dados da conta">
       <div className="space-y-5 max-w-lg">
@@ -361,10 +382,45 @@ function AccountSection({ email, onLogout }: { email: string; onLogout: () => vo
         </div>
 
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
-          <div className="font-semibold text-destructive">Excluir conta</div>
-          <p className="text-sm text-muted-foreground mt-1">
-            A exclusão da conta deve ser solicitada ao administrador da sua instituição.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="font-semibold text-destructive">Excluir conta</div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Esta ação é permanente. Seus dados de perfil serão removidos e você perderá o acesso.
+              </p>
+            </div>
+            <AlertDialog onOpenChange={() => setConfirm("")}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">
+                  <Trash2 className="h-4 w-4" /> Excluir
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir conta permanentemente?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação não pode ser desfeita. Para confirmar, digite{" "}
+                    <span className="font-semibold text-destructive">EXCLUIR</span> abaixo.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <Input
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  placeholder="Digite EXCLUIR"
+                />
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={confirm !== "EXCLUIR" || deleting}
+                    onClick={(e) => { e.preventDefault(); handleDelete(); }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleting ? "Excluindo..." : "Sim, excluir conta"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </div>
     </SectionShell>
