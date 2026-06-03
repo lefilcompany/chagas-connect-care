@@ -28,7 +28,6 @@ const nav = [
   { to: "/app/conteudos", label: "Conteúdos", icon: BookOpen },
   { to: "/app/segmentos", label: "Segmentos", icon: Target },
   { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
-  { to: "/app/integracoes", label: "Integrações", icon: Plug },
   { to: "/app/perfil", label: "Perfil", icon: UserCircle },
 ];
 
