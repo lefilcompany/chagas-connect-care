@@ -47,14 +47,6 @@ export default function Messages() {
   const [newPatientOpen, setNewPatientOpen] = useState(false);
   const [institution, setInstitution] = useState("");
 
-  // Tabs + cross-tab template handoff
-  const [tab, setTab] = useState<string>("modelos");
-  const [campaignTemplateId, setCampaignTemplateId] = useState<string | null>(null);
-
-  const openSegmentedWithTemplate = (t: MessageTemplate) => {
-    setCampaignTemplateId(t.id);
-    setTab("campanha");
-  };
 
   useEffect(() => {
     if (user) {
