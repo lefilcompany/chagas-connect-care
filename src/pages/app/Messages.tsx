@@ -20,10 +20,7 @@ import {
 } from "lucide-react";
 import { User, Phone, MessageSquare } from "lucide-react";
 import { queueAndSend } from "@/lib/whatsapp";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import TemplatesTab from "@/components/app/messages/TemplatesTab";
 import CampaignTab from "@/components/app/messages/CampaignTab";
-import type { MessageTemplate } from "@/lib/templates";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
