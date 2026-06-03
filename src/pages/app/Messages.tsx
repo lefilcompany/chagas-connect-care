@@ -20,10 +20,7 @@ import {
 } from "lucide-react";
 import { User, Phone, MessageSquare } from "lucide-react";
 import { queueAndSend } from "@/lib/whatsapp";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import TemplatesTab from "@/components/app/messages/TemplatesTab";
 import CampaignTab from "@/components/app/messages/CampaignTab";
-import type { MessageTemplate } from "@/lib/templates";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
@@ -50,14 +47,6 @@ export default function Messages() {
   const [newPatientOpen, setNewPatientOpen] = useState(false);
   const [institution, setInstitution] = useState("");
 
-  // Tabs + cross-tab template handoff
-  const [tab, setTab] = useState<string>("modelos");
-  const [campaignTemplateId, setCampaignTemplateId] = useState<string | null>(null);
-
-  const openSegmentedWithTemplate = (t: MessageTemplate) => {
-    setCampaignTemplateId(t.id);
-    setTab("campanha");
-  };
 
   useEffect(() => {
     if (user) {
@@ -153,23 +142,7 @@ export default function Messages() {
         </div>
       </header>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="modelos">Modelos</TabsTrigger>
-          <TabsTrigger value="campanha">Envio segmentado</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="modelos">
-          <TemplatesTab onGoToSegmented={openSegmentedWithTemplate} />
-        </TabsContent>
-
-        <TabsContent value="campanha">
-          <CampaignTab
-            initialTemplateId={campaignTemplateId}
-            onConsumeInitial={() => setCampaignTemplateId(null)}
-          />
-        </TabsContent>
-      </Tabs>
+      <CampaignTab />
 
       {/* Send dialog */}
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
