@@ -467,19 +467,6 @@ export default function CampaignTab({
 
       {step === 3 && (
         <div className="space-y-4">
-          {hasRecipientVar && (
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-900 dark:text-emerald-200">
-              <code className="font-mono">{"{nome_destinatario}"}</code> será substituído
-              automaticamente pelo nome de cada destinatário selecionado (paciente, familiar,
-              cuidador ou médico).
-            </div>
-          )}
-          {usesMedication && (
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-900 dark:text-emerald-200">
-              As medicações vêm automaticamente do cadastro de cada paciente. Familiares,
-              cuidadores e médicos recebem a lista de medicações do paciente vinculado.
-            </div>
-          )}
           {usesMedication && patientsWithoutMeds.length > 0 && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
