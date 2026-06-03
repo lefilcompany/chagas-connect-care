@@ -136,7 +136,21 @@ export default function CampaignTab({
 
   const body = selectedTemplate?.body ?? freeBody;
   const detectedVars = useMemo(() => extractVariables(body), [body]);
-  const renderedBody = useMemo(() => renderTemplate(body, vars), [body, vars]);
+  const AUTO_RECIPIENT_VARS = ["nome_destinatario", "nome_paciente", "nome_contato"] as const;
+  const manualVars = useMemo(
+    () => detectedVars.filter((v) => !AUTO_RECIPIENT_VARS.includes(v as any)),
+    [detectedVars],
+  );
+  const hasRecipientVar = useMemo(
+    () => detectedVars.some((v) => AUTO_RECIPIENT_VARS.includes(v as any)),
+    [detectedVars],
+  );
+  const previewVars = useMemo(() => {
+    const out: Record<string, string> = { ...vars };
+    for (const v of AUTO_RECIPIENT_VARS) if (!out[v]) out[v] = "Destinatário";
+    return out;
+  }, [vars]);
+  const renderedBody = useMemo(() => renderTemplate(body, previewVars), [body, previewVars]);
 
   const finalRecipients = useMemo(
     () => recipients.filter((r) => selected.has(r.key) && r.phone && r.channel === "whatsapp"),
@@ -366,11 +380,18 @@ export default function CampaignTab({
 
       {step === 3 && (
         <div className="space-y-4">
-          {detectedVars.length > 0 && (
+          {hasRecipientVar && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-900 dark:text-emerald-200">
+              <code className="font-mono">{"{nome_destinatario}"}</code> será substituído
+              automaticamente pelo nome de cada destinatário selecionado (paciente, familiar,
+              cuidador ou médico).
+            </div>
+          )}
+          {manualVars.length > 0 && (
             <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
               <Label className="text-xs uppercase">Variáveis</Label>
               <div className="grid gap-2 sm:grid-cols-2">
-                {detectedVars.map((v) => (
+                {manualVars.map((v) => (
                   <div key={v} className="space-y-1">
                     <Label className="font-mono text-xs">{`{${v}}`}</Label>
                     <Input
