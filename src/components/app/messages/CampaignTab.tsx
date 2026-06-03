@@ -20,7 +20,7 @@ import {
   SegmentFilters, TargetingMode, emptyFilters, resolveRecipients,
 } from "@/lib/segments";
 import {
-  extractVariables, renderTemplate, type MessageTemplate,
+  extractVariables, renderTemplate, formatMedications, type MessageTemplate,
 } from "@/lib/templates";
 import { createBatch } from "@/lib/whatsapp";
 import { TemplateCard, StartBlankCard } from "./TemplateCard";
@@ -61,6 +61,7 @@ export default function CampaignTab({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
   const [institution, setInstitution] = useState("");
+  const [medicationMode, setMedicationMode] = useState<"all" | "first">("all");
 
   useEffect(() => {
     if (user) {
@@ -136,26 +137,104 @@ export default function CampaignTab({
 
   const body = selectedTemplate?.body ?? freeBody;
   const detectedVars = useMemo(() => extractVariables(body), [body]);
-  const AUTO_RECIPIENT_VARS = ["nome_destinatario", "nome_paciente", "nome_contato"] as const;
+  const AUTO_RECIPIENT_VARS = [
+    "nome_destinatario",
+    "nome_paciente",
+    "nome_contato",
+    "medicacao",
+    "medicacao_orientacao",
+  ] as const;
   const manualVars = useMemo(
     () => detectedVars.filter((v) => !AUTO_RECIPIENT_VARS.includes(v as any)),
     [detectedVars],
   );
   const hasRecipientVar = useMemo(
-    () => detectedVars.some((v) => AUTO_RECIPIENT_VARS.includes(v as any)),
+    () =>
+      detectedVars.some((v) =>
+        ["nome_destinatario", "nome_paciente", "nome_contato"].includes(v),
+      ),
     [detectedVars],
   );
-  const previewVars = useMemo(() => {
-    const out: Record<string, string> = { ...vars };
-    for (const v of AUTO_RECIPIENT_VARS) if (!out[v]) out[v] = "Destinatário";
-    return out;
-  }, [vars]);
-  const renderedBody = useMemo(() => renderTemplate(body, previewVars), [body, previewVars]);
+  const usesMedication = useMemo(
+    () =>
+      detectedVars.includes("medicacao") || detectedVars.includes("medicacao_orientacao"),
+    [detectedVars],
+  );
 
   const finalRecipients = useMemo(
     () => recipients.filter((r) => selected.has(r.key) && r.phone && r.channel === "whatsapp"),
     [recipients, selected],
   );
+
+  // Fetch medications for selected patients when the template references medication vars
+  const finalPatientIds = useMemo(
+    () => Array.from(new Set(finalRecipients.map((r) => r.patient_id))),
+    [finalRecipients],
+  );
+  const { data: medsByPatient = new Map<string, { name: string | null; dose: string | null; schedule: string | null }[]>() } =
+    useQuery({
+      queryKey: ["campaign-meds", finalPatientIds],
+      enabled: usesMedication && finalPatientIds.length > 0 && step >= 3,
+      queryFn: async () => {
+        const { data } = await supabase
+          .from("medications")
+          .select("patient_id, name, dose, schedule")
+          .in("patient_id", finalPatientIds);
+        const map = new Map<string, { name: string | null; dose: string | null; schedule: string | null }[]>();
+        for (const m of data ?? []) {
+          const list = map.get(m.patient_id as string) ?? [];
+          list.push({ name: m.name, dose: m.dose, schedule: m.schedule });
+          map.set(m.patient_id as string, list);
+        }
+        return map;
+      },
+    });
+
+  // Patients without medications (only relevant when template uses medication vars)
+  const patientsWithoutMeds = useMemo(() => {
+    if (!usesMedication) return [] as string[];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const r of finalRecipients) {
+      if (seen.has(r.patient_id)) continue;
+      seen.add(r.patient_id);
+      const list = medsByPatient.get(r.patient_id) ?? [];
+      if (list.length === 0) out.push(r.patient_name || r.name);
+    }
+    return out;
+  }, [usesMedication, finalRecipients, medsByPatient]);
+
+  // Build a representative preview per audience type present in finalRecipients
+  const previewsByAudience = useMemo(() => {
+    const order: AudienceType[] = ["paciente", "familiar", "cuidador", "medico"];
+    const seen: Partial<Record<AudienceType, Recipient>> = {};
+    for (const r of finalRecipients) if (!seen[r.relation]) seen[r.relation] = r;
+    return order
+      .filter((a) => seen[a])
+      .map((a) => {
+        const r = seen[a]!;
+        const meds = medsByPatient.get(r.patient_id) ?? [];
+        const medText = formatMedications(meds, medicationMode);
+        const perVars: Record<string, string> = { ...vars };
+        const rname = (r.name ?? "").trim() || "Destinatário";
+        perVars.nome_destinatario = rname;
+        if (!perVars.nome_paciente) perVars.nome_paciente = rname;
+        if (!perVars.nome_contato) perVars.nome_contato = rname;
+        if (usesMedication) {
+          const fallback = medText || "(sem medicação cadastrada)";
+          if (!perVars.medicacao) perVars.medicacao = fallback;
+          if (!perVars.medicacao_orientacao) perVars.medicacao_orientacao = fallback;
+        }
+        return {
+          audience: a,
+          recipient: r,
+          body: renderTemplate(body, perVars),
+        };
+      });
+  }, [finalRecipients, medsByPatient, medicationMode, vars, body, usesMedication]);
+
+  // First preview body is used as the "representative" rendered body for the send confirm step
+  const renderedBody = previewsByAudience[0]?.body ?? body;
 
   // Normalize BR phone for preview (mirrors edge function logic)
   const normalizeBR = (raw: string): string | null => {
@@ -171,7 +250,12 @@ export default function CampaignTab({
     if (i === 0) return !!selectedTemplate || freeBody.trim().length >= 3;
     if (i === 1) return previewAud.length > 0;
     if (i === 2) return finalRecipients.length > 0;
-    if (i === 3) return renderedBody.trim().length >= 3;
+    if (i === 3) {
+      if (renderedBody.trim().length < 3) return false;
+      // Block advancing if every selected patient lacks meds for a medication template
+      if (usesMedication && finalPatientIds.length > 0 && patientsWithoutMeds.length >= finalPatientIds.length) return false;
+      return true;
+    }
     return true;
   };
 
@@ -198,14 +282,17 @@ export default function CampaignTab({
       filters: mode === "filters" ? (filters as any) : {},
       institution,
       created_by: user?.id ?? null,
+      medication_mode: medicationMode,
     });
     setSending(false);
     qc.invalidateQueries({ queryKey: qk.messages });
     qc.invalidateQueries({ queryKey: qk.batches });
     if (!result.ok) return toast.error(result.error ?? "Falha ao disparar campanha");
+    const sentCount = result.ok_count ?? (finalRecipients.length - (result.skipped_count ?? 0));
     toast.success(
-      `Campanha disparada: ${result.ok_count ?? finalRecipients.length} enviadas` +
-        (result.failed_count ? `, ${result.failed_count} falharam` : ""),
+      `Campanha disparada: ${sentCount} enviadas` +
+        (result.failed_count ? `, ${result.failed_count} falharam` : "") +
+        (result.skipped_count ? `, ${result.skipped_count} pulado(s) por falta de medicação` : ""),
     );
     // Reset
     setStep(0);
