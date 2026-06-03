@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { renderTemplate } from "@/lib/templates";
+import { renderTemplate, formatMedications, extractVariables } from "@/lib/templates";
 import type { Recipient } from "@/lib/segments";
 
 /**
@@ -231,6 +231,7 @@ export type CreateBatchInput = {
   filters?: Record<string, unknown>;
   institution?: string;
   created_by?: string | null;
+  medication_mode?: "all" | "first";
 };
 
 export type CreateBatchResult = {
@@ -239,6 +240,8 @@ export type CreateBatchResult = {
   error?: string;
   ok_count?: number;
   failed_count?: number;
+  skipped_count?: number;
+  skipped_names?: string[];
 };
 
 /**
@@ -279,7 +282,31 @@ export async function createBatch(input: CreateBatchInput): Promise<CreateBatchR
     input.template?.template_kind === "meta" ? input.template?.meta_template_name ?? null : null;
   const vars = input.variables ?? {};
 
-  const rows = input.recipients.map((r) => {
+  // Detect if the template body uses medication variables
+  const sourceBody = input.template ? input.template.body : input.body;
+  const bodyVars = extractVariables(sourceBody);
+  const usesMedication =
+    bodyVars.includes("medicacao") || bodyVars.includes("medicacao_orientacao");
+
+  // Fetch medications per patient (one query) if needed
+  const medsByPatient = new Map<string, { name: string | null; dose: string | null; schedule: string | null }[]>();
+  if (usesMedication) {
+    const patientIds = Array.from(new Set(input.recipients.map((r) => r.patient_id)));
+    const { data: meds } = await supabase
+      .from("medications")
+      .select("patient_id, name, dose, schedule")
+      .in("patient_id", patientIds);
+    for (const m of meds ?? []) {
+      const list = medsByPatient.get(m.patient_id as string) ?? [];
+      list.push({ name: m.name, dose: m.dose, schedule: m.schedule });
+      medsByPatient.set(m.patient_id as string, list);
+    }
+  }
+
+  const medMode = input.medication_mode ?? "all";
+  const skipped: string[] = [];
+
+  const rows = input.recipients.flatMap((r) => {
     const perVars: Record<string, string> = { ...vars };
     const rname = (r.name ?? "").trim();
     if (rname) {
@@ -288,7 +315,16 @@ export async function createBatch(input: CreateBatchInput): Promise<CreateBatchR
       if (!perVars.nome_paciente) perVars.nome_paciente = rname;
       if (!perVars.nome_contato) perVars.nome_contato = rname;
     }
-    const sourceBody = input.template ? input.template.body : input.body;
+    if (usesMedication) {
+      const medText = formatMedications(medsByPatient.get(r.patient_id) ?? [], medMode);
+      if (!medText) {
+        const label = `${r.patient_name}${r.kind === "contact" ? ` (${r.relation})` : ""}`;
+        skipped.push(label);
+        return [] as any[];
+      }
+      if (!perVars.medicacao) perVars.medicacao = medText;
+      if (!perVars.medicacao_orientacao) perVars.medicacao_orientacao = medText;
+    }
     const body = renderTemplate(sourceBody, perVars);
     return {
       patient_id: r.patient_id,
@@ -306,6 +342,32 @@ export async function createBatch(input: CreateBatchInput): Promise<CreateBatchR
       created_by: input.created_by ?? null,
     };
   });
+
+  if (rows.length === 0) {
+    await supabase
+      .from("message_batches")
+      .update({
+        status: "failed",
+        last_error: "Nenhum destinatário com medicação cadastrada",
+        finished_at: new Date().toISOString(),
+      })
+      .eq("id", batch.id);
+    return {
+      batch_id: batch.id,
+      ok: false,
+      error: "Nenhum destinatário possui medicação cadastrada.",
+      skipped_count: skipped.length,
+      skipped_names: skipped,
+    };
+  }
+
+  // Update batch total to reflect actual rows after skipping
+  if (skipped.length > 0) {
+    await supabase
+      .from("message_batches")
+      .update({ total_recipients: rows.length })
+      .eq("id", batch.id);
+  }
 
   const { error: insErr } = await supabase.from("messages").insert(rows as any);
   if (insErr) {
@@ -329,6 +391,8 @@ export async function createBatch(input: CreateBatchInput): Promise<CreateBatchR
       ok: payload?.ok !== false,
       ok_count: payload?.ok_count,
       failed_count: payload?.failed_count,
+      skipped_count: skipped.length,
+      skipped_names: skipped,
       error: payload?.error,
     };
   } catch (e) {
@@ -336,6 +400,8 @@ export async function createBatch(input: CreateBatchInput): Promise<CreateBatchR
       batch_id: batch.id,
       ok: false,
       error: e instanceof Error ? e.message : "Erro ao invocar processamento",
+      skipped_count: skipped.length,
+      skipped_names: skipped,
     };
   }
 }
