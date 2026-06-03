@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchAllAppRoutes, prefetchRoute } from "@/lib/queries";
 import {
   Heart, LayoutDashboard, Users, MessageCircle, BookOpen, BarChart3,
-  Plug, UserCircle, LogOut, Menu, X, Target,
+  UserCircle, LogOut, Menu, X, Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
