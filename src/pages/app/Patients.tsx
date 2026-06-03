@@ -73,6 +73,16 @@ export default function Patients() {
   const [open, setOpen] = useState(false);
   const [institution, setInstitution] = useState("");
   const [view, setView] = useState<"table" | "cards">("table");
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : true,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  const effectiveView: "table" | "cards" = isDesktop ? view : "cards";
   const [stageFilter, setStageFilter] = useState<"todos" | "diagnostico" | "agudo" | "cronico">("todos");
   const [medOpen, setMedOpen] = useState<Patient | null>(null);
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
@@ -363,7 +373,7 @@ export default function Patients() {
             <SelectItem value="cronico">Crônico</SelectItem>
           </SelectContent>
         </Select>
-        <div className="ml-auto inline-flex rounded-full border border-border bg-card p-1">
+        {isDesktop && <div className="ml-auto inline-flex rounded-full border border-border bg-card p-1">
           {[
             { v: "table", icon: List, label: "Tabela" },
             { v: "cards", icon: LayoutGrid, label: "Cards" },
@@ -379,14 +389,14 @@ export default function Patients() {
               <Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
-        </div>
+        </div>}
       </div>
 
       {filtered.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card p-12 text-center text-muted-foreground shadow-card">
           Nenhum paciente encontrado.
         </div>
-      ) : view === "table" ? (
+      ) : effectiveView === "table" ? (
         <div className="rounded-2xl border border-border bg-card shadow-card overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
