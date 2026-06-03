@@ -113,3 +113,38 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Auto-hide scrollbars: only visible while the user is scrolling */
+@layer base {
+  * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+    transition: background-color 0.3s ease;
+  }
+
+  html.is-scrolling {
+    scrollbar-width: thin;
+  }
+  html.is-scrolling *,
+  html.is-scrolling {
+    scrollbar-width: thin;
+    -ms-overflow-style: auto;
+  }
+  html.is-scrolling *::-webkit-scrollbar-thumb,
+  html.is-scrolling::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.35);
+  }
+  html.is-scrolling *::-webkit-scrollbar-thumb:hover,
+  html.is-scrolling::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.55);
+  }
+}
