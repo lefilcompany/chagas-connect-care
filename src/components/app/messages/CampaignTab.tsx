@@ -70,6 +70,24 @@ export default function CampaignTab({
     }
   }, [user]);
 
+  // Realtime: refresh medication-derived state whenever medications change anywhere.
+  useEffect(() => {
+    const channel = supabase
+      .channel("campaign-medications-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "medications" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["campaign-meds"] });
+          qc.invalidateQueries({ queryKey: ["medications"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
+
   // Apply preselected template (when navigated from "Usar modelo > Segmento")
   useEffect(() => {
     if (initialTemplateId) {
