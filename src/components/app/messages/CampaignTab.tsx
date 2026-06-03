@@ -474,6 +474,50 @@ export default function CampaignTab({
               cuidador ou médico).
             </div>
           )}
+          {usesMedication && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-900 dark:text-emerald-200">
+              As medicações vêm automaticamente do cadastro de cada paciente. Familiares,
+              cuidadores e médicos recebem a lista de medicações do paciente vinculado.
+            </div>
+          )}
+          {usesMedication && patientsWithoutMeds.length > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-medium">
+                  {patientsWithoutMeds.length} paciente(s) sem medicação cadastrada serão pulados no envio:
+                </p>
+                <p>{patientsWithoutMeds.slice(0, 8).join(", ")}{patientsWithoutMeds.length > 8 ? `, +${patientsWithoutMeds.length - 8}` : ""}.</p>
+                <p className="opacity-90">
+                  Cadastre as medicações desses pacientes ou remova-os no passo Destinatários.
+                </p>
+              </div>
+            </div>
+          )}
+          {usesMedication && (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs space-y-2">
+              <Label className="text-xs uppercase">Quando o paciente tiver várias medicações</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { v: "all", label: "Listar todas" },
+                  { v: "first", label: "Enviar só a primeira" },
+                ].map((opt) => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setMedicationMode(opt.v as "all" | "first")}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                      medicationMode === opt.v
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {manualVars.length > 0 && (
             <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
               <Label className="text-xs uppercase">Variáveis</Label>
@@ -495,9 +539,9 @@ export default function CampaignTab({
             </div>
           )}
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-2 text-sm">
-              <h4 className="font-semibold text-brand">Resumo</h4>
+          <div className="space-y-2 text-sm">
+            <h4 className="font-semibold text-brand">Resumo</h4>
+            <div className="grid gap-1 sm:grid-cols-2">
               <p><span className="text-muted-foreground">Campanha:</span> {campaignName || "—"}</p>
               <p><span className="text-muted-foreground">Modelo:</span> {selectedTemplate?.name ?? "Texto livre"}</p>
               <p>
@@ -509,25 +553,60 @@ export default function CampaignTab({
                   : "Texto livre"}
               </p>
               <p><span className="text-muted-foreground">Canal:</span> WhatsApp</p>
-              <p><span className="text-muted-foreground">Destinatários:</span> {finalRecipients.length}</p>
-              {finalRecipients[0] && (
-                <div className="rounded-md border border-border bg-muted/30 p-2 text-xs space-y-0.5">
-                  <p className="text-muted-foreground">Exemplo do primeiro destinatário:</p>
-                  <p>
-                    <span className="text-muted-foreground">Original:</span>{" "}
-                    <span className="font-mono">{finalRecipients[0].phone}</span>
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Normalizado:</span>{" "}
-                    <span className="font-mono">
-                      {normalizeBR(finalRecipients[0].phone) ?? "inválido"}
-                    </span>
-                  </p>
-                </div>
-              )}
+              <p>
+                <span className="text-muted-foreground">Destinatários:</span>{" "}
+                {finalRecipients.length}
+                {usesMedication && patientsWithoutMeds.length > 0 && (
+                  <span className="text-amber-700 dark:text-amber-300">
+                    {" "}({finalRecipients.length - patientsWithoutMeds.reduce((acc, _name) => {
+                      // count recipients whose patient is in patientsWithoutMeds
+                      return acc;
+                    }, 0)} efetivos)
+                  </span>
+                )}
+              </p>
             </div>
-            <WhatsAppPreview body={renderedBody} recipientName="Destinatário" highlightVars={false} />
           </div>
+
+          {previewsByAudience.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs uppercase">Como cada tipo de público verá a mensagem</Label>
+              <div className="grid gap-3 md:grid-cols-2">
+                {previewsByAudience.map((p) => (
+                  <div key={p.audience} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-brand">{AUDIENCE_LABELS[p.audience]}</span>
+                      <span className="text-muted-foreground">
+                        Ex.: {p.recipient.name}
+                        {p.audience !== "paciente" && ` → paciente ${p.recipient.patient_name}`}
+                      </span>
+                    </div>
+                    <WhatsAppPreview
+                      body={p.body}
+                      recipientName={p.recipient.name}
+                      highlightVars={false}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {finalRecipients[0] && (
+            <div className="rounded-md border border-border bg-muted/30 p-2 text-xs space-y-0.5">
+              <p className="text-muted-foreground">Exemplo do primeiro destinatário:</p>
+              <p>
+                <span className="text-muted-foreground">Original:</span>{" "}
+                <span className="font-mono">{finalRecipients[0].phone}</span>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Normalizado:</span>{" "}
+                <span className="font-mono">
+                  {normalizeBR(finalRecipients[0].phone) ?? "inválido"}
+                </span>
+              </p>
+            </div>
+          )}
 
           {(!selectedTemplate || selectedTemplate.template_kind === "internal") && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
