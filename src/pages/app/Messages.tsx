@@ -142,23 +142,7 @@ export default function Messages() {
         </div>
       </header>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="modelos">Modelos</TabsTrigger>
-          <TabsTrigger value="campanha">Envio segmentado</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="modelos">
-          <TemplatesTab onGoToSegmented={openSegmentedWithTemplate} />
-        </TabsContent>
-
-        <TabsContent value="campanha">
-          <CampaignTab
-            initialTemplateId={campaignTemplateId}
-            onConsumeInitial={() => setCampaignTemplateId(null)}
-          />
-        </TabsContent>
-      </Tabs>
+      <CampaignTab />
 
       {/* Send dialog */}
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
