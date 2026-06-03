@@ -23,10 +23,13 @@ import SegmentEditor from "./pages/app/SegmentEditor";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000,
-      gcTime: 5 * 60_000,
+      // Aggressive caching: dados ficam "frescos" por 5 min e em memória por 30 min,
+      // assim a troca de rotas não dispara loaders/refetch o tempo todo.
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
+      refetchOnMount: false,
       retry: 1,
     },
   },
