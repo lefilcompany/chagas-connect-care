@@ -154,6 +154,7 @@ export function UseTemplateDialog({
       contact_id: mode === "contact" ? contactId : null,
       variables: vars,
       created_by: user?.id ?? null,
+      recipient_name: recipientName || null,
     });
     setSending(false);
     qc.invalidateQueries({ queryKey: qk.messages });

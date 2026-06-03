@@ -189,8 +189,16 @@ export async function queueAndSendFromTemplate(input: {
   contact_id?: string | null;
   variables: Record<string, string>;
   created_by?: string | null;
+  recipient_name?: string | null;
 }): Promise<QueueAndSendResult> {
-  const body = renderTemplate(input.template.body, input.variables);
+  const recipientName = (input.recipient_name ?? "").trim();
+  const mergedVars: Record<string, string> = { ...input.variables };
+  if (recipientName) {
+    if (!mergedVars.nome_destinatario) mergedVars.nome_destinatario = recipientName;
+    if (!mergedVars.nome_paciente) mergedVars.nome_paciente = recipientName;
+    if (!mergedVars.nome_contato) mergedVars.nome_contato = recipientName;
+  }
+  const body = renderTemplate(input.template.body, mergedVars);
   return queueAndSend({
     patient_id: input.patient_id,
     contact_id: input.contact_id ?? null,
@@ -201,7 +209,7 @@ export async function queueAndSendFromTemplate(input: {
     template_id: input.template.id,
     template_name:
       input.template.template_kind === "meta" ? input.template.meta_template_name ?? null : null,
-    template_variables: input.variables,
+    template_variables: mergedVars,
   });
 }
 
@@ -272,7 +280,16 @@ export async function createBatch(input: CreateBatchInput): Promise<CreateBatchR
   const vars = input.variables ?? {};
 
   const rows = input.recipients.map((r) => {
-    const body = input.template ? renderTemplate(input.template.body, vars) : input.body;
+    const perVars: Record<string, string> = { ...vars };
+    const rname = (r.name ?? "").trim();
+    if (rname) {
+      perVars.nome_destinatario = rname;
+      // Backward compat: legacy placeholders use recipient name when unset
+      if (!perVars.nome_paciente) perVars.nome_paciente = rname;
+      if (!perVars.nome_contato) perVars.nome_contato = rname;
+    }
+    const sourceBody = input.template ? input.template.body : input.body;
+    const body = renderTemplate(sourceBody, perVars);
     return {
       patient_id: r.patient_id,
       contact_id: r.contact_id ?? null,
@@ -284,7 +301,7 @@ export async function createBatch(input: CreateBatchInput): Promise<CreateBatchR
       message_type: messageType,
       template_id: input.template?.id ?? null,
       template_name: templateName,
-      template_variables: vars,
+      template_variables: perVars,
       batch_id: batch.id,
       created_by: input.created_by ?? null,
     };

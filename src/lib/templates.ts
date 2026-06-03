@@ -74,8 +74,9 @@ export const META_STATUS_LABEL: Record<MetaStatus, string> = {
 
 /** Common variable suggestions to display as chips in the editor. */
 export const VARIABLE_SUGGESTIONS: { key: string; hint: string }[] = [
-  { key: "nome_paciente", hint: "Nome do paciente" },
-  { key: "nome_contato", hint: "Nome do familiar/cuidador/médico" },
+  { key: "nome_destinatario", hint: "Nome do destinatário (paciente, familiar, cuidador, etc.)" },
+  { key: "nome_paciente", hint: "Nome do paciente (compatibilidade)" },
+  { key: "nome_contato", hint: "Nome do familiar/cuidador/médico (compatibilidade)" },
   { key: "medicacao", hint: "Medicação" },
   { key: "medicacao_orientacao", hint: "Orientação de medicação" },
   { key: "orientacao", hint: "Orientação genérica" },
@@ -97,8 +98,11 @@ export function autofillVariables(
   },
 ): Record<string, string> {
   const out: Record<string, string> = {};
+  const recipientName =
+    ctx.contact?.full_name?.trim() || ctx.patient?.full_name?.trim() || "";
   for (const v of variables) {
-    if (v === "nome_paciente" && ctx.patient?.full_name) out[v] = ctx.patient.full_name;
+    if (v === "nome_destinatario" && recipientName) out[v] = recipientName;
+    else if (v === "nome_paciente" && ctx.patient?.full_name) out[v] = ctx.patient.full_name;
     else if (v === "nome_contato" && ctx.contact?.full_name) out[v] = ctx.contact.full_name;
     else if ((v === "medicacao" || v === "medicacao_orientacao") && ctx.medications?.length) {
       const m = ctx.medications[0];
