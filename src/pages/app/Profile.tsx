@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchers, qk } from "@/lib/queries";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -32,21 +34,27 @@ const sections: { id: SectionId; label: string; description: string; icon: typeo
 export default function Profile() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [active, setActive] = useState<SectionId>("perfil");
   const [profile, setProfile] = useState({ full_name: "", role_label: "", institution: "", professional_registry: "" });
   const [saving, setSaving] = useState(false);
 
+  const { data: profileData, isLoading: profileLoading } = useQuery({
+    queryKey: user ? qk.profile(user.id) : ["profile", "anon"],
+    queryFn: () => fetchers.profile(user!.id),
+    enabled: !!user,
+  });
+
   useEffect(() => {
-    if (!user) return;
-    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle().then(({ data: p }) => {
-      if (p) setProfile({
-        full_name: p.full_name ?? "",
-        role_label: p.role_label ?? "",
-        institution: p.institution ?? "",
-        professional_registry: p.professional_registry ?? "",
+    if (profileData) {
+      setProfile({
+        full_name: profileData.full_name ?? "",
+        role_label: profileData.role_label ?? "",
+        institution: profileData.institution ?? "",
+        professional_registry: profileData.professional_registry ?? "",
       });
-    });
-  }, [user]);
+    }
+  }, [profileData]);
 
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,10 +63,13 @@ export default function Profile() {
     const { error } = await supabase.from("profiles").update(editable).eq("id", user!.id);
     setSaving(false);
     if (error) return toast.error(error.message);
+    queryClient.setQueryData(qk.profile(user!.id), (prev: any) => ({ ...(prev ?? {}), ...editable }));
     toast.success("Perfil atualizado");
   };
 
-  const initials = (profile.full_name || user?.email || "?")
+  const ready = !!user && !profileLoading;
+  const displayName = profile.full_name || (ready ? (user?.email ?? "") : "");
+  const initials = (displayName || "?")
     .split(/\s+/).map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
   return (
@@ -72,11 +83,21 @@ export default function Profile() {
         {/* Sidebar */}
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-6 shadow-card text-center">
-            <div className="mx-auto h-20 w-20 rounded-full bg-primary text-brand flex items-center justify-center text-2xl font-bold ring-4 ring-primary/30">
-              {initials}
-            </div>
-            <div className="mt-3 font-semibold text-brand truncate">{profile.full_name || "Sem nome"}</div>
-            <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
+            {ready ? (
+              <>
+                <div className="mx-auto h-20 w-20 rounded-full bg-primary text-brand flex items-center justify-center text-2xl font-bold ring-4 ring-primary/30">
+                  {initials}
+                </div>
+                <div className="mt-3 font-semibold text-brand truncate">{profile.full_name || "Sem nome"}</div>
+                <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
+              </>
+            ) : (
+              <>
+                <div className="mx-auto h-20 w-20 rounded-full bg-muted animate-pulse ring-4 ring-primary/20" />
+                <div className="mx-auto mt-3 h-4 w-32 rounded bg-muted animate-pulse" />
+                <div className="mx-auto mt-2 h-3 w-40 rounded bg-muted animate-pulse" />
+              </>
+            )}
             {profile.institution && (
               <div className="mt-3 inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-xs text-brand">
                 <BadgeCheck className="h-3 w-3" /> {profile.institution}
