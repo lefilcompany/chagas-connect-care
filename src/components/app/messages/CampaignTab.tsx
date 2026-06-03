@@ -558,10 +558,7 @@ export default function CampaignTab({
                 {finalRecipients.length}
                 {usesMedication && patientsWithoutMeds.length > 0 && (
                   <span className="text-amber-700 dark:text-amber-300">
-                    {" "}({finalRecipients.length - patientsWithoutMeds.reduce((acc, _name) => {
-                      // count recipients whose patient is in patientsWithoutMeds
-                      return acc;
-                    }, 0)} efetivos)
+                    {" "}({finalRecipients.filter((r) => (medsByPatient.get(r.patient_id) ?? []).length > 0).length} efetivos)
                   </span>
                 )}
               </p>
