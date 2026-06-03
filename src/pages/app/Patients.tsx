@@ -73,6 +73,16 @@ export default function Patients() {
   const [open, setOpen] = useState(false);
   const [institution, setInstitution] = useState("");
   const [view, setView] = useState<"table" | "cards">("table");
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : true,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  const effectiveView: "table" | "cards" = isDesktop ? view : "cards";
   const [stageFilter, setStageFilter] = useState<"todos" | "diagnostico" | "agudo" | "cronico">("todos");
   const [medOpen, setMedOpen] = useState<Patient | null>(null);
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
