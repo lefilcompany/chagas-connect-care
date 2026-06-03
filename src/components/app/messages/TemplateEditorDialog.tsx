@@ -287,7 +287,7 @@ export function TemplateEditorDialog({
                   rows={8}
                   value={form.body}
                   onChange={(e) => setForm({ ...form, body: e.target.value })}
-                  placeholder="Olá, {nome_paciente}. Lembramos que você tem uma consulta em {data_consulta}..."
+                  placeholder="Olá, {nome_destinatario}. Lembramos que você tem uma consulta em {data_consulta}..."
                 />
               </div>
               <div className="space-y-2">
