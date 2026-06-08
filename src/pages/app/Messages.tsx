@@ -22,7 +22,7 @@ import { User, Phone, MessageSquare } from "lucide-react";
 import { queueAndSend } from "@/lib/whatsapp";
 import CampaignTab from "@/components/app/messages/CampaignTab";
 
-type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
+type Patient = { id: string; full_name: string; phone: string; channel_pref: string; stage: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string; channel_pref: string };
 
 export default function Messages() {
@@ -45,15 +45,6 @@ export default function Messages() {
 
   // Create patient dialog
   const [newPatientOpen, setNewPatientOpen] = useState(false);
-  const [institution, setInstitution] = useState("");
-
-
-  useEffect(() => {
-    if (user) {
-      supabase.from("profiles").select("institution").eq("id", user.id).maybeSingle()
-        .then(({ data }) => setInstitution(data?.institution ?? ""));
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!sendPatientId) { setPatientContacts([]); return; }
@@ -94,7 +85,6 @@ export default function Messages() {
       phone: fd.phone ?? "",
       stage: (fd.stage || "diagnostico") as any,
       channel_pref: (fd.channel_pref || "whatsapp") as any,
-      institution: fd.institution || institution,
       owner_id: user!.id,
     }).select("id").maybeSingle();
     if (error) return toast.error(error.message);
@@ -259,17 +249,14 @@ export default function Messages() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2"><Label>Canal</Label>
-                <Select name="channel_pref" defaultValue="whatsapp">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                    <SelectItem value="sms">SMS</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2"><Label>Instituição</Label><Input name="institution" defaultValue={institution} /></div>
+            <div className="space-y-2"><Label>Canal</Label>
+              <Select name="channel_pref" defaultValue="whatsapp">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="sms">SMS</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Button type="submit" variant="hero" className="w-full">Cadastrar e abrir disparo</Button>
           </form>

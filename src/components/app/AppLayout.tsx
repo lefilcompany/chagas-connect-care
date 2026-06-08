@@ -45,7 +45,7 @@ export const AppLayout = () => {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("full_name,institution").eq("id", user.id).maybeSingle().then(({ data }) => {
+    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle().then(({ data }) => {
       if (data) setProfileName(data.full_name || user.email || "");
     });
   }, [user]);
