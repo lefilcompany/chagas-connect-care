@@ -457,8 +457,6 @@ export default function CampaignTab({
             {mode === "filters" && (
               <div className="mt-3 rounded-lg border border-border bg-card p-3">
                 <SegmentFiltersForm
-                  audienceTypes={aud}
-                  onAudienceChange={setAud}
                   filters={filters}
                   onFiltersChange={setFilters}
                 />
