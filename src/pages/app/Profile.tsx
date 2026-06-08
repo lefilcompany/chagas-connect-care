@@ -36,7 +36,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [active, setActive] = useState<SectionId>("perfil");
-  const [profile, setProfile] = useState({ full_name: "", role_label: "", institution: "", professional_registry: "" });
+  const [profile, setProfile] = useState({ full_name: "", role_label: "", professional_registry: "" });
   const [saving, setSaving] = useState(false);
 
   const { data: profileData, isLoading: profileLoading } = useQuery({
@@ -50,7 +50,6 @@ export default function Profile() {
       setProfile({
         full_name: profileData.full_name ?? "",
         role_label: profileData.role_label ?? "",
-        institution: profileData.institution ?? "",
         professional_registry: profileData.professional_registry ?? "",
       });
     }
@@ -59,7 +58,7 @@ export default function Profile() {
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const { institution: _i, ...editable } = profile;
+    const editable = { ...profile };
     const { error } = await supabase.from("profiles").update(editable).eq("id", user!.id);
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -97,11 +96,6 @@ export default function Profile() {
                 <div className="mx-auto mt-3 h-4 w-32 rounded bg-muted animate-pulse" />
                 <div className="mx-auto mt-2 h-3 w-40 rounded bg-muted animate-pulse" />
               </>
-            )}
-            {profile.institution && (
-              <div className="mt-3 inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-xs text-brand">
-                <BadgeCheck className="h-3 w-3" /> {profile.institution}
-              </div>
             )}
           </div>
 
@@ -180,16 +174,6 @@ export default function Profile() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Instituição</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-0" />
-                    <Input value={profile.institution} disabled />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    A instituição é definida no cadastro e só pode ser alterada por um administrador.
-                  </p>
-                </div>
               </form>
             </SectionShell>
           )}
