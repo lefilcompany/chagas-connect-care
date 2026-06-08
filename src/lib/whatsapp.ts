@@ -228,6 +228,7 @@ export type CreateBatchInput = {
   targeting_mode: string;
   audience_types: string[];
   segment_id?: string | null;
+  filters?: Record<string, unknown>;
   created_by?: string | null;
   medication_mode?: "all" | "first";
 };

@@ -140,14 +140,6 @@ export function SegmentFiltersForm({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label>Instituição</Label>
-          <Input
-            value={filters.institution ?? ""}
-            onChange={(e) => onFiltersChange({ ...filters, institution: e.target.value })}
-            placeholder="Contém..."
-          />
-        </div>
       </div>
     </div>
   );
