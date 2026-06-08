@@ -111,8 +111,8 @@ export function SegmentFiltersForm({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-3">
+        <div className="space-y-1.5 flex-1 min-w-[180px]">
           <Label>Idade mínima</Label>
           <Input
             type="number"
@@ -125,7 +125,7 @@ export function SegmentFiltersForm({
             placeholder="Sem mínimo"
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 flex-1 min-w-[180px]">
           <Label>Idade máxima</Label>
           <Input
             type="number"
@@ -138,10 +138,7 @@ export function SegmentFiltersForm({
             placeholder="Sem máximo"
           />
         </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 flex-1 min-w-[180px]">
           <Label>Status</Label>
           <Select value={filters.status || "todos"} onValueChange={(v) => onFiltersChange({ ...filters, status: v === "todos" ? "" : (v as "ativo" | "inativo") })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -152,7 +149,7 @@ export function SegmentFiltersForm({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 flex-1 min-w-[180px]">
           <Label>Canal preferido</Label>
           <Select value={filters.channel || "todos"} onValueChange={(v) => onFiltersChange({ ...filters, channel: v === "todos" ? "" : (v as "whatsapp" | "sms") })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
