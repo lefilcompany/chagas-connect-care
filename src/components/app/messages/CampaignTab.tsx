@@ -298,7 +298,6 @@ export default function CampaignTab({
       audience_types: previewAud,
       segment_id: mode === "segment" ? segmentId : null,
       filters: mode === "filters" ? (filters as any) : {},
-      institution,
       created_by: user?.id ?? null,
       medication_mode: medicationMode,
     });
