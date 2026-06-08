@@ -161,6 +161,15 @@ export const emptyFilters = (): SegmentFilters => ({
   channel: "",
 });
 
+export const normalizeFilters = (f: SegmentFilters | null | undefined): SegmentFilters => {
+  if (!f) return emptyFilters();
+  return {
+    ...f,
+    city: toStrArr(f.city),
+    state: toStrArr(f.state),
+  };
+};
+
 export type TargetingMode = "all" | "audiences" | "segment" | "filters";
 
 export type ContentTargeting = {
