@@ -19,7 +19,7 @@ import { z } from "zod";
 
 type Patient = {
   id: string; full_name: string; stage: string; phone: string;
-  channel_pref: string; institution: string;
+  channel_pref: string;
 };
 
 const schema = z.object({
@@ -27,7 +27,6 @@ const schema = z.object({
   phone: z.string().trim().regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, "Telefone deve ter 10 ou 11 dígitos"),
   stage: z.enum(["diagnostico", "agudo", "cronico"]),
   channel_pref: z.enum(["whatsapp", "sms"]),
-  institution: z.string().trim().max(160),
   notes: z.string().max(2000).optional(),
   email: z.string().trim().email("Email inválido").max(160).or(z.literal("")).optional(),
   birth_date: z.string().optional(),
@@ -71,7 +70,6 @@ export default function Patients() {
   const { data: items = [] } = useQuery({ queryKey: qk.patients, queryFn: fetchers.patients as () => Promise<Patient[]> });
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-  const [institution, setInstitution] = useState("");
   const [view, setView] = useState<"table" | "cards">("table");
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : true,
@@ -143,9 +141,6 @@ export default function Patients() {
     queryClient.invalidateQueries({ queryKey: ["contacts", contactOpen.p.id, contactOpen.relation] });
   };
 
-  useEffect(() => {
-    if (user) supabase.from("profiles").select("institution").eq("id", user.id).maybeSingle().then(({ data }) => setInstitution(data?.institution ?? ""));
-  }, [user]);
 
   useEffect(() => {
     setContactIndex(0);
@@ -185,7 +180,6 @@ export default function Patients() {
       stage: parsed.data.stage,
       channel_pref: parsed.data.channel_pref,
       notes: parsed.data.notes ?? "",
-      institution: parsed.data.institution || institution,
       owner_id: user!.id,
       email: parsed.data.email ?? "",
       birth_date: parsed.data.birth_date || null,
