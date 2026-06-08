@@ -145,8 +145,8 @@ export const resolveRecipients = async (
 
 export const emptyFilters = (): SegmentFilters => ({
   stages: [],
-  city: "",
-  state: "",
+  city: [],
+  state: [],
   age_min: null,
   age_max: null,
   status: "",
