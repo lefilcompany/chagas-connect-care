@@ -387,8 +387,8 @@ function SummaryItem({ label, value }: { label: string; value: React.ReactNode }
 function FiltersChips({ filters }: { filters: SegmentFilters }) {
   const chips: string[] = [];
   if (filters.stages?.length) chips.push(`Etapas: ${filters.stages.join(", ")}`);
-  if (filters.city) chips.push(`Cidade: ${filters.city}`);
-  if (filters.state) chips.push(`UF: ${filters.state}`);
+  if (filters.city?.length) chips.push(`Cidade: ${filters.city.join(", ")}`);
+  if (filters.state?.length) chips.push(`UF: ${filters.state.join(", ")}`);
   if (filters.age_min != null) chips.push(`≥ ${filters.age_min} anos`);
   if (filters.age_max != null) chips.push(`≤ ${filters.age_max} anos`);
   if (filters.status) chips.push(`Status: ${filters.status}`);
