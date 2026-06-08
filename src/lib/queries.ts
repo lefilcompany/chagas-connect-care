@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeFilters } from "@/lib/segments";
 import type { QueryClient } from "@tanstack/react-query";
 
 export const qk = {
