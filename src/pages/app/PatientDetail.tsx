@@ -58,7 +58,6 @@ export default function PatientDetail() {
       stage: p.data.stage ?? "diagnostico",
       channel_pref: p.data.channel_pref ?? "whatsapp",
       phone: p.data.phone ?? "",
-      institution: p.data.institution ?? "",
       notes: p.data.notes ?? "",
       email: p.data.email ?? "",
       birth_date: p.data.birth_date ?? "",
@@ -81,7 +80,6 @@ export default function PatientDetail() {
     phone: z.string().trim().min(8, "Telefone inválido").max(20),
     stage: z.enum(["diagnostico", "agudo", "cronico"]),
     channel_pref: z.enum(["whatsapp", "sms"]),
-    institution: z.string().trim().max(160),
     notes: z.string().max(2000).optional(),
     email: z.string().trim().email("Email inválido").max(160).or(z.literal("")).optional(),
     birth_date: z.string().optional(),
@@ -99,7 +97,6 @@ export default function PatientDetail() {
       (patient.stage ?? "diagnostico") !== (form.stage ?? "diagnostico") ||
       (patient.channel_pref ?? "whatsapp") !== (form.channel_pref ?? "whatsapp") ||
       (patient.phone ?? "") !== (form.phone ?? "") ||
-      (patient.institution ?? "") !== (form.institution ?? "") ||
       (patient.notes ?? "") !== (form.notes ?? "") ||
       (patient.email ?? "") !== (form.email ?? "") ||
       ((patient.birth_date ?? "") !== (form.birth_date ?? "")) ||
@@ -258,10 +255,6 @@ export default function PatientDetail() {
           <div className="space-y-1.5">
             <Label>Estado</Label>
             <Input value={form.state ?? ""} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })} placeholder="SP" maxLength={2} className="uppercase" />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Instituição</Label>
-            <Input value={form.institution ?? ""} onChange={(e) => setForm({ ...form, institution: e.target.value })} maxLength={160} />
           </div>
           <div className="space-y-1.5">
             <Label>Etapa</Label>
