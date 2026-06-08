@@ -92,7 +92,7 @@ function SegmentChips({ filters }: { filters: SegmentFilters }) {
   if (filters.age_max != null) chips.push(`≤ ${filters.age_max} anos`);
   if (filters.status) chips.push(`Status: ${filters.status}`);
   if (filters.channel) chips.push(`Canal: ${filters.channel}`);
-  if (filters.institution) chips.push(`Instituição: ${filters.institution}`);
+  
   if (!chips.length) return <p className="text-xs text-muted-foreground italic">Sem filtros (todos os registros).</p>;
   return (
     <div className="flex flex-wrap gap-1.5">

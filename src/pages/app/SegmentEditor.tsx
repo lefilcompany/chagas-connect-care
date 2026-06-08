@@ -395,7 +395,7 @@ function FiltersChips({ filters }: { filters: SegmentFilters }) {
   if (filters.age_max != null) chips.push(`≤ ${filters.age_max} anos`);
   if (filters.status) chips.push(`Status: ${filters.status}`);
   if (filters.channel) chips.push(`Canal: ${filters.channel}`);
-  if (filters.institution) chips.push(`Instituição: ${filters.institution}`);
+  
   if (!chips.length) return <span className="italic text-muted-foreground text-xs">Sem filtros — todos os registros do público.</span>;
   return (
     <div className="flex flex-wrap gap-1.5">
