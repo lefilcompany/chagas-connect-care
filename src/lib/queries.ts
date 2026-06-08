@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeFilters } from "@/lib/segments";
 import type { QueryClient } from "@tanstack/react-query";
 
 export const qk = {
@@ -88,7 +89,7 @@ export const fetchers = {
       .from("audience_segments")
       .select("*")
       .order("created_at", { ascending: false });
-    return (data ?? []) as any[];
+    return (data ?? []).map((s: any) => ({ ...s, filters: normalizeFilters(s.filters) }));
   },
   templates: async () => {
     const { data } = await supabase

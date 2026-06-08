@@ -1,8 +1,13 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { SegmentFilters } from "@/lib/segments";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const UF_LIST: { value: string; label: string }[] = [
   { value: "AC", label: "Acre" }, { value: "AL", label: "Alagoas" }, { value: "AP", label: "Amapá" },
@@ -22,6 +27,104 @@ const STAGES = [
   { value: "cronico", label: "Crônico" },
 ];
 
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  disabled,
+}: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (vals: string[]) => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const toggle = (val: string) => {
+    if (selected.includes(val)) {
+      onChange(selected.filter((v) => v !== val));
+    } else {
+      onChange([...selected, val]);
+    }
+  };
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
+  }, [options, search]);
+
+  const selectedMap = useMemo(() => new Set(selected), [selected]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className={cn(
+            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            open && "ring-2 ring-ring ring-offset-2"
+          )}
+        >
+          <span className="flex-1 truncate text-left">
+            {selected.length === 0 ? (
+              <span className="text-muted-foreground">{placeholder}</span>
+            ) : (
+              <span className="flex flex-wrap gap-1">
+                {selected.map((s) => {
+                  const opt = options.find((o) => o.value === s);
+                  return (
+                    <Badge key={s} variant="secondary" className="text-[10px] font-normal gap-1 pr-1">
+                      {opt?.label ?? s}
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); toggle(s); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); toggle(s); } }}
+                        className="cursor-pointer hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </span>
+                    </Badge>
+                  );
+                })}
+              </span>
+            )}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} value={search} onValueChange={setSearch} />
+          <CommandList>
+            <CommandEmpty>Nenhum resultado.</CommandEmpty>
+            <CommandGroup>
+              {filtered.map((opt) => (
+                <CommandItem
+                  key={opt.value}
+                  value={opt.value}
+                  onSelect={() => toggle(opt.value)}
+                  className="flex items-center gap-2"
+                >
+                  <Checkbox checked={selectedMap.has(opt.value)} />
+                  <span className="flex-1">{opt.label}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function SegmentFiltersForm({
   filters,
   onFiltersChange,
@@ -34,21 +137,69 @@ export function SegmentFiltersForm({
     onFiltersChange({ ...filters, stages: on ? Array.from(new Set([...cur, s])) : cur.filter((x) => x !== s) });
   };
 
-  const [cities, setCities] = useState<string[]>([]);
-  const [loadingCities, setLoadingCities] = useState(false);
-  const uf = filters.state ?? "";
+  const selectedStates = filters.state ?? [];
+  const selectedCities = filters.city ?? [];
+
+  const [citiesByUf, setCitiesByUf] = useState<Record<string, string[]>>({});
+  const [loadingUfs, setLoadingUfs] = useState<string[]>([]);
 
   useEffect(() => {
-    let cancelled = false;
-    if (!uf) { setCities([]); return; }
-    setLoadingCities(true);
-    fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`)
-      .then((r) => r.json())
-      .then((data) => { if (!cancelled) setCities((data ?? []).map((m: any) => m.nome)); })
-      .catch(() => { if (!cancelled) setCities([]); })
-      .finally(() => { if (!cancelled) setLoadingCities(false); });
-    return () => { cancelled = true; };
-  }, [uf]);
+    const toLoad = selectedStates.filter((uf) => !citiesByUf[uf] && !loadingUfs.includes(uf));
+    if (!toLoad.length) return;
+
+    setLoadingUfs((prev) => [...new Set([...prev, ...toLoad])]);
+
+    const controllers = toLoad.map((uf) => {
+      const ctrl = new AbortController();
+      fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`, { signal: ctrl.signal })
+        .then((r) => r.json())
+        .then((data) => {
+          const names = (data ?? []).map((m: any) => m.nome);
+          setCitiesByUf((prev) => ({ ...prev, [uf]: names }));
+        })
+        .catch(() => {
+          setCitiesByUf((prev) => ({ ...prev, [uf]: [] }));
+        })
+        .finally(() => {
+          setLoadingUfs((prev) => prev.filter((u) => u !== uf));
+        });
+      return ctrl;
+    });
+
+    return () => { controllers.forEach((c) => c.abort()); };
+  }, [selectedStates]);
+
+  // Remove cities from deselected states
+  useEffect(() => {
+    const removedUfs = Object.keys(citiesByUf).filter((uf) => !selectedStates.includes(uf));
+    if (!removedUfs.length) return;
+    setCitiesByUf((prev) => {
+      const next = { ...prev };
+      for (const uf of removedUfs) delete next[uf];
+      return next;
+    });
+    const removedCityNames = removedUfs.flatMap((uf) => citiesByUf[uf] ?? []);
+    if (removedCityNames.length && selectedCities.length) {
+      const stillValid = selectedCities.filter((c) => !removedCityNames.includes(c));
+      if (stillValid.length !== selectedCities.length) {
+        onFiltersChange({ ...filters, city: stillValid });
+      }
+    }
+  }, [selectedStates]);
+
+  const allCityOptions = useMemo(() => {
+    const opts: { value: string; label: string }[] = [];
+    const seen = new Set<string>();
+    for (const uf of selectedStates) {
+      const cities = citiesByUf[uf] ?? [];
+      for (const c of cities) {
+        if (seen.has(c)) continue;
+        seen.add(c);
+        opts.push({ value: c, label: `${c} (${uf})` });
+      }
+    }
+    return opts;
+  }, [selectedStates, citiesByUf]);
 
   return (
     <div className="space-y-5">
@@ -75,39 +226,25 @@ export function SegmentFiltersForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Estado (UF)</Label>
-          <Select
-            value={uf || "todos"}
-            onValueChange={(v) =>
-              onFiltersChange({ ...filters, state: v === "todos" ? "" : v, city: "" })
-            }
-          >
-            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              {UF_LIST.map((s) => (
-                <SelectItem key={s.value} value={s.value}>{s.value} — {s.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>Estados (UF)</Label>
+          <MultiSelect
+            options={UF_LIST.map((s) => ({ value: s.value, label: `${s.value} — ${s.label}` }))}
+            selected={selectedStates}
+            onChange={(vals) => onFiltersChange({ ...filters, state: vals, city: [] })}
+            placeholder="Selecione os estados"
+            searchPlaceholder="Buscar estado..."
+          />
         </div>
         <div className="space-y-1.5">
-          <Label>Cidade</Label>
-          <Select
-            value={filters.city || "todas"}
-            onValueChange={(v) => onFiltersChange({ ...filters, city: v === "todas" ? "" : v })}
-            disabled={!uf || loadingCities}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={!uf ? "Selecione um estado" : loadingCities ? "Carregando..." : "Todas"} />
-            </SelectTrigger>
-            <SelectContent className="max-h-72">
-              <SelectItem value="todas">Todas</SelectItem>
-              {cities.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>Cidades</Label>
+          <MultiSelect
+            options={allCityOptions}
+            selected={selectedCities}
+            onChange={(vals) => onFiltersChange({ ...filters, city: vals })}
+            placeholder={selectedStates.length === 0 ? "Selecione estados primeiro" : loadingUfs.length ? "Carregando cidades..." : "Selecione as cidades"}
+            searchPlaceholder="Buscar cidade..."
+            disabled={selectedStates.length === 0 || loadingUfs.length > 0}
+          />
         </div>
       </div>
 
@@ -140,25 +277,27 @@ export function SegmentFiltersForm({
         </div>
         <div className="space-y-1.5 flex-1 min-w-[180px]">
           <Label>Status</Label>
-          <Select value={filters.status || "todos"} onValueChange={(v) => onFiltersChange({ ...filters, status: v === "todos" ? "" : (v as "ativo" | "inativo") })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="ativo">Ativo</SelectItem>
-              <SelectItem value="inativo">Inativo</SelectItem>
-            </SelectContent>
-          </Select>
+          <select
+            value={filters.status || ""}
+            onChange={(e) => onFiltersChange({ ...filters, status: e.target.value as "ativo" | "inativo" | "" })}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <option value="">Todos</option>
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+          </select>
         </div>
         <div className="space-y-1.5 flex-1 min-w-[180px]">
           <Label>Canal preferido</Label>
-          <Select value={filters.channel || "todos"} onValueChange={(v) => onFiltersChange({ ...filters, channel: v === "todos" ? "" : (v as "whatsapp" | "sms") })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              <SelectItem value="sms">SMS</SelectItem>
-            </SelectContent>
-          </Select>
+          <select
+            value={filters.channel || ""}
+            onChange={(e) => onFiltersChange({ ...filters, channel: e.target.value as "whatsapp" | "sms" | "" })}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <option value="">Todos</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="sms">SMS</option>
+          </select>
         </div>
       </div>
     </div>
