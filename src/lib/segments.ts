@@ -57,12 +57,20 @@ const ageFromBirth = (birth: string | null | undefined): number | null => {
 
 const norm = (v?: string | null) => (v ?? "").trim().toLowerCase();
 
+const toStrArr = (v: unknown): string[] => {
+  if (Array.isArray(v)) return v as string[];
+  if (typeof v === "string" && v) return [v];
+  return [];
+};
+
 const matchesCommon = (
   row: { city?: string | null; state?: string | null; status?: string | null; channel_pref?: string | null; birth_date?: string | null },
   f: SegmentFilters,
 ): boolean => {
-  if (f.city?.length && !f.city.some((c) => norm(row.city).includes(norm(c)))) return false;
-  if (f.state?.length && !f.state.some((s) => norm(row.state) === norm(s))) return false;
+  const cities = toStrArr(f.city);
+  const states = toStrArr(f.state);
+  if (cities.length && !cities.some((c) => norm(row.city).includes(norm(c)))) return false;
+  if (states.length && !states.some((s) => norm(row.state) === norm(s))) return false;
   if (f.status && (row.status ?? "ativo") !== f.status) return false;
   if (f.channel && (row.channel_pref ?? "") !== f.channel) return false;
   const age = ageFromBirth(row.birth_date);
