@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { queueAndSend } from "@/lib/whatsapp";
 
-type Patient = { id: string; full_name: string; phone: string; channel_pref: string; institution: string; stage: string };
+type Patient = { id: string; full_name: string; phone: string; channel_pref: string; stage: string };
 
 const statusMeta: Record<string, { label: string; icon: any; tone: string }> = {
   enviado: { label: "Enviado", icon: Check, tone: "text-muted-foreground" },

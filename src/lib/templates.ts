@@ -27,7 +27,7 @@ export type MessageTemplate = {
   meta_language: string;
   meta_category: string | null;
   meta_status: MetaStatus;
-  institution: string;
+  
   created_by: string | null;
   is_active: boolean;
   is_default?: boolean;
