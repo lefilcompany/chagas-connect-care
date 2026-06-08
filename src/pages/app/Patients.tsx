@@ -345,7 +345,7 @@ export default function Patients() {
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2"><Label>Instituição</Label><Input name="institution" defaultValue={institution} placeholder="Ex: Hospital das Clínicas" /></div>
+              
               <div className="space-y-2"><Label>Observações</Label><Input name="notes" placeholder="Ex: Alergia a penicilina" /></div>
               <Button type="submit" variant="hero" className="w-full">Cadastrar</Button>
             </form>
@@ -407,7 +407,6 @@ export default function Patients() {
                 <tr key={p.id} className="border-t border-border hover:bg-muted/30">
                   <td className="p-4">
                     <Link to={`/app/pacientes/${p.id}`} className="font-medium text-brand hover:underline">{p.full_name}</Link>
-                    <div className="text-xs text-muted-foreground">{p.institution}</div>
                   </td>
                   <td className="p-4">
                     <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${stageColors[p.stage] ?? ""}`}>
@@ -435,7 +434,6 @@ export default function Patients() {
                   <span className="font-display font-bold text-brand group-hover:underline truncate block">
                     {p.full_name}
                   </span>
-                  <div className="text-xs text-muted-foreground truncate">{p.institution || "—"}</div>
                 </div>
                 <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${stageColors[p.stage] ?? ""}`}>
                   {stageLabels[p.stage] ?? p.stage}
