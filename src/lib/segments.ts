@@ -61,8 +61,8 @@ const matchesCommon = (
   row: { city?: string | null; state?: string | null; status?: string | null; channel_pref?: string | null; birth_date?: string | null },
   f: SegmentFilters,
 ): boolean => {
-  if (f.city && !norm(row.city).includes(norm(f.city))) return false;
-  if (f.state && norm(row.state) !== norm(f.state)) return false;
+  if (f.city?.length && !f.city.some((c) => norm(row.city).includes(norm(c)))) return false;
+  if (f.state?.length && !f.state.some((s) => norm(row.state) === norm(s))) return false;
   if (f.status && (row.status ?? "ativo") !== f.status) return false;
   if (f.channel && (row.channel_pref ?? "") !== f.channel) return false;
   const age = ageFromBirth(row.birth_date);
