@@ -2,6 +2,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SegmentFilters } from "@/lib/segments";
+import { useEffect, useState } from "react";
+
+const UF_LIST: { value: string; label: string }[] = [
+  { value: "AC", label: "Acre" }, { value: "AL", label: "Alagoas" }, { value: "AP", label: "Amapá" },
+  { value: "AM", label: "Amazonas" }, { value: "BA", label: "Bahia" }, { value: "CE", label: "Ceará" },
+  { value: "DF", label: "Distrito Federal" }, { value: "ES", label: "Espírito Santo" }, { value: "GO", label: "Goiás" },
+  { value: "MA", label: "Maranhão" }, { value: "MT", label: "Mato Grosso" }, { value: "MS", label: "Mato Grosso do Sul" },
+  { value: "MG", label: "Minas Gerais" }, { value: "PA", label: "Pará" }, { value: "PB", label: "Paraíba" },
+  { value: "PR", label: "Paraná" }, { value: "PE", label: "Pernambuco" }, { value: "PI", label: "Piauí" },
+  { value: "RJ", label: "Rio de Janeiro" }, { value: "RN", label: "Rio Grande do Norte" }, { value: "RS", label: "Rio Grande do Sul" },
+  { value: "RO", label: "Rondônia" }, { value: "RR", label: "Roraima" }, { value: "SC", label: "Santa Catarina" },
+  { value: "SP", label: "São Paulo" }, { value: "SE", label: "Sergipe" }, { value: "TO", label: "Tocantins" },
+];
 
 const STAGES = [
   { value: "diagnostico", label: "Diagnóstico" },
@@ -20,6 +33,22 @@ export function SegmentFiltersForm({
     const cur = filters.stages ?? [];
     onFiltersChange({ ...filters, stages: on ? Array.from(new Set([...cur, s])) : cur.filter((x) => x !== s) });
   };
+
+  const [cities, setCities] = useState<string[]>([]);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const uf = filters.state ?? "";
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!uf) { setCities([]); return; }
+    setLoadingCities(true);
+    fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`)
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setCities((data ?? []).map((m: any) => m.nome)); })
+      .catch(() => { if (!cancelled) setCities([]); })
+      .finally(() => { if (!cancelled) setLoadingCities(false); });
+    return () => { cancelled = true; };
+  }, [uf]);
 
   return (
     <div className="space-y-5">
@@ -46,22 +75,39 @@ export function SegmentFiltersForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Cidade</Label>
-          <Input
-            value={filters.city ?? ""}
-            onChange={(e) => onFiltersChange({ ...filters, city: e.target.value })}
-            placeholder="Ex: Recife"
-          />
+          <Label>Estado (UF)</Label>
+          <Select
+            value={uf || "todos"}
+            onValueChange={(v) =>
+              onFiltersChange({ ...filters, state: v === "todos" ? "" : v, city: "" })
+            }
+          >
+            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              {UF_LIST.map((s) => (
+                <SelectItem key={s.value} value={s.value}>{s.value} — {s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Estado (UF)</Label>
-          <Input
-            value={filters.state ?? ""}
-            onChange={(e) => onFiltersChange({ ...filters, state: e.target.value.toUpperCase() })}
-            placeholder="SP"
-            maxLength={2}
-            className="uppercase"
-          />
+          <Label>Cidade</Label>
+          <Select
+            value={filters.city || "todas"}
+            onValueChange={(v) => onFiltersChange({ ...filters, city: v === "todas" ? "" : v })}
+            disabled={!uf || loadingCities}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={!uf ? "Selecione um estado" : loadingCities ? "Carregando..." : "Todas"} />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              <SelectItem value="todas">Todas</SelectItem>
+              {cities.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
