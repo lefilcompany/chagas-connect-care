@@ -10,7 +10,6 @@ export type SegmentFilters = {
   age_max?: number | null;
   status?: "ativo" | "inativo" | "";
   channel?: "whatsapp" | "sms" | "";
-  institution?: string;
 };
 
 export type SegmentDef = {
@@ -20,7 +19,6 @@ export type SegmentDef = {
   audience_types: AudienceType[];
   filters: SegmentFilters;
   owner_id?: string | null;
-  institution?: string;
   created_at?: string;
   updated_at?: string;
 };
@@ -81,12 +79,11 @@ export const resolveRecipients = async (
 
   const { data: patientsData } = await supabase
     .from("patients")
-    .select("id, full_name, phone, channel_pref, stage, city, state, status, birth_date, institution");
+    .select("id, full_name, phone, channel_pref, stage, city, state, status, birth_date");
   const patients = patientsData ?? [];
 
   const matchPatient = (p: any) => {
     if (f_active.stages?.length && !f_active.stages.includes(p.stage)) return false;
-    if (f_active.institution && !norm(p.institution).includes(norm(f_active.institution))) return false;
     return matchesCommon(p, f_active);
   };
 
@@ -123,9 +120,8 @@ export const resolveRecipients = async (
       if (!(contactRels as AudienceType[]).includes(c.relation as AudienceType)) continue;
       const parent = patientMap.get(c.patient_id) as any;
       if (!parent) continue;
-      // patient-level filters (stage, institution) still apply via parent
+      // patient-level filters (stage) still apply via parent
       if (f_active.stages?.length && !f_active.stages.includes(parent.stage)) continue;
-      if (f_active.institution && !norm(parent.institution).includes(norm(f_active.institution))) continue;
       // contact-level filters
       if (!matchesCommon(c as any, f_active)) continue;
       out.push({
@@ -155,7 +151,6 @@ export const emptyFilters = (): SegmentFilters => ({
   age_max: null,
   status: "",
   channel: "",
-  institution: "",
 });
 
 export type TargetingMode = "all" | "audiences" | "segment" | "filters";

@@ -228,8 +228,6 @@ export type CreateBatchInput = {
   targeting_mode: string;
   audience_types: string[];
   segment_id?: string | null;
-  filters?: Record<string, unknown>;
-  institution?: string;
   created_by?: string | null;
   medication_mode?: "all" | "first";
 };
@@ -266,7 +264,6 @@ export async function createBatch(input: CreateBatchInput): Promise<CreateBatchR
       channel: "whatsapp",
       total_recipients: input.recipients.length,
       status: "queued",
-      institution: input.institution ?? "",
       created_by: input.created_by ?? null,
     } as any)
     .select("id")
