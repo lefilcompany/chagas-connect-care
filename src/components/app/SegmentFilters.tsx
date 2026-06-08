@@ -1,8 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AUDIENCE_LABELS, AudienceType, SegmentFilters } from "@/lib/segments";
+import { SegmentFilters } from "@/lib/segments";
 
 const STAGES = [
   { value: "diagnostico", label: "Diagnóstico" },
@@ -11,19 +10,12 @@ const STAGES = [
 ];
 
 export function SegmentFiltersForm({
-  audienceTypes,
-  onAudienceChange,
   filters,
   onFiltersChange,
 }: {
-  audienceTypes: AudienceType[];
-  onAudienceChange: (v: AudienceType[]) => void;
   filters: SegmentFilters;
   onFiltersChange: (f: SegmentFilters) => void;
 }) {
-  const toggleAud = (a: AudienceType, on: boolean) => {
-    onAudienceChange(on ? Array.from(new Set([...audienceTypes, a])) : audienceTypes.filter((x) => x !== a));
-  };
   const toggleStage = (s: string, on: boolean) => {
     const cur = filters.stages ?? [];
     onFiltersChange({ ...filters, stages: on ? Array.from(new Set([...cur, s])) : cur.filter((x) => x !== s) });
