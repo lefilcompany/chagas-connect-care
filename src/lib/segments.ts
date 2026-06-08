@@ -4,8 +4,8 @@ export type AudienceType = "paciente" | "familiar" | "cuidador" | "medico";
 
 export type SegmentFilters = {
   stages?: string[];
-  city?: string;
-  state?: string;
+  city?: string[];
+  state?: string[];
   age_min?: number | null;
   age_max?: number | null;
   status?: "ativo" | "inativo" | "";
