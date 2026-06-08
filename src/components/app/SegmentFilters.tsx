@@ -24,21 +24,6 @@ export function SegmentFiltersForm({
   return (
     <div className="space-y-5">
       <div className="space-y-2">
-        <Label>Tipo de público</Label>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {(Object.keys(AUDIENCE_LABELS) as AudienceType[]).map((a) => (
-            <label key={a} className="flex items-center gap-2 rounded-lg border border-border p-2 text-sm cursor-pointer hover:bg-muted/50">
-              <Checkbox
-                checked={audienceTypes.includes(a)}
-                onCheckedChange={(v) => toggleAud(a, !!v)}
-              />
-              <span>{AUDIENCE_LABELS[a]}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-2">
         <Label>Etapa do paciente</Label>
         <div className="flex flex-wrap gap-2">
           {STAGES.map((s) => {

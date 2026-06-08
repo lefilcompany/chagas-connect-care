@@ -292,8 +292,6 @@ export default function SegmentEditor() {
                 cidade, idade, status ou canal preferido.
               </Tip>
               <SegmentFiltersForm
-                audienceTypes={audienceTypes}
-                onAudienceChange={setAudienceTypes}
                 filters={filters}
                 onFiltersChange={setFilters}
               />

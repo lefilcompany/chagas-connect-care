@@ -452,8 +452,6 @@ function ContentFormDialog({
 
             {form.targeting_mode === "filters" && (
               <SegmentFiltersForm
-                audienceTypes={form.audience_types}
-                onAudienceChange={(v) => setForm({ ...form, audience_types: v })}
                 filters={form.filters}
                 onFiltersChange={(f) => setForm({ ...form, filters: f })}
               />
@@ -783,8 +781,6 @@ function SendContentDialog({
                   </div>
                 ) : (
                   <SegmentFiltersForm
-                    audienceTypes={adhocAudiences}
-                    onAudienceChange={setAdhocAudiences}
                     filters={adhocFilters}
                     onFiltersChange={setAdhocFilters}
                   />

@@ -352,8 +352,6 @@ export function TemplateEditorDialog({
             {(form.targeting_mode === "audiences" || form.targeting_mode === "filters") && (
               <div className="rounded-lg border border-border bg-card p-3">
                 <SegmentFiltersForm
-                  audienceTypes={form.audience_types}
-                  onAudienceChange={(v) => setForm({ ...form, audience_types: v })}
                   filters={form.filters}
                   onFiltersChange={(f) => setForm({ ...form, filters: f })}
                 />
