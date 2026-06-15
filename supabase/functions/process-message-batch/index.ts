@@ -40,6 +40,16 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+  // Authorization: verify the caller can access this batch via RLS
+  const { data: authorized, error: authzErr } = await authClient
+    .from("message_batches")
+    .select("id")
+    .eq("id", body.batch_id)
+    .maybeSingle();
+  if (authzErr || !authorized) {
+    return json(403, { error: "Forbidden" });
+  }
+
   const { data: batch, error: batchErr } = await admin
     .from("message_batches")
     .select("id, status")
