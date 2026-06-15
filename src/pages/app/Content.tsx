@@ -579,53 +579,6 @@ function FolderDetail({
       </section>
 
       {/* Educational content section */}
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-display text-lg font-bold text-brand inline-flex items-center gap-2">
-            <BookOpen className="h-5 w-5" /> Conteúdos educativos
-            <span className="text-xs font-normal text-muted-foreground">({contents.length})</span>
-          </h2>
-          <Button variant="hero" size="sm" onClick={onNewContent}>
-            <Plus className="h-4 w-4" /> Novo conteúdo
-          </Button>
-        </div>
-        {contents.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-            Nenhum conteúdo educativo nesta pasta.
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {contents.map((c) => (
-              <article
-                key={c.id}
-                className="group flex flex-col rounded-2xl border border-border bg-card p-5 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft cursor-pointer"
-                onClick={() => onEditContent(c)}
-              >
-                <h3 className="font-display text-base font-bold text-brand line-clamp-2">{c.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground line-clamp-3 flex-1">{c.body}</p>
-                <div className="mt-4 flex items-center gap-2 pt-3 border-t border-border">
-                  <Button
-                    variant="hero"
-                    size="sm"
-                    className="flex-1"
-                    onClick={(e) => { e.stopPropagation(); onSendContent(c); }}
-                  >
-                    <Send className="h-4 w-4" /> Enviar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); onEditContent(c); }}
-                  >
-                    Editar
-                  </Button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
       {/* Template dialogs */}
       <TemplateEditorDialog
         open={editorOpen}
