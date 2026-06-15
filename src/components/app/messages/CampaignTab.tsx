@@ -27,7 +27,7 @@ import { createBatch } from "@/lib/whatsapp";
 import { TemplateCard, StartBlankCard } from "./TemplateCard";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 
-const STEPS = ["Modelo", "Público e destinatários", "Revisar", "Enviar"] as const;
+const STEPS = ["Modelo", "Destinatários", "Revisar", "Enviar"] as const;
 
 export default function CampaignTab({
   initialTemplateId,
@@ -695,14 +695,14 @@ export default function CampaignTab({
 
 function Stepper({ step }: { step: number }) {
   return (
-    <ol className="flex items-center gap-2">
+    <ol className="flex w-full items-center">
       {STEPS.map((label, i) => {
         const active = i === step;
         const done = i < step;
         return (
-          <li key={label} className="flex flex-1 items-center gap-2">
+          <li key={label} className="flex flex-1 items-center">
             <div
-              className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                 active
                   ? "bg-primary text-primary-foreground"
                   : done
@@ -712,10 +712,10 @@ function Stepper({ step }: { step: number }) {
             >
               {i + 1}
             </div>
-            <span className={`text-xs font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}>
+            <span className={`mx-2 text-xs font-medium whitespace-nowrap ${active ? "text-foreground" : "text-muted-foreground"}`}>
               {label}
             </span>
-            {i < STEPS.length - 1 && <div className="ml-1 h-px flex-1 bg-border" />}
+            {i < STEPS.length - 1 && <div className="mx-2 h-px flex-1 bg-border" />}
           </li>
         );
       })}
