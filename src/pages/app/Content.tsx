@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchers, qk } from "@/lib/queries";
@@ -13,7 +14,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Search, Send, Trash2, X } from "lucide-react";
+import {
+  Plus, Search, Send, Trash2, X, ArrowLeft, ArrowRight,
+  Pill, Utensils, Moon, Activity, Users, Stethoscope,
+  HeartHandshake, BookOpen, Layers, FolderOpen, MessageSquare,
+  Megaphone,
+} from "lucide-react";
 import { z } from "zod";
 import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
 import { RecipientPreview } from "@/components/app/RecipientPreview";
@@ -23,15 +29,33 @@ import {
   emptyFilters, resolveRecipients, resolveContentTargeting, TargetingMode,
   AUDIENCE_LABELS, ALL_AUDIENCES,
 } from "@/lib/segments";
+import { TemplateCard, StartBlankCard } from "@/components/app/messages/TemplateCard";
+import { TemplateEditorDialog } from "@/components/app/messages/TemplateEditorDialog";
+import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
+import type { MessageTemplate } from "@/lib/templates";
+import { useAuth } from "@/lib/auth";
+import { useNavigate } from "react-router-dom";
 
-const CATEGORIES = [
-  { value: "medicacao", label: "Medicação" },
-  { value: "alimentacao", label: "Alimentação" },
-  { value: "sono", label: "Sono" },
-  { value: "atividade", label: "Atividade física" },
-  { value: "familia", label: "Família" },
-  { value: "geral", label: "Geral" },
+/** Canonical folders (themes). Each folder groups templates + educational content. */
+const FOLDERS: { value: string; label: string; icon: any; description: string }[] = [
+  { value: "medicacao",   label: "Medicação",         icon: Pill,           description: "Lembretes de dose, horários e adesão à medicação." },
+  { value: "alimentacao", label: "Alimentação",       icon: Utensils,       description: "Orientações nutricionais e hábitos alimentares." },
+  { value: "consulta",    label: "Consulta",          icon: Stethoscope,    description: "Confirmações, lembretes e preparo de consultas." },
+  { value: "adesao",      label: "Adesão",            icon: HeartHandshake, description: "Reforço de tratamento e acompanhamento." },
+  { value: "orientacao",  label: "Orientação",        icon: BookOpen,       description: "Materiais educativos e instruções gerais." },
+  { value: "sono",        label: "Sono",              icon: Moon,           description: "Higiene do sono e rotina de descanso." },
+  { value: "atividade",   label: "Atividade física",  icon: Activity,       description: "Recomendações de movimento e exercícios." },
+  { value: "familia",     label: "Família",           icon: Users,          description: "Conteúdos para familiares e cuidadores." },
+  { value: "geral",       label: "Geral",             icon: Layers,         description: "Mensagens variadas que não se encaixam em outras pastas." },
 ];
+/** Backwards-compat: rows persisted with categories not in the canonical list fall here. */
+const FALLBACK_FOLDER = "geral";
+const CATEGORIES = FOLDERS.map((f) => ({ value: f.value, label: f.label }));
+
+const folderOf = (cat: string | null | undefined): string =>
+  FOLDERS.find((f) => f.value === cat)?.value ?? FALLBACK_FOLDER;
+const folderLabel = (cat: string) => FOLDERS.find((f) => f.value === cat)?.label ?? "Geral";
+
 const AUDIENCES = [
   { value: "paciente", label: "Paciente" },
   { value: "familia", label: "Família" },
@@ -85,126 +109,192 @@ function describeTargeting(c: ContentRow, segments: SegmentDef[]): string {
 
 export default function Content() {
   const queryClient = useQueryClient();
+  const [params, setParams] = useSearchParams();
+  const activeFolder = params.get("pasta");
   const { data: items = [] } = useQuery({ queryKey: qk.content, queryFn: fetchers.content });
   const { data: segments = [] } = useQuery<SegmentDef[]>({
     queryKey: qk.segments,
     queryFn: fetchers.segments as () => Promise<SegmentDef[]>,
   });
+  const { data: templates = [] } = useQuery<MessageTemplate[]>({
+    queryKey: qk.templates,
+    queryFn: fetchers.templates as () => Promise<MessageTemplate[]>,
+  });
 
   const [q, setQ] = useState("");
-  const [catFilter, setCatFilter] = useState<string>("todos");
-  const [audFilter, setAudFilter] = useState<string>("todos");
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [createDefaultCategory, setCreateDefaultCategory] = useState<string | undefined>();
   const [editItem, setEditItem] = useState<ContentRow | null>(null);
   const [sendItem, setSendItem] = useState<ContentRow | null>(null);
 
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    return (items as ContentRow[]).filter((c) =>
-      (catFilter === "todos" || c.category === catFilter) &&
-      (audFilter === "todos" || c.audience === audFilter) &&
-      (!term || c.title.toLowerCase().includes(term) || c.body.toLowerCase().includes(term)),
-    );
-  }, [items, q, catFilter, audFilter]);
+  const allContent = items as ContentRow[];
+  const activeTemplates = useMemo(
+    () => (templates as MessageTemplate[]).filter((t) => t.is_active),
+    [templates],
+  );
 
-  const hasFilters = q || catFilter !== "todos" || audFilter !== "todos";
+  // Counts per folder (templates + content)
+  const folderCounts = useMemo(() => {
+    const tplByFolder = new Map<string, number>();
+    for (const t of activeTemplates) {
+      const k = folderOf(t.category);
+      tplByFolder.set(k, (tplByFolder.get(k) ?? 0) + 1);
+    }
+    const ctByFolder = new Map<string, number>();
+    for (const c of allContent) {
+      const k = folderOf(c.category);
+      ctByFolder.set(k, (ctByFolder.get(k) ?? 0) + 1);
+    }
+    return FOLDERS.map((f) => ({
+      ...f,
+      templates: tplByFolder.get(f.value) ?? 0,
+      contents: ctByFolder.get(f.value) ?? 0,
+      total: (tplByFolder.get(f.value) ?? 0) + (ctByFolder.get(f.value) ?? 0),
+    }));
+  }, [activeTemplates, allContent]);
+
+  // Global search across folders
+  const searchTerm = q.trim().toLowerCase();
+  const globalResults = useMemo(() => {
+    if (!searchTerm) return null;
+    const tpls = activeTemplates.filter(
+      (t) =>
+        t.name.toLowerCase().includes(searchTerm) ||
+        t.body.toLowerCase().includes(searchTerm) ||
+        (t.description ?? "").toLowerCase().includes(searchTerm),
+    );
+    const cts = allContent.filter(
+      (c) =>
+        c.title.toLowerCase().includes(searchTerm) ||
+        c.body.toLowerCase().includes(searchTerm),
+    );
+    return { tpls, cts };
+  }, [searchTerm, activeTemplates, allContent]);
+
+  // Folder detail view
+  if (activeFolder) {
+    const folder = FOLDERS.find((f) => f.value === activeFolder) ?? FOLDERS[FOLDERS.length - 1];
+    const folderTemplates = activeTemplates.filter((t) => folderOf(t.category) === folder.value);
+    const folderContents = allContent.filter((c) => folderOf(c.category) === folder.value);
+
+    return (
+      <FolderDetail
+        folder={folder}
+        templates={folderTemplates}
+        contents={folderContents}
+        onBack={() => setParams({})}
+        onNewContent={() => { setCreateDefaultCategory(folder.value); setCreateOpen(true); }}
+        onEditContent={(c) => setEditItem(c)}
+        onSendContent={(c) => setSendItem(c)}
+        onContentSaved={() => queryClient.invalidateQueries({ queryKey: qk.content })}
+        onContentSent={() => queryClient.invalidateQueries({ queryKey: qk.messages })}
+        createOpen={createOpen}
+        setCreateOpen={setCreateOpen}
+        createDefaultCategory={createDefaultCategory}
+        editItem={editItem}
+        setEditItem={setEditItem}
+        sendItem={sendItem}
+        setSendItem={setSendItem}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold text-brand">Conteúdos educativos</h1>
-          <p className="text-muted-foreground mt-1">Biblioteca de orientações para pacientes, famílias e cuidadores.</p>
+          <p className="text-muted-foreground mt-1">
+            Modelos de mensagem e materiais educativos organizados por tema. Abra uma pasta para enviar ou gerenciar conteúdos daquele tema.
+          </p>
         </div>
-        <Button variant="hero" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" /> Novo conteúdo
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/app/conteudos/campanha">
+              <Megaphone className="h-4 w-4" /> Disparar campanha
+            </Link>
+          </Button>
+          <Button variant="hero" onClick={() => { setCreateDefaultCategory(undefined); setCreateOpen(true); }}>
+            <Plus className="h-4 w-4" /> Novo conteúdo
+          </Button>
+        </div>
       </header>
 
       <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_220px_200px_auto] lg:items-center">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar por título ou conteúdo"
-              className="pl-9 w-full"
-            />
-          </div>
-          <Select value={catFilter} onValueChange={setCatFilter}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Categoria" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todas as categorias</SelectItem>
-              {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={audFilter} onValueChange={setAudFilter}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Público" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os públicos</SelectItem>
-              {AUDIENCES.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {hasFilters ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="justify-self-start sm:justify-self-end"
-              onClick={() => { setQ(""); setCatFilter("todos"); setAudFilter("todos"); }}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar em todas as pastas (modelos e conteúdos)..."
+            className="pl-9 w-full"
+          />
+          {q && (
+            <button
+              type="button"
+              onClick={() => setQ("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-md"
+              aria-label="Limpar busca"
             >
-              <X className="h-4 w-4" /> Limpar
-            </Button>
-          ) : <div className="hidden lg:block" />}
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
-          Nenhum conteúdo encontrado.
-        </div>
+      {globalResults ? (
+        <SearchResults
+          templates={globalResults.tpls}
+          contents={globalResults.cts}
+          onOpenFolder={(cat) => setParams({ pasta: cat })}
+          onEditContent={(c) => setEditItem(c)}
+          onSendContent={(c) => setSendItem(c)}
+        />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((c) => (
-            <article
-              key={c.id}
-              className="group flex flex-col rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft cursor-pointer"
-              onClick={() => setEditItem(c)}
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">{labelOf(CATEGORIES, c.category)}</Badge>
-                <Badge variant="outline" className="max-w-full truncate">
-                  {describeTargeting(c, segments as SegmentDef[])}
-                </Badge>
-              </div>
-              <h3 className="mt-3 font-display text-lg font-bold text-brand line-clamp-2">{c.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground line-clamp-3 flex-1">{c.body}</p>
-              <div className="mt-4 flex items-center gap-2 pt-3 border-t border-border">
-                <Button
-                  variant="hero"
-                  size="sm"
-                  className="flex-1"
-                  onClick={(e) => { e.stopPropagation(); setSendItem(c); }}
-                >
-                  <Send className="h-4 w-4" /> Enviar
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); setEditItem(c); }}
-                >
-                  Editar
-                </Button>
-              </div>
-            </article>
-          ))}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {folderCounts.map((f) => {
+            const Icon = f.icon;
+            return (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setParams({ pasta: f.value })}
+                className="group text-left flex flex-col rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 text-brand flex items-center justify-center shrink-0 transition-colors group-hover:bg-primary/20">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-display text-lg font-bold text-brand line-clamp-1">{f.label}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{f.description}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-border text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <MessageSquare className="h-3.5 w-3.5 text-brand" />
+                    <span className="tabular-nums font-medium">{f.templates}</span> modelo{f.templates === 1 ? "" : "s"}
+                  </span>
+                  <span className="text-muted-foreground/40">·</span>
+                  <span className="inline-flex items-center gap-1">
+                    <BookOpen className="h-3.5 w-3.5 text-brand" />
+                    <span className="tabular-nums font-medium">{f.contents}</span> conteúdo{f.contents === 1 ? "" : "s"}
+                  </span>
+                  <span className="ml-auto inline-flex items-center gap-1 text-brand font-medium opacity-0 transition-opacity group-hover:opacity-100">
+                    Abrir <ArrowRight className="h-3.5 w-3.5" />
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
       <ContentFormDialog
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(o) => { setCreateOpen(o); if (!o) setCreateDefaultCategory(undefined); }}
+        defaultCategory={createDefaultCategory}
         onSaved={() => queryClient.invalidateQueries({ queryKey: qk.content })}
       />
       <ContentFormDialog
@@ -222,13 +312,315 @@ export default function Content() {
   );
 }
 
+/** Search results across all folders. */
+function SearchResults({
+  templates, contents, onOpenFolder, onEditContent, onSendContent,
+}: {
+  templates: MessageTemplate[];
+  contents: ContentRow[];
+  onOpenFolder: (cat: string) => void;
+  onEditContent: (c: ContentRow) => void;
+  onSendContent: (c: ContentRow) => void;
+}) {
+  if (!templates.length && !contents.length) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
+        Nenhum resultado para sua busca.
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-6">
+      {templates.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Modelos · {templates.length}
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {templates.map((t) => (
+              <div key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpenFolder(folderOf(t.category))}
+                  className="mb-1 text-[10px] uppercase tracking-wide text-brand hover:underline inline-flex items-center gap-1"
+                >
+                  <FolderOpen className="h-3 w-3" /> {folderLabel(folderOf(t.category))}
+                </button>
+                <TemplateCard
+                  template={t}
+                  onUse={() => onOpenFolder(folderOf(t.category))}
+                  onEdit={() => onOpenFolder(folderOf(t.category))}
+                  onDuplicate={() => onOpenFolder(folderOf(t.category))}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {contents.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Conteúdos · {contents.length}
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {contents.map((c) => (
+              <article
+                key={c.id}
+                onClick={() => onEditContent(c)}
+                className="group flex flex-col rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft cursor-pointer"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onOpenFolder(folderOf(c.category)); }}
+                    className="text-[10px] uppercase tracking-wide text-brand hover:underline inline-flex items-center gap-1"
+                  >
+                    <FolderOpen className="h-3 w-3" /> {folderLabel(folderOf(c.category))}
+                  </button>
+                </div>
+                <h3 className="mt-2 font-display text-lg font-bold text-brand line-clamp-2">{c.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground line-clamp-3 flex-1">{c.body}</p>
+                <div className="mt-4 flex items-center gap-2 pt-3 border-t border-border">
+                  <Button variant="hero" size="sm" className="flex-1" onClick={(e) => { e.stopPropagation(); onSendContent(c); }}>
+                    <Send className="h-4 w-4" /> Enviar
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** Folder detail: templates + content for one theme. */
+function FolderDetail({
+  folder, templates, contents, onBack,
+  onNewContent, onEditContent, onSendContent,
+  onContentSaved, onContentSent,
+  createOpen, setCreateOpen, createDefaultCategory,
+  editItem, setEditItem, sendItem, setSendItem,
+}: {
+  folder: typeof FOLDERS[number];
+  templates: MessageTemplate[];
+  contents: ContentRow[];
+  onBack: () => void;
+  onNewContent: () => void;
+  onEditContent: (c: ContentRow) => void;
+  onSendContent: (c: ContentRow) => void;
+  onContentSaved: () => void;
+  onContentSent: () => void;
+  createOpen: boolean;
+  setCreateOpen: (o: boolean) => void;
+  createDefaultCategory?: string;
+  editItem: ContentRow | null;
+  setEditItem: (c: ContentRow | null) => void;
+  sendItem: ContentRow | null;
+  setSendItem: (c: ContentRow | null) => void;
+}) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const Icon = folder.icon;
+
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingTpl, setEditingTpl] = useState<MessageTemplate | null>(null);
+  const [useOpen, setUseOpen] = useState(false);
+  const [usingTpl, setUsingTpl] = useState<MessageTemplate | null>(null);
+
+  const duplicateTpl = async (t: MessageTemplate) => {
+    let institution = "";
+    if (user) {
+      const { data } = await supabase.from("profiles").select("institution").eq("id", user.id).maybeSingle();
+      institution = data?.institution ?? "";
+    }
+    const { error } = await supabase.from("message_templates").insert({
+      name: `${t.name} (cópia)`,
+      description: t.description,
+      category: t.category,
+      body: t.body,
+      variables: t.variables,
+      template_kind: "internal",
+      meta_language: t.meta_language,
+      channel: "whatsapp",
+      targeting_mode: t.targeting_mode,
+      audience_types: t.audience_types,
+      filters: t.filters,
+      created_by: user!.id,
+      institution,
+      is_default: false,
+    } as any);
+    if (error) return toast.error(error.message);
+    toast.success("Modelo duplicado");
+    qc.invalidateQueries({ queryKey: qk.templates });
+  };
+
+  const sortedTemplates = useMemo(() => {
+    return [...templates].sort((a, b) => {
+      const ad = a.is_default ? 1 : 0;
+      const bd = b.is_default ? 1 : 0;
+      if (ad !== bd) return bd - ad;
+      return a.name.localeCompare(b.name);
+    });
+  }, [templates]);
+
+  return (
+    <div className="space-y-6">
+      <header className="space-y-3">
+        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
+          <ArrowLeft className="h-4 w-4" /> Voltar para pastas
+        </Button>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 text-brand flex items-center justify-center shrink-0">
+              <Icon className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs text-muted-foreground">Conteúdos / <span className="font-medium text-brand">{folder.label}</span></div>
+              <h1 className="font-display text-2xl sm:text-3xl font-bold text-brand mt-0.5">{folder.label}</h1>
+              <p className="text-muted-foreground text-sm mt-1 max-w-2xl">{folder.description}</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Templates section */}
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-display text-lg font-bold text-brand inline-flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" /> Modelos de mensagem
+            <span className="text-xs font-normal text-muted-foreground">({sortedTemplates.length})</span>
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/app/conteudos/campanha`)}
+            >
+              <Megaphone className="h-4 w-4" /> Disparar campanha
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setEditingTpl(null); setEditorOpen(true); }}
+            >
+              <Plus className="h-4 w-4" /> Novo modelo
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <StartBlankCard onClick={() => { setEditingTpl(null); setEditorOpen(true); }} />
+          {sortedTemplates.map((t) => (
+            <TemplateCard
+              key={t.id}
+              template={t}
+              onUse={() => { setUsingTpl(t); setUseOpen(true); }}
+              onEdit={() => { setEditingTpl(t); setEditorOpen(true); }}
+              onDuplicate={() => duplicateTpl(t)}
+            />
+          ))}
+        </div>
+        {sortedTemplates.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
+            Nenhum modelo nesta pasta ainda. Clique em <strong className="text-brand">Novo modelo</strong> para criar.
+          </div>
+        )}
+      </section>
+
+      {/* Educational content section */}
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-display text-lg font-bold text-brand inline-flex items-center gap-2">
+            <BookOpen className="h-5 w-5" /> Conteúdos educativos
+            <span className="text-xs font-normal text-muted-foreground">({contents.length})</span>
+          </h2>
+          <Button variant="hero" size="sm" onClick={onNewContent}>
+            <Plus className="h-4 w-4" /> Novo conteúdo
+          </Button>
+        </div>
+        {contents.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
+            Nenhum conteúdo educativo nesta pasta.
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {contents.map((c) => (
+              <article
+                key={c.id}
+                className="group flex flex-col rounded-2xl border border-border bg-card p-5 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft cursor-pointer"
+                onClick={() => onEditContent(c)}
+              >
+                <h3 className="font-display text-base font-bold text-brand line-clamp-2">{c.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground line-clamp-3 flex-1">{c.body}</p>
+                <div className="mt-4 flex items-center gap-2 pt-3 border-t border-border">
+                  <Button
+                    variant="hero"
+                    size="sm"
+                    className="flex-1"
+                    onClick={(e) => { e.stopPropagation(); onSendContent(c); }}
+                  >
+                    <Send className="h-4 w-4" /> Enviar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onEditContent(c); }}
+                  >
+                    Editar
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Template dialogs */}
+      <TemplateEditorDialog
+        open={editorOpen}
+        onOpenChange={(o) => { setEditorOpen(o); if (!o) setEditingTpl(null); }}
+        editing={editingTpl}
+        defaultCategory={folder.value}
+        onSavedUse={(t) => { setUsingTpl(t); setUseOpen(true); }}
+      />
+      <UseTemplateDialog
+        open={useOpen}
+        onOpenChange={(o) => { setUseOpen(o); if (!o) setUsingTpl(null); }}
+        template={usingTpl}
+        onGoToSegmented={(t) => navigate(`/app/conteudos/campanha?template=${t.id}`)}
+      />
+
+      {/* Content dialogs */}
+      <ContentFormDialog
+        open={createOpen}
+        onOpenChange={(o) => setCreateOpen(o)}
+        defaultCategory={createDefaultCategory ?? folder.value}
+        onSaved={onContentSaved}
+      />
+      <ContentFormDialog
+        open={!!editItem}
+        onOpenChange={(v) => !v && setEditItem(null)}
+        initial={editItem ?? undefined}
+        onSaved={onContentSaved}
+      />
+      <SendContentDialog
+        item={sendItem}
+        onOpenChange={(v) => !v && setSendItem(null)}
+        onSent={onContentSent}
+      />
+    </div>
+  );
+}
+
 function ContentFormDialog({
-  open, onOpenChange, initial, onSaved,
+  open, onOpenChange, initial, onSaved, defaultCategory,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial?: ContentRow;
   onSaved: () => void;
+  defaultCategory?: string;
 }) {
   const isEdit = !!initial;
   const [form, setForm] = useState({
@@ -254,7 +646,7 @@ function ContentFormDialog({
     if (open) {
       setForm({
         title: initial?.title ?? "",
-        category: initial?.category ?? "medicacao",
+        category: initial?.category ?? defaultCategory ?? "medicacao",
         audience: initial?.audience ?? "ambos",
         body: initial?.body ?? "",
         targeting_mode: (initial?.targeting_mode ?? "all") as TargetingMode,
@@ -264,7 +656,7 @@ function ContentFormDialog({
       });
       setPreviewKeys(new Set());
     }
-  }, [open, initial]);
+  }, [open, initial, defaultCategory]);
 
   const parsed = contentSchema.safeParse(form);
   const valid = parsed.success;

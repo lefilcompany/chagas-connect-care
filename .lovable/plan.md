@@ -1,87 +1,99 @@
-## Objetivo
+## Visão geral
 
-Simplificar o disparo de campanha removendo a exposição de variáveis técnicas (`{medicacao_orientacao}`, `{medicacao}`, etc.). As medicações devem vir automaticamente dos pacientes cadastrados, e o passo "Revisar" deve mostrar prévias por tipo de público (paciente, familiar, cuidador, médico).
+1. **Mensagens** vira **histórico puro** (sem disparo / cadastro). Três visualizações: linha do tempo, por paciente, tabela.
+2. **Conteúdos** vira **pastas por tema**. Cada pasta abre mostrando modelos de mensagem + conteúdos educativos daquele tema. Disparo de campanha sai daqui.
+3. **Envio direto** (1 paciente, 1+ familiares) sai da **ficha do paciente**, com modelo opcional.
+4. Nova segmentação: **"Pacientes específicos"** — escolho N pacientes e marco se quero atingir o paciente, familiares (filtrando por relação), cuidadores, médicos.
 
-## Comportamento desejado
+---
 
-1. **Variáveis de medicação são automáticas**
-   - `{medicacao}` e `{medicacao_orientacao}` deixam de aparecer como campo manual no passo "Revisar".
-   - Para cada destinatário, a medicação é buscada da tabela `medications` do paciente vinculado:
-     - **Paciente** → medicações do próprio paciente.
-     - **Familiar / Cuidador / Médico** → medicações do paciente ao qual o contato está vinculado (mensagem fica do tipo "Lembrete: João está tomando…").
+## Tela "Mensagens" — histórico
 
-2. **Tratamento de múltiplas medicações**
-   - Se o paciente tiver **1 medicação** → preenche direto (`Nome — Dose — Horário`).
-   - Se tiver **várias** → lista todas formatadas em linhas separadas (`• Nome — Dose — Horário`).
-   - Adicionar um seletor opcional no passo "Revisar": "Como enviar quando houver várias medicações?" com duas opções:
-     - **Todas em lista** (padrão)
-     - **Apenas a primeira cadastrada**
-   - (Escolher uma medicação específica por paciente fica fora do escopo porque cada paciente pode ter um conjunto diferente — listar todas é o comportamento seguro.)
+Substitui a tela atual.
 
-3. **Aviso de pacientes sem medicação cadastrada**
-   - Quando o modelo usa variável de medicação e houver destinatários cujo paciente não tem medicação cadastrada, exibir um alerta amarelo no passo "Revisar" listando os nomes desses pacientes, com texto orientando "Cadastre as medicações desses pacientes antes de enviar, ou remova-os no passo Destinatários".
-   - Permitir prosseguir mesmo assim (mas a mensagem desses destinatários será pulada para evitar enviar texto com `{medicacao}` em branco).
+- Remove "Disparar mensagem", "Novo paciente", aba de Campanhas.
+- Cabeçalho "Histórico de mensagens" + filtros já existentes (busca, paciente, canal, status) e chips de filtros ativos.
+- **Toggle de visualização** no topo (Tabs):
+  - **Linha do tempo** — lista cronológica agrupada por dia (atual).
+  - **Por paciente** — agrupado, mostra contagem e última interação; expandir abre as mensagens daquele paciente.
+  - **Tabela** — Data | Paciente | Destinatário | Canal | Status | Trecho.
+- Diálogo de detalhe da mensagem permanece, mas troca "Reenviar" por "Ver paciente" e "Abrir modelo" (quando originada de template).
+- Rota `/app/mensagens/historico` é descontinuada; `/app/mensagens` passa a ser o histórico.
 
-4. **Prévia por tipo de público no passo "Revisar"**
-   - Substituir o card único de WhatsApp por **uma prévia por tipo de público presente nos destinatários selecionados** (Paciente, Familiar, Cuidador, Médico).
-   - Cada prévia usa um destinatário real daquele tipo (o primeiro da lista) para mostrar como o nome e as medicações serão renderizados.
-   - Se um tipo não tiver destinatários, não aparece.
+---
 
-5. **Esconder também as outras variáveis automáticas**
-   - Já é feito para `{nome_destinatario}`. Estender para `{medicacao}` e `{medicacao_orientacao}` no `manualVars` do `CampaignTab`.
+## Tela "Conteúdos" — pastas por tema
 
-## Mudanças técnicas
+Duas camadas, mesma rota com `?pasta=<categoria>`.
 
-### `src/lib/templates.ts`
-- Adicionar helper `formatMedications(meds, mode: "all" | "first"): string` que devolve string formatada (lista com `•` para várias, ou linha única).
-- Remover `medicacao` e `medicacao_orientacao` de `VARIABLE_SUGGESTIONS` (continuam funcionando, só não são sugeridas como input manual).
+### Camada 1 — grade de pastas
 
-### `src/lib/whatsapp.ts` — `createBatch`
-- Aceitar novo parâmetro opcional `medication_mode: "all" | "first"`.
-- Antes de gerar `rows`, fazer **uma** query `supabase.from("medications").select("patient_id, name, dose, schedule").in("patient_id", uniquePatientIds)` e agrupar por `patient_id`.
-- Para cada destinatário:
-  - Calcular `medText = formatMedications(medsByPatient[r.patient_id] ?? [], medication_mode)`.
-  - Injetar em `perVars.medicacao` e `perVars.medicacao_orientacao` se ainda não definidos.
-  - Se o template referencia `{medicacao}`/`{medicacao_orientacao}` e a lista estiver vazia, **pular** esse destinatário (não inserir em `messages`) e contabilizar em `skipped`.
-- Retornar `skipped_count` e `skipped_names: string[]` no resultado para o toast final.
+- Cards grandes por categoria (Medicação, Alimentação, Sono, Atividade, Família, Consulta, Adesão, Orientação, Geral), com ícone, nome e contagem (modelos + conteúdos).
+- Busca global no topo (encontra modelos/conteúdos em qualquer pasta).
 
-### `src/components/app/messages/CampaignTab.tsx`
-- Expandir `AUTO_RECIPIENT_VARS` para incluir `medicacao` e `medicacao_orientacao` → escondem do bloco "Variáveis".
-- Detectar se o body contém variáveis de medicação (`bodyUsesMedication`).
-- Quando `bodyUsesMedication`:
-  - Buscar medicações dos pacientes finais via `useQuery(["medications-by-patient", patientIds], ...)`.
-  - Calcular `patientsWithoutMeds: string[]` e mostrar alerta amarelo no passo Revisar.
-  - Mostrar um pequeno seletor "Quando o paciente tiver várias medicações: [Listar todas | Enviar só a primeira]".
-- Substituir o card único de `WhatsAppPreview` por um grid de prévias, uma por tipo de público presente em `finalRecipients`. Cada prévia rende o body usando um destinatário-exemplo daquele tipo + suas medicações (ou as do paciente vinculado).
-- Passar `medication_mode` para `createBatch`.
-- Atualizar toast final para mencionar `skipped_count` quando > 0.
+### Camada 2 — dentro de uma pasta
 
-### Banco de dados
-- Nenhuma migração necessária. A tabela `medications` já existe com RLS por paciente.
+- Breadcrumb "Conteúdos / Medicação" + voltar.
+- Duas seções:
+  - **Modelos de mensagem** — cards (`TemplateCard`), ações Usar / Editar / Duplicar. "Usar" abre o `UseTemplateDialog` evoluído (ver abaixo).
+  - **Conteúdos educativos** — cards do `content_library`, ações Enviar / Editar.
+- Botões "Novo modelo" e "Novo conteúdo" já chegam com a categoria pré-selecionada.
 
-## Telas afetadas
+---
 
-```text
-[Passo 4 – Revisar]
-┌──────────────────────────────────────────────┐
-│ Aviso: 2 pacientes selecionados não têm      │
-│ medicação cadastrada (Maria S., João P.).    │
-│ Eles serão pulados no envio.                 │
-└──────────────────────────────────────────────┘
+## Envio: dois caminhos para o mesmo diálogo
 
-Quando houver várias medicações:  ( ) Listar todas  (•) Só a primeira
+Um único componente `SendMessageDialog` (evolução do atual `UseTemplateDialog`) atende todos os casos. Pontos de entrada:
 
-┌─ Resumo ───────────────┐  ┌─ Prévia: Paciente ─────────┐
-│ Campanha: ...          │  │ Olá, Ana. Este é um lembrete│
-│ Modelo: ...            │  │ ... • Benzonidazol 100mg  │
-│ Destinatários: 6       │  │     • Vitamina D 1x/dia   │
-│ Pacientes sem med: 2   │  └────────────────────────────┘
-└────────────────────────┘  ┌─ Prévia: Familiar ─────────┐
-                            │ Olá, Carla. Este é um ...  │
-                            │ ... do paciente João: ...  │
-                            └────────────────────────────┘
-```
+- **Pastas em Conteúdos** → "Usar modelo" no card (campanha em massa ou direcionada).
+- **Ficha do paciente** → botão "Enviar mensagem" (já entra com paciente pré-selecionado e modo "contatos deste paciente").
 
-## Riscos / observações
-- Per-recipient rendering passa a depender de uma query extra de medications — limitada por RLS já existente em `medications` (`can_access_patient`).
-- Pacientes sem medicação são silenciosamente pulados quando o template exige medicação — o usuário é avisado antes de confirmar e o toast final relata quantos foram pulados.
+### Modos de destinatário no diálogo
+
+1. **1 paciente** (envio direto ao paciente).
+2. **Familiares/contatos de 1 paciente** — multi-seleção dos contatos do paciente, com filtro por relação. **(novo)**
+3. **Pacientes específicos** — escolho N pacientes (busca com chips) + marco quem é alvo: o paciente, familiares (relações), cuidadores, médicos. **(novo)**
+4. **Por tipo de público** (familiar/cuidador/etc.) — como hoje.
+5. **Segmento salvo / Filtros personalizados** — como hoje.
+
+Modelo de mensagem é **opcional** em todos os modos (pode digitar texto livre). Quando vem da pasta, o modelo já está selecionado.
+
+---
+
+## Mudanças de dados (segmentação)
+
+Sem alteração de schema. Acrescentamos campos opcionais ao tipo de filtros em código:
+
+- `SegmentFilters` ganha:
+  - `patient_ids?: string[]` — restringe o universo de pacientes alvo.
+  - `relations?: string[]` — para familiar/cuidador, filtra por relação (mãe, pai, cônjuge, cuidador, etc.).
+- `TargetingMode` ganha `"specific_patients"`.
+- `resolveRecipients` em `src/lib/segments.ts` passa a respeitar esses dois campos.
+- Persistido no JSONB `filters` já existente em `audience_segments`, `message_templates`, `message_batches`, `content_library`.
+
+---
+
+## Detalhes técnicos
+
+- **Rotas (`src/App.tsx`)**: remover `/app/mensagens/historico`; `/app/mensagens` renderiza `MessageHistory` renomeado para `Messages`. Manter `/app/conteudos`.
+- **Arquivos a tocar**:
+  - `src/pages/app/Messages.tsx` — substituir conteúdo pelo de `MessageHistory.tsx` + toggle de 3 vistas.
+  - `src/pages/app/MessageHistory.tsx` — remover (ou virar redirect).
+  - `src/pages/app/Content.tsx` — refatorar em grade de pastas + visão de pasta (`useSearchParams("pasta")`).
+  - `src/pages/app/PatientDetail.tsx` — adicionar botão "Enviar mensagem" que abre `SendMessageDialog` com paciente fixo.
+  - `src/components/app/messages/UseTemplateDialog.tsx` → evoluir/renomear para `SendMessageDialog`, com os 5 modos acima e contato multi-select.
+  - `src/components/app/SegmentFilters.tsx` — UI para `patient_ids` (busca + chips de pacientes) e `relations` (chips).
+  - `src/lib/segments.ts` — novos campos + lógica em `resolveRecipients`.
+  - `src/lib/templates.ts` — unificar lista canônica de categorias com as de conteúdo, em `src/lib/content-folders.ts`.
+  - `CampaignTab` deixa de ser montado em Mensagens; sua lógica é absorvida por `SendMessageDialog` ou disparada a partir das pastas.
+- **AppLayout**: nada muda nos itens do menu.
+- **Compatibilidade**: dados antigos continuam funcionando (campos novos opcionais). `normalizeFilters` em `src/lib/queries.ts` ganha defaults `[]` para `patient_ids` e `relations`.
+
+---
+
+## Fora do escopo desta entrega
+
+- Mudanças de schema do banco.
+- Exportação CSV do histórico (pode ser uma próxima entrega).
+- "Calendário" de envios.
+- Notificações/automação de novas mensagens.

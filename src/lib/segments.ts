@@ -10,6 +10,8 @@ export type SegmentFilters = {
   age_max?: number | null;
   status?: "ativo" | "inativo" | "";
   channel?: "whatsapp" | "sms" | "";
+  /** Optional: restrict the universe of patients (and their contacts) to a specific list. */
+  patient_ids?: string[];
 };
 
 export type SegmentDef = {
@@ -91,6 +93,7 @@ export const resolveRecipients = async (
   const patients = patientsData ?? [];
 
   const matchPatient = (p: any) => {
+    if (f_active.patient_ids?.length && !f_active.patient_ids.includes(p.id)) return false;
     if (f_active.stages?.length && !f_active.stages.includes(p.stage)) return false;
     return matchesCommon(p, f_active);
   };
@@ -128,6 +131,8 @@ export const resolveRecipients = async (
       if (!(contactRels as AudienceType[]).includes(c.relation as AudienceType)) continue;
       const parent = patientMap.get(c.patient_id) as any;
       if (!parent) continue;
+      // Restrict to selected patients when patient_ids is set
+      if (f_active.patient_ids?.length && !f_active.patient_ids.includes(c.patient_id)) continue;
       // patient-level filters (stage) still apply via parent
       if (f_active.stages?.length && !f_active.stages.includes(parent.stage)) continue;
       // contact-level filters
@@ -159,6 +164,7 @@ export const emptyFilters = (): SegmentFilters => ({
   age_max: null,
   status: "",
   channel: "",
+  patient_ids: [],
 });
 
 export const normalizeFilters = (f: SegmentFilters | null | undefined): SegmentFilters => {
@@ -167,6 +173,7 @@ export const normalizeFilters = (f: SegmentFilters | null | undefined): SegmentF
     ...f,
     city: toStrArr(f.city),
     state: toStrArr(f.state),
+    patient_ids: toStrArr((f as any).patient_ids),
   };
 };
 
