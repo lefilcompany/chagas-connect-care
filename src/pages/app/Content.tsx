@@ -18,7 +18,7 @@ import {
   Plus, Search, Send, Trash2, X, ArrowLeft, ArrowRight,
   Pill, Utensils, Moon, Activity, Users, Stethoscope,
   HeartHandshake, BookOpen, Layers, FolderOpen, MessageSquare,
-  Megaphone,
+  Megaphone, MoreVertical,
 } from "lucide-react";
 import { z } from "zod";
 import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
@@ -35,26 +35,24 @@ import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
 import type { MessageTemplate } from "@/lib/templates";
 import { useAuth } from "@/lib/auth";
 import { useNavigate } from "react-router-dom";
+import { useFolders, FALLBACK_FOLDER as FB_FOLDER, type FolderDef } from "@/hooks/useFolders";
+import { NewFolderDialog } from "@/components/app/content/NewFolderDialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-/** Canonical folders (themes). Each folder groups templates + educational content. */
-const FOLDERS: { value: string; label: string; icon: any; description: string }[] = [
-  { value: "medicacao",   label: "Medicação",         icon: Pill,           description: "Lembretes de dose, horários e adesão à medicação." },
-  { value: "alimentacao", label: "Alimentação",       icon: Utensils,       description: "Orientações nutricionais e hábitos alimentares." },
-  { value: "consulta",    label: "Consulta",          icon: Stethoscope,    description: "Confirmações, lembretes e preparo de consultas." },
-  { value: "adesao",      label: "Adesão",            icon: HeartHandshake, description: "Reforço de tratamento e acompanhamento." },
-  { value: "orientacao",  label: "Orientação",        icon: BookOpen,       description: "Materiais educativos e instruções gerais." },
-  { value: "sono",        label: "Sono",              icon: Moon,           description: "Higiene do sono e rotina de descanso." },
-  { value: "atividade",   label: "Atividade física",  icon: Activity,       description: "Recomendações de movimento e exercícios." },
-  { value: "familia",     label: "Família",           icon: Users,          description: "Conteúdos para familiares e cuidadores." },
-  { value: "geral",       label: "Geral",             icon: Layers,         description: "Mensagens variadas que não se encaixam em outras pastas." },
-];
-/** Backwards-compat: rows persisted with categories not in the canonical list fall here. */
-const FALLBACK_FOLDER = "geral";
-const CATEGORIES = FOLDERS.map((f) => ({ value: f.value, label: f.label }));
-
+/**
+ * Folders (themes) — base set + custom user folders.
+ * Helpers below read from a module-level reference updated by Content() via
+ * useFolders(), so subcomponents can call them at render time without prop drilling.
+ */
+let CURRENT_FOLDERS: FolderDef[] = [];
+let CURRENT_CATEGORIES: { value: string; label: string }[] = [];
+const FALLBACK_FOLDER = FB_FOLDER;
 const folderOf = (cat: string | null | undefined): string =>
-  FOLDERS.find((f) => f.value === cat)?.value ?? FALLBACK_FOLDER;
-const folderLabel = (cat: string) => FOLDERS.find((f) => f.value === cat)?.label ?? "Geral";
+  CURRENT_FOLDERS.find((f) => f.value === cat)?.value ?? FALLBACK_FOLDER;
+const folderLabel = (cat: string | null | undefined): string =>
+  CURRENT_FOLDERS.find((f) => f.value === cat)?.label ?? "Geral";
 
 const AUDIENCES = [
   { value: "paciente", label: "Paciente" },
@@ -127,6 +125,13 @@ export default function Content() {
   const [createDefaultCategory, setCreateDefaultCategory] = useState<string | undefined>();
   const [editItem, setEditItem] = useState<ContentRow | null>(null);
   const [sendItem, setSendItem] = useState<ContentRow | null>(null);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+
+  // Merged folders (base + custom) — also kept on a module-level ref so
+  // descendant components can use folderOf/folderLabel without prop drilling.
+  const { folders, categories } = useFolders();
+  CURRENT_FOLDERS = folders;
+  CURRENT_CATEGORIES = categories;
 
   const allContent = items as ContentRow[];
   const activeTemplates = useMemo(
@@ -146,13 +151,13 @@ export default function Content() {
       const k = folderOf(c.category);
       ctByFolder.set(k, (ctByFolder.get(k) ?? 0) + 1);
     }
-    return FOLDERS.map((f) => ({
+    return folders.map((f) => ({
       ...f,
       templates: tplByFolder.get(f.value) ?? 0,
       contents: ctByFolder.get(f.value) ?? 0,
       total: (tplByFolder.get(f.value) ?? 0) + (ctByFolder.get(f.value) ?? 0),
     }));
-  }, [activeTemplates, allContent]);
+  }, [activeTemplates, allContent, folders]);
 
   // Global search across folders
   const searchTerm = q.trim().toLowerCase();
@@ -174,7 +179,9 @@ export default function Content() {
 
   // Folder detail view
   if (activeFolder) {
-    const folder = FOLDERS.find((f) => f.value === activeFolder) ?? FOLDERS[FOLDERS.length - 1];
+    const folder = folders.find((f) => f.value === activeFolder)
+      ?? folders[folders.length - 1];
+    if (!folder) return null;
     const folderTemplates = activeTemplates.filter((t) => folderOf(t.category) === folder.value);
     const folderContents = allContent.filter((c) => folderOf(c.category) === folder.value);
 
@@ -215,8 +222,8 @@ export default function Content() {
               <Megaphone className="h-4 w-4" /> Disparar mensagem
             </Link>
           </Button>
-          <Button variant="hero" onClick={() => { setCreateDefaultCategory(undefined); setCreateOpen(true); }}>
-            <Plus className="h-4 w-4" /> Novo conteúdo
+          <Button variant="hero" onClick={() => setNewFolderOpen(true)}>
+            <Plus className="h-4 w-4" /> Nova pasta
           </Button>
         </div>
       </header>
@@ -255,32 +262,75 @@ export default function Content() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {folderCounts.map((f) => {
             const Icon = f.icon;
+            const isCustom = (f as FolderDef).isCustom;
+            const folderId = (f as FolderDef).id;
             return (
-              <button
+              <div
                 key={f.value}
-                type="button"
-                onClick={() => setParams({ pasta: f.value })}
-                className="group text-left flex flex-col rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft"
+                className="group relative flex flex-col rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft"
               >
-                <div className="flex items-start gap-3">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 text-brand flex items-center justify-center shrink-0 transition-colors group-hover:bg-primary/20">
-                    <Icon className="h-6 w-6" />
+                {isCustom && folderId && (
+                  <div className="absolute right-2 top-2 z-10">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="Opções da pasta"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!confirm(`Excluir a pasta "${f.label}"? Modelos e conteúdos dentro dela permanecerão, mas voltarão à pasta Geral.`)) return;
+                            const { error } = await supabase.from("content_folders").delete().eq("id", folderId);
+                            if (error) return toast.error(error.message);
+                            toast.success("Pasta excluída");
+                            queryClient.invalidateQueries({ queryKey: ["content-folders"] });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" /> Excluir pasta
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-display text-lg font-bold text-brand line-clamp-1">{f.label}</h3>
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{f.description}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setParams({ pasta: f.value })}
+                  className="text-left flex flex-col flex-1"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="h-12 w-12 rounded-xl bg-primary/10 text-brand flex items-center justify-center shrink-0 transition-colors group-hover:bg-primary/20">
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0 flex-1 pr-6">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-display text-lg font-bold text-brand line-clamp-1">{f.label}</h3>
+                        {isCustom && (
+                          <Badge variant="secondary" className="text-[10px] uppercase">Personalizada</Badge>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{f.description}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-border text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <MessageSquare className="h-3.5 w-3.5 text-brand" />
-                    <span className="tabular-nums font-medium">{f.templates}</span> modelo{f.templates === 1 ? "" : "s"}
-                  </span>
-                  <span className="ml-auto inline-flex items-center gap-1 text-brand font-medium opacity-0 transition-opacity group-hover:opacity-100">
-                    Abrir <ArrowRight className="h-3.5 w-3.5" />
-                  </span>
-                </div>
-              </button>
+                  <div className="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-border text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <MessageSquare className="h-3.5 w-3.5 text-brand" />
+                      <span className="tabular-nums font-medium">{f.templates}</span> modelo{f.templates === 1 ? "" : "s"}
+                    </span>
+                    <span className="ml-auto inline-flex items-center gap-1 text-brand font-medium opacity-0 transition-opacity group-hover:opacity-100">
+                      Abrir <ArrowRight className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                </button>
+              </div>
             );
           })}
         </div>
@@ -302,6 +352,11 @@ export default function Content() {
         item={sendItem}
         onOpenChange={(v) => !v && setSendItem(null)}
         onSent={() => queryClient.invalidateQueries({ queryKey: qk.messages })}
+      />
+      <NewFolderDialog
+        open={newFolderOpen}
+        onOpenChange={setNewFolderOpen}
+        onCreated={(slug) => setParams({ pasta: slug })}
       />
     </div>
   );
@@ -397,7 +452,7 @@ function FolderDetail({
   createOpen, setCreateOpen, createDefaultCategory,
   editItem, setEditItem, sendItem, setSendItem,
 }: {
-  folder: typeof FOLDERS[number];
+  folder: FolderDef;
   templates: MessageTemplate[];
   contents: ContentRow[];
   onBack: () => void;
@@ -740,7 +795,7 @@ function ContentFormDialog({
             <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                {CURRENT_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

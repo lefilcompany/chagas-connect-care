@@ -157,6 +157,42 @@ export type Database = {
           },
         ]
       }
+      content_folders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          icon: string
+          id: string
+          institution: string
+          label: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          icon?: string
+          id?: string
+          institution: string
+          label: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          icon?: string
+          id?: string
+          institution?: string
+          label?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       content_library: {
         Row: {
           audience: string

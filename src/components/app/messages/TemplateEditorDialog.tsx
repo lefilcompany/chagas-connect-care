@@ -28,6 +28,7 @@ import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
 import {
   AudienceType, SegmentFilters, TargetingMode, emptyFilters,
 } from "@/lib/segments";
+import { useFolders } from "@/hooks/useFolders";
 
 type Form = {
   name: string;
@@ -76,6 +77,7 @@ export function TemplateEditorDialog({
   /** Pre-selected category when creating a new template (ignored when editing). */
   defaultCategory?: string;
 }) {
+  const { categories: folderCategories } = useFolders();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [step, setStep] = useState(0);
@@ -203,7 +205,7 @@ export function TemplateEditorDialog({
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {TEMPLATE_CATEGORIES.map((c) => (
+                    {folderCategories.map((c) => (
                       <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                     ))}
                   </SelectContent>
