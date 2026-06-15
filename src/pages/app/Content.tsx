@@ -262,32 +262,75 @@ export default function Content() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {folderCounts.map((f) => {
             const Icon = f.icon;
+            const isCustom = (f as FolderDef).isCustom;
+            const folderId = (f as FolderDef).id;
             return (
-              <button
+              <div
                 key={f.value}
-                type="button"
-                onClick={() => setParams({ pasta: f.value })}
-                className="group text-left flex flex-col rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft"
+                className="group relative flex flex-col rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft"
               >
-                <div className="flex items-start gap-3">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 text-brand flex items-center justify-center shrink-0 transition-colors group-hover:bg-primary/20">
-                    <Icon className="h-6 w-6" />
+                {isCustom && folderId && (
+                  <div className="absolute right-2 top-2 z-10">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="Opções da pasta"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!confirm(`Excluir a pasta "${f.label}"? Modelos e conteúdos dentro dela permanecerão, mas voltarão à pasta Geral.`)) return;
+                            const { error } = await supabase.from("content_folders").delete().eq("id", folderId);
+                            if (error) return toast.error(error.message);
+                            toast.success("Pasta excluída");
+                            queryClient.invalidateQueries({ queryKey: ["content-folders"] });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" /> Excluir pasta
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-display text-lg font-bold text-brand line-clamp-1">{f.label}</h3>
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{f.description}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setParams({ pasta: f.value })}
+                  className="text-left flex flex-col flex-1"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="h-12 w-12 rounded-xl bg-primary/10 text-brand flex items-center justify-center shrink-0 transition-colors group-hover:bg-primary/20">
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0 flex-1 pr-6">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-display text-lg font-bold text-brand line-clamp-1">{f.label}</h3>
+                        {isCustom && (
+                          <Badge variant="secondary" className="text-[10px] uppercase">Personalizada</Badge>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{f.description}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-border text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <MessageSquare className="h-3.5 w-3.5 text-brand" />
-                    <span className="tabular-nums font-medium">{f.templates}</span> modelo{f.templates === 1 ? "" : "s"}
-                  </span>
-                  <span className="ml-auto inline-flex items-center gap-1 text-brand font-medium opacity-0 transition-opacity group-hover:opacity-100">
-                    Abrir <ArrowRight className="h-3.5 w-3.5" />
-                  </span>
-                </div>
-              </button>
+                  <div className="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-border text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <MessageSquare className="h-3.5 w-3.5 text-brand" />
+                      <span className="tabular-nums font-medium">{f.templates}</span> modelo{f.templates === 1 ? "" : "s"}
+                    </span>
+                    <span className="ml-auto inline-flex items-center gap-1 text-brand font-medium opacity-0 transition-opacity group-hover:opacity-100">
+                      Abrir <ArrowRight className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                </button>
+              </div>
             );
           })}
         </div>
@@ -309,6 +352,11 @@ export default function Content() {
         item={sendItem}
         onOpenChange={(v) => !v && setSendItem(null)}
         onSent={() => queryClient.invalidateQueries({ queryKey: qk.messages })}
+      />
+      <NewFolderDialog
+        open={newFolderOpen}
+        onOpenChange={setNewFolderOpen}
+        onCreated={(slug) => setParams({ pasta: slug })}
       />
     </div>
   );
