@@ -27,7 +27,7 @@ import { createBatch } from "@/lib/whatsapp";
 import { TemplateCard, StartBlankCard } from "./TemplateCard";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 
-const STEPS = ["Modelo", "Público e destinatários", "Revisar", "Enviar"] as const;
+const STEPS = ["Modelo", "Destinatários", "Revisar", "Enviar"] as const;
 
 export default function CampaignTab({
   initialTemplateId,
