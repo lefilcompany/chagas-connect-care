@@ -614,12 +614,13 @@ function FolderDetail({
 }
 
 function ContentFormDialog({
-  open, onOpenChange, initial, onSaved,
+  open, onOpenChange, initial, onSaved, defaultCategory,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial?: ContentRow;
   onSaved: () => void;
+  defaultCategory?: string;
 }) {
   const isEdit = !!initial;
   const [form, setForm] = useState({
@@ -645,7 +646,7 @@ function ContentFormDialog({
     if (open) {
       setForm({
         title: initial?.title ?? "",
-        category: initial?.category ?? "medicacao",
+        category: initial?.category ?? defaultCategory ?? "medicacao",
         audience: initial?.audience ?? "ambos",
         body: initial?.body ?? "",
         targeting_mode: (initial?.targeting_mode ?? "all") as TargetingMode,
@@ -655,7 +656,7 @@ function ContentFormDialog({
       });
       setPreviewKeys(new Set());
     }
-  }, [open, initial]);
+  }, [open, initial, defaultCategory]);
 
   const parsed = contentSchema.safeParse(form);
   const valid = parsed.success;
