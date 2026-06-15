@@ -305,7 +305,11 @@ export default function CampaignTab({
       targeting_mode: mode,
       audience_types: previewAud,
       segment_id: mode === "segment" ? segmentId : null,
-      filters: mode === "filters" ? (filters as any) : {},
+      filters: (mode === "filters"
+        ? { ...filters, patient_ids: previewFilters.patient_ids ?? [] }
+        : patientIds.length
+          ? { patient_ids: patientIds }
+          : {}) as any,
       created_by: user?.id ?? null,
       medication_mode: medicationMode,
     });
@@ -326,6 +330,7 @@ export default function CampaignTab({
     setCampaignName("");
     setVars({});
     setSelected(new Set());
+    setPatientIds([]);
   };
 
   return (
