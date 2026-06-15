@@ -18,7 +18,7 @@ import {
   Plus, Search, Send, Trash2, X, ArrowLeft, ArrowRight,
   Pill, Utensils, Moon, Activity, Users, Stethoscope,
   HeartHandshake, BookOpen, Layers, FolderOpen, MessageSquare,
-  Megaphone, Folder, MoreVertical,
+  Megaphone, MoreVertical,
 } from "lucide-react";
 import { z } from "zod";
 import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
