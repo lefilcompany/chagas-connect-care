@@ -6,6 +6,7 @@ import { qk } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -35,12 +36,18 @@ export function UseTemplateDialog({
   onOpenChange,
   template,
   onGoToSegmented,
+  lockedPatientId,
+  initialMode,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   template: MessageTemplate | null;
   /** Called when the user picks "segment" mode — should switch to /app/mensagens "Envio segmentado" tab. */
   onGoToSegmented?: (template: MessageTemplate) => void;
+  /** If set, hides the patient picker and forces this patient. */
+  lockedPatientId?: string;
+  /** Pre-selects the dispatch mode. When `lockedPatientId` is set, segment mode is hidden. */
+  initialMode?: Mode;
 }) {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -48,7 +55,7 @@ export function UseTemplateDialog({
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState<Mode>("patient");
   const [patientId, setPatientId] = useState<string>("");
-  const [contactId, setContactId] = useState<string>("");
+  const [contactIds, setContactIds] = useState<string[]>([]);
   const [vars, setVars] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
 
@@ -97,20 +104,20 @@ export function UseTemplateDialog({
   useEffect(() => {
     if (!open) return;
     setStep(0);
-    setMode("patient");
-    setPatientId("");
-    setContactId("");
+    setMode(initialMode ?? "patient");
+    setPatientId(lockedPatientId ?? "");
+    setContactIds([]);
     setVars({});
-  }, [open, template?.id]);
+  }, [open, template?.id, lockedPatientId, initialMode]);
 
-  // Auto-fill variables when patient/contact selected
+  // Auto-fill variables when patient / first contact selected
   useEffect(() => {
     if (!template) return;
     const patient = patients.find((p) => p.id === patientId) ?? null;
-    const contact = contacts.find((c) => c.id === contactId) ?? null;
+    const firstContact = contacts.find((c) => c.id === contactIds[0]) ?? null;
     const auto = autofillVariables(detectedVars, {
       patient,
-      contact,
+      contact: firstContact,
       medications,
     });
     setVars((cur) => {
@@ -118,17 +125,20 @@ export function UseTemplateDialog({
       for (const k of Object.keys(auto)) if (!next[k]) next[k] = auto[k];
       return next;
     });
-  }, [patientId, contactId, patients, contacts, medications, detectedVars, template]);
+  }, [patientId, contactIds, patients, contacts, medications, detectedVars, template]);
 
   if (!template) return null;
 
   const patient = patients.find((p) => p.id === patientId);
-  const contact = contacts.find((c) => c.id === contactId);
+  const selectedContacts = contacts.filter((c) => contactIds.includes(c.id));
+  const firstContact = selectedContacts[0];
   const recipientName = mode === "contact"
-    ? contact?.full_name ?? ""
+    ? selectedContacts.length === 1
+      ? firstContact?.full_name ?? ""
+      : `${selectedContacts.length} contatos`
     : patient?.full_name ?? "";
   const recipientPhone = mode === "contact"
-    ? contact?.phone ?? ""
+    ? firstContact?.phone ?? ""
     : patient?.phone ?? "";
 
   const renderedBody = renderTemplate(template.body, vars);
@@ -137,29 +147,53 @@ export function UseTemplateDialog({
     ? true
     : mode === "patient"
       ? !!patientId && !!recipientPhone
-      : !!patientId && !!contactId && !!recipientPhone;
+      : !!patientId && contactIds.length > 0;
+
+  const toggleContact = (id: string) => {
+    setContactIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  };
 
   const handleSend = async () => {
     if (!canAdvance0) return toast.error("Selecione um destinatário válido");
     setSending(true);
-    const result = await queueAndSendFromTemplate({
-      template: {
-        id: template.id,
-        body: template.body,
-        template_kind: template.template_kind,
-        meta_template_name: template.meta_template_name ?? null,
-        channel: "whatsapp",
-      },
-      patient_id: patientId,
-      contact_id: mode === "contact" ? contactId : null,
-      variables: vars,
-      created_by: user?.id ?? null,
-      recipient_name: recipientName || null,
-    });
+    const targets = mode === "contact"
+      ? selectedContacts.map((c) => ({
+          contact_id: c.id as string | null,
+          name: c.full_name,
+          // Per-contact autofill so {nome_contato} / {nome_destinatario} are right.
+          extraVars: autofillVariables(detectedVars, {
+            patient: patient ?? null,
+            contact: c,
+            medications,
+          }),
+        }))
+      : [{ contact_id: null as string | null, name: patient?.full_name ?? "", extraVars: {} as Record<string, string> }];
+
+    let ok = 0;
+    let fail = 0;
+    for (const t of targets) {
+      const perVars = { ...vars, ...t.extraVars };
+      const result = await queueAndSendFromTemplate({
+        template: {
+          id: template.id,
+          body: template.body,
+          template_kind: template.template_kind,
+          meta_template_name: template.meta_template_name ?? null,
+          channel: "whatsapp",
+        },
+        patient_id: patientId,
+        contact_id: t.contact_id,
+        variables: perVars,
+        created_by: user?.id ?? null,
+        recipient_name: t.name || null,
+      });
+      if (result.ok) ok++; else fail++;
+    }
     setSending(false);
     qc.invalidateQueries({ queryKey: qk.messages });
-    if (!result.ok) return toast.error(result.error ?? "Falha ao enviar");
-    toast.success("Mensagem enviada");
+    if (ok === 0) return toast.error(`Falha ao enviar (${fail})`);
+    if (fail > 0) toast.success(`${ok} mensagem(ns) enviada(s), ${fail} falharam`);
+    else toast.success(targets.length > 1 ? `${ok} mensagens enviadas` : "Mensagem enviada");
     onOpenChange(false);
   };
 
@@ -175,63 +209,103 @@ export function UseTemplateDialog({
         {step === 0 && (
           <div className="space-y-4">
             <Label>Quem vai receber?</Label>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className={`grid gap-2 ${lockedPatientId ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
               <RecipientOption
                 selected={mode === "patient"}
                 icon={<UserIcon className="h-5 w-5" />}
                 title="Paciente"
                 desc="Enviar para um paciente específico"
-                onClick={() => { setMode("patient"); setContactId(""); }}
+                onClick={() => { setMode("patient"); setContactIds([]); }}
               />
               <RecipientOption
                 selected={mode === "contact"}
                 icon={<UserIcon className="h-5 w-5" />}
                 title="Familiar/Cuidador/Médico"
-                desc="Enviar a um contato vinculado"
+                desc="Enviar a um ou mais contatos vinculados"
                 onClick={() => setMode("contact")}
               />
-              <RecipientOption
-                selected={mode === "segment"}
-                icon={<Users className="h-5 w-5" />}
-                title="Segmento de pacientes"
-                desc="Disparar para vários ao mesmo tempo"
-                onClick={() => setMode("segment")}
-              />
+              {!lockedPatientId && (
+                <RecipientOption
+                  selected={mode === "segment"}
+                  icon={<Users className="h-5 w-5" />}
+                  title="Segmento de pacientes"
+                  desc="Disparar para vários ao mesmo tempo"
+                  onClick={() => setMode("segment")}
+                />
+              )}
             </div>
 
             {mode !== "segment" && (
               <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label>Paciente</Label>
-                  <Select value={patientId} onValueChange={setPatientId}>
-                    <SelectTrigger><SelectValue placeholder="Selecione um paciente" /></SelectTrigger>
-                    <SelectContent>
-                      {patients.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.full_name} {p.phone ? `· ${p.phone}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {mode === "contact" && (
+                {!lockedPatientId && (
                   <div className="space-y-1.5">
-                    <Label>Contato vinculado</Label>
-                    <Select value={contactId} onValueChange={setContactId} disabled={!patientId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={patientId ? "Selecione um contato" : "Escolha um paciente primeiro"} />
-                      </SelectTrigger>
+                    <Label>Paciente</Label>
+                    <Select value={patientId} onValueChange={setPatientId}>
+                      <SelectTrigger><SelectValue placeholder="Selecione um paciente" /></SelectTrigger>
                       <SelectContent>
-                        {contacts.length === 0 && (
-                          <SelectItem value="_none" disabled>Nenhum contato cadastrado</SelectItem>
-                        )}
-                        {contacts.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.full_name} ({c.relation}) {c.phone ? `· ${c.phone}` : ""}
+                        {patients.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.full_name} {p.phone ? `· ${p.phone}` : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                )}
+                {mode === "contact" && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label>Contatos vinculados</Label>
+                      <span className="text-[11px] text-muted-foreground">
+                        {contactIds.length} selecionado(s)
+                      </span>
+                    </div>
+                    {!patientId ? (
+                      <p className="text-sm text-muted-foreground">Escolha um paciente primeiro.</p>
+                    ) : contacts.length === 0 ? (
+                      <p className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                        Nenhum contato cadastrado para este paciente.
+                      </p>
+                    ) : (
+                      <ul className="divide-y divide-border rounded-md border border-border bg-card max-h-64 overflow-y-auto">
+                        {contacts.map((c) => {
+                          const checked = contactIds.includes(c.id);
+                          const disabled = !c.phone;
+                          return (
+                            <li key={c.id}>
+                              <label
+                                className={`flex items-center gap-3 p-3 text-sm ${
+                                  disabled ? "opacity-60" : "cursor-pointer hover:bg-muted/40"
+                                }`}
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  disabled={disabled}
+                                  onCheckedChange={() => !disabled && toggleContact(c.id)}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium truncate">{c.full_name}</span>
+                                    <span className="text-[10px] uppercase text-muted-foreground">
+                                      {c.relation}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-muted-foreground">
+                                    {c.phone || "sem telefone"}
+                                  </div>
+                                </div>
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                    {contactIds.length > 1 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Variáveis dependentes do contato (ex.: <code>{`{nome_contato}`}</code>) serão
+                        preenchidas individualmente no envio.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -279,9 +353,21 @@ export function UseTemplateDialog({
               <div className="space-y-2 text-sm">
                 <h4 className="font-semibold text-brand">Resumo do envio</h4>
                 <p><span className="text-muted-foreground">Destinatário:</span> {recipientName || "—"}</p>
-                <p><span className="text-muted-foreground">Telefone:</span> {recipientPhone || "—"}</p>
+                {mode === "contact" && selectedContacts.length > 0 ? (
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    {selectedContacts.slice(0, 5).map((c) => (
+                      <div key={c.id}>• {c.full_name} ({c.relation}) {c.phone ? `· ${c.phone}` : ""}</div>
+                    ))}
+                    {selectedContacts.length > 5 && <div>… e mais {selectedContacts.length - 5}</div>}
+                  </div>
+                ) : (
+                  <p><span className="text-muted-foreground">Telefone:</span> {recipientPhone || "—"}</p>
+                )}
                 <p><span className="text-muted-foreground">Canal:</span> WhatsApp</p>
                 <p><span className="text-muted-foreground">Modelo:</span> {template.name}</p>
+                {mode === "contact" && selectedContacts.length > 1 && (
+                  <p><span className="text-muted-foreground">Total:</span> {selectedContacts.length} envios</p>
+                )}
               </div>
               <WhatsAppPreview body={renderedBody} recipientName={recipientName || "Destinatário"} highlightVars={false} />
             </div>
