@@ -12,8 +12,8 @@ import Dashboard from "./pages/app/Dashboard";
 import Patients from "./pages/app/Patients";
 import PatientDetail from "./pages/app/PatientDetail";
 import Messages from "./pages/app/Messages";
-import MessageHistory from "./pages/app/MessageHistory";
 import Content from "./pages/app/Content";
+import Campaign from "./pages/app/Campaign";
 import Reports from "./pages/app/Reports";
 import Integrations from "./pages/app/Integrations";
 import Profile from "./pages/app/Profile";
@@ -50,8 +50,8 @@ const App = () => (
               <Route path="pacientes" element={<Patients />} />
               <Route path="pacientes/:id" element={<PatientDetail />} />
               <Route path="mensagens" element={<Messages />} />
-              <Route path="mensagens/historico" element={<MessageHistory />} />
               <Route path="conteudos" element={<Content />} />
+              <Route path="conteudos/campanha" element={<Campaign />} />
               <Route path="segmentos" element={<Segments />} />
               <Route path="segmentos/novo" element={<SegmentEditor />} />
               <Route path="segmentos/:id/editar" element={<SegmentEditor />} />
