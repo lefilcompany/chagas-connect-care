@@ -404,7 +404,7 @@ function FolderDetail({
   createOpen, setCreateOpen, createDefaultCategory,
   editItem, setEditItem, sendItem, setSendItem,
 }: {
-  folder: typeof FOLDERS[number];
+  folder: FolderDef;
   templates: MessageTemplate[];
   contents: ContentRow[];
   onBack: () => void;
@@ -747,7 +747,7 @@ function ContentFormDialog({
             <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                {CURRENT_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
