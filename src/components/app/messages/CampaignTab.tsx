@@ -27,7 +27,7 @@ import { createBatch } from "@/lib/whatsapp";
 import { TemplateCard, StartBlankCard } from "./TemplateCard";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 
-const STEPS = ["Modelo", "Público", "Destinatários", "Revisar", "Enviar"] as const;
+const STEPS = ["Modelo", "Público e destinatários", "Revisar", "Enviar"] as const;
 
 export default function CampaignTab({
   initialTemplateId,
@@ -158,7 +158,7 @@ export default function CampaignTab({
   const { data: recipients = [], isLoading: previewLoading } = useQuery<Recipient[]>({
     queryKey: ["campaign-recipients", previewAud, previewFilters],
     queryFn: () => resolveRecipients(previewAud, previewFilters),
-    enabled: previewAud.length > 0 && step >= 2,
+    enabled: previewAud.length > 0 && step >= 1,
   });
 
   const body = selectedTemplate?.body ?? freeBody;
@@ -200,7 +200,7 @@ export default function CampaignTab({
   const { data: medsByPatient = new Map<string, { name: string | null; dose: string | null; schedule: string | null }[]>() } =
     useQuery({
       queryKey: ["campaign-meds", finalPatientIds],
-      enabled: usesMedication && finalPatientIds.length > 0 && step >= 3,
+      enabled: usesMedication && finalPatientIds.length > 0 && step >= 2,
       queryFn: async () => {
         const { data } = await supabase
           .from("medications")
@@ -274,9 +274,8 @@ export default function CampaignTab({
 
   const stepValid = (i: number): boolean => {
     if (i === 0) return !!selectedTemplate || freeBody.trim().length >= 3;
-    if (i === 1) return previewAud.length > 0;
-    if (i === 2) return finalRecipients.length > 0;
-    if (i === 3) {
+    if (i === 1) return previewAud.length > 0 && finalRecipients.length > 0;
+    if (i === 2) {
       if (renderedBody.trim().length < 3) return false;
       // Block advancing if every selected patient lacks meds for a medication template
       if (usesMedication && finalPatientIds.length > 0 && patientsWithoutMeds.length >= finalPatientIds.length) return false;
@@ -489,24 +488,23 @@ export default function CampaignTab({
               </div>
             )}
           </div>
+
+          <div className="space-y-2 pt-2 border-t border-border">
+            <Label className="text-xs uppercase">Destinatários</Label>
+            <p className="text-xs text-muted-foreground">
+              Confira a lista resultante e remova quem não deve receber.
+            </p>
+            <RecipientPreview
+              recipients={recipients}
+              loading={previewLoading}
+              selectedKeys={selected}
+              onChange={setSelected}
+            />
+          </div>
         </div>
       )}
 
       {step === 2 && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Confira a lista de destinatários e remova quem não deve receber.
-          </p>
-          <RecipientPreview
-            recipients={recipients}
-            loading={previewLoading}
-            selectedKeys={selected}
-            onChange={setSelected}
-          />
-        </div>
-      )}
-
-      {step === 3 && (
         <div className="space-y-4">
           {usesMedication && patientsWithoutMeds.length > 0 && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
@@ -653,7 +651,7 @@ export default function CampaignTab({
         </div>
       )}
 
-      {step === 4 && (
+      {step === 3 && (
         <div className="space-y-4 text-center py-6">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Send className="h-7 w-7" />
