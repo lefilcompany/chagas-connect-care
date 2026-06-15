@@ -18,7 +18,7 @@ import {
   Plus, Search, Send, Trash2, X, ArrowLeft, ArrowRight,
   Pill, Utensils, Moon, Activity, Users, Stethoscope,
   HeartHandshake, BookOpen, Layers, FolderOpen, MessageSquare,
-  Megaphone,
+  Megaphone, Folder, MoreVertical,
 } from "lucide-react";
 import { z } from "zod";
 import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
@@ -35,26 +35,24 @@ import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
 import type { MessageTemplate } from "@/lib/templates";
 import { useAuth } from "@/lib/auth";
 import { useNavigate } from "react-router-dom";
+import { useFolders, FALLBACK_FOLDER as FB_FOLDER, type FolderDef } from "@/hooks/useFolders";
+import { NewFolderDialog } from "@/components/app/content/NewFolderDialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-/** Canonical folders (themes). Each folder groups templates + educational content. */
-const FOLDERS: { value: string; label: string; icon: any; description: string }[] = [
-  { value: "medicacao",   label: "Medicação",         icon: Pill,           description: "Lembretes de dose, horários e adesão à medicação." },
-  { value: "alimentacao", label: "Alimentação",       icon: Utensils,       description: "Orientações nutricionais e hábitos alimentares." },
-  { value: "consulta",    label: "Consulta",          icon: Stethoscope,    description: "Confirmações, lembretes e preparo de consultas." },
-  { value: "adesao",      label: "Adesão",            icon: HeartHandshake, description: "Reforço de tratamento e acompanhamento." },
-  { value: "orientacao",  label: "Orientação",        icon: BookOpen,       description: "Materiais educativos e instruções gerais." },
-  { value: "sono",        label: "Sono",              icon: Moon,           description: "Higiene do sono e rotina de descanso." },
-  { value: "atividade",   label: "Atividade física",  icon: Activity,       description: "Recomendações de movimento e exercícios." },
-  { value: "familia",     label: "Família",           icon: Users,          description: "Conteúdos para familiares e cuidadores." },
-  { value: "geral",       label: "Geral",             icon: Layers,         description: "Mensagens variadas que não se encaixam em outras pastas." },
-];
-/** Backwards-compat: rows persisted with categories not in the canonical list fall here. */
-const FALLBACK_FOLDER = "geral";
-const CATEGORIES = FOLDERS.map((f) => ({ value: f.value, label: f.label }));
-
+/**
+ * Folders (themes) — base set + custom user folders.
+ * Helpers below read from a module-level reference updated by Content() via
+ * useFolders(), so subcomponents can call them at render time without prop drilling.
+ */
+let CURRENT_FOLDERS: FolderDef[] = [];
+let CURRENT_CATEGORIES: { value: string; label: string }[] = [];
+const FALLBACK_FOLDER = FB_FOLDER;
 const folderOf = (cat: string | null | undefined): string =>
-  FOLDERS.find((f) => f.value === cat)?.value ?? FALLBACK_FOLDER;
-const folderLabel = (cat: string) => FOLDERS.find((f) => f.value === cat)?.label ?? "Geral";
+  CURRENT_FOLDERS.find((f) => f.value === cat)?.value ?? FALLBACK_FOLDER;
+const folderLabel = (cat: string | null | undefined): string =>
+  CURRENT_FOLDERS.find((f) => f.value === cat)?.label ?? "Geral";
 
 const AUDIENCES = [
   { value: "paciente", label: "Paciente" },
