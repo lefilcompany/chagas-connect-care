@@ -66,12 +66,15 @@ export function TemplateEditorDialog({
   onOpenChange,
   editing,
   onSavedUse,
+  defaultCategory,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   editing: MessageTemplate | null;
   /** Called with the newly saved template id when the user clicks "Salvar e usar agora". */
   onSavedUse?: (template: MessageTemplate) => void;
+  /** Pre-selected category when creating a new template (ignored when editing). */
+  defaultCategory?: string;
 }) {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -106,9 +109,9 @@ export function TemplateEditorDialog({
         filters: (editing.filters as SegmentFilters) ?? emptyFilters(),
       });
     } else {
-      setForm(emptyForm());
+      setForm({ ...emptyForm(), category: defaultCategory ?? "geral" });
     }
-  }, [open, editing]);
+  }, [open, editing, defaultCategory]);
 
   const variables = useMemo(() => extractVariables(form.body), [form.body]);
 
