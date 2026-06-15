@@ -410,6 +410,19 @@ export default function CampaignTab({
             />
           </div>
 
+          <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3">
+            <Label className="text-xs uppercase">Restringir a pacientes específicos</Label>
+            <PatientMultiSelect
+              selected={patientIds}
+              onChange={setPatientIds}
+              placeholder="Todos os pacientes (sem restrição)"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Quando preenchido, o disparo (e os contatos vinculados) fica limitado a
+              estes pacientes — combina com qualquer modo de público abaixo.
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label className="text-xs uppercase">Público</Label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
