@@ -603,6 +603,58 @@ export default function PatientDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Step 1: pick a template */}
+      <Dialog
+        open={!!sendDialog && !pickedTemplate}
+        onOpenChange={(o) => { if (!o) setSendDialog(null); }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {sendDialog?.mode === "contact"
+                ? "Enviar a familiares de " + (patient?.full_name ?? "paciente")
+                : "Enviar ao paciente " + (patient?.full_name ?? "")}
+            </DialogTitle>
+            <DialogDescription>Escolha um modelo de mensagem para continuar.</DialogDescription>
+          </DialogHeader>
+          {activeTemplates.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum modelo ativo cadastrado. Crie um em <strong>Conteúdos</strong>.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border rounded-md border border-border max-h-[60vh] overflow-y-auto">
+              {activeTemplates.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => setPickedTemplate(t)}
+                    className="w-full text-left p-3 hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="font-medium text-sm">{t.name}</div>
+                    <div className="text-xs text-muted-foreground line-clamp-2">{t.body}</div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Step 2: actual UseTemplateDialog */}
+      <UseTemplateDialog
+        open={!!sendDialog && !!pickedTemplate}
+        onOpenChange={(o) => {
+          if (!o) {
+            setPickedTemplate(null);
+            setSendDialog(null);
+            loadAll();
+          }
+        }}
+        template={pickedTemplate}
+        lockedPatientId={id}
+        initialMode={sendDialog?.mode}
+      />
     </div>
   );
 }
