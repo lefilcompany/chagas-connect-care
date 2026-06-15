@@ -212,7 +212,7 @@ export default function Content() {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link to="/app/conteudos/campanha">
-              <Megaphone className="h-4 w-4" /> Disparar campanha
+              <Megaphone className="h-4 w-4" /> Disparar mensagem
             </Link>
           </Button>
           <Button variant="hero" onClick={() => { setCreateDefaultCategory(undefined); setCreateOpen(true); }}>
