@@ -14,10 +14,14 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Plus, CheckCircle2, XCircle,
   Users, Pill, MessageSquare, Activity, Phone, Building2,
-  Save, Trash2, Check, CheckCheck, Clock,
+  Save, Trash2, Check, CheckCheck, Clock, Send, ChevronDown,
 } from "lucide-react";
 import { z } from "zod";
 import { queueAndSend } from "@/lib/whatsapp";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
 
 function formatPhone(v: string) {
   const digits = v.replace(/\D/g, "");
@@ -42,6 +46,7 @@ export default function PatientDetail() {
   const [medDoseValue, setMedDoseValue] = useState("");
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
   const [msgToDelete, setMsgToDelete] = useState<string | null>(null);
+  const [sendDialog, setSendDialog] = useState<null | { mode: "patient" | "contact" }>(null);
 
   const loadAll = async () => {
     if (!id) return;
@@ -219,9 +224,27 @@ export default function PatientDetail() {
               {stageLabels[form.stage] ?? form.stage}
             </span>
           </div>
-          <Button size="sm" variant="hero" onClick={savePatient} disabled={saving || !hasChanges}>
-            <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar alterações"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Send className="h-4 w-4" /> Enviar mensagem
+                  <ChevronDown className="h-4 w-4 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => setSendDialog({ mode: "patient" })}>
+                  <Users className="h-4 w-4" /> Enviar ao paciente
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSendDialog({ mode: "contact" })}>
+                  <Users className="h-4 w-4" /> Enviar a familiares/contatos
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" variant="hero" onClick={savePatient} disabled={saving || !hasChanges}>
+              <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar alterações"}
+            </Button>
+          </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
