@@ -3,6 +3,40 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN") ?? "";
+const APP_SECRET = Deno.env.get("WHATSAPP_APP_SECRET") ?? "";
+
+function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.replace(/^sha256=/, "").trim();
+  if (clean.length % 2 !== 0) return new Uint8Array();
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(clean.substr(i * 2, 2), 16);
+  }
+  return out;
+}
+
+function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length || a.length === 0) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+async function verifyMetaSignature(rawBody: string, signatureHeader: string): Promise<boolean> {
+  if (!APP_SECRET || !signatureHeader) return false;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(APP_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody)),
+  );
+  const received = hexToBytes(signatureHeader);
+  return timingSafeEqual(sig, received);
+}
 
 function normalizeBR(p: string): string {
   const digits = (p ?? "").replace(/\D/g, "");
@@ -45,9 +79,24 @@ Deno.serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
+  // Read raw body for signature verification
+  const rawBody = await req.text();
+
+  // Fail closed: WHATSAPP_APP_SECRET must be configured to verify Meta payloads
+  if (!APP_SECRET) {
+    console.error("whatsapp-webhook: WHATSAPP_APP_SECRET not configured; rejecting POST");
+    return new Response("Server misconfigured", { status: 503 });
+  }
+
+  const sigHeader = req.headers.get("x-hub-signature-256") ?? "";
+  const valid = await verifyMetaSignature(rawBody, sigHeader);
+  if (!valid) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
   let payload: any;
   try {
-    payload = await req.json();
+    payload = JSON.parse(rawBody);
   } catch {
     return new Response("ok", { status: 200 });
   }
