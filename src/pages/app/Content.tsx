@@ -125,6 +125,13 @@ export default function Content() {
   const [createDefaultCategory, setCreateDefaultCategory] = useState<string | undefined>();
   const [editItem, setEditItem] = useState<ContentRow | null>(null);
   const [sendItem, setSendItem] = useState<ContentRow | null>(null);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+
+  // Merged folders (base + custom) — also kept on a module-level ref so
+  // descendant components can use folderOf/folderLabel without prop drilling.
+  const { folders, categories } = useFolders();
+  CURRENT_FOLDERS = folders;
+  CURRENT_CATEGORIES = categories;
 
   const allContent = items as ContentRow[];
   const activeTemplates = useMemo(
@@ -144,13 +151,13 @@ export default function Content() {
       const k = folderOf(c.category);
       ctByFolder.set(k, (ctByFolder.get(k) ?? 0) + 1);
     }
-    return FOLDERS.map((f) => ({
+    return folders.map((f) => ({
       ...f,
       templates: tplByFolder.get(f.value) ?? 0,
       contents: ctByFolder.get(f.value) ?? 0,
       total: (tplByFolder.get(f.value) ?? 0) + (ctByFolder.get(f.value) ?? 0),
     }));
-  }, [activeTemplates, allContent]);
+  }, [activeTemplates, allContent, folders]);
 
   // Global search across folders
   const searchTerm = q.trim().toLowerCase();
@@ -172,7 +179,9 @@ export default function Content() {
 
   // Folder detail view
   if (activeFolder) {
-    const folder = FOLDERS.find((f) => f.value === activeFolder) ?? FOLDERS[FOLDERS.length - 1];
+    const folder = folders.find((f) => f.value === activeFolder)
+      ?? folders[folders.length - 1];
+    if (!folder) return null;
     const folderTemplates = activeTemplates.filter((t) => folderOf(t.category) === folder.value);
     const folderContents = allContent.filter((c) => folderOf(c.category) === folder.value);
 
@@ -213,8 +222,8 @@ export default function Content() {
               <Megaphone className="h-4 w-4" /> Disparar mensagem
             </Link>
           </Button>
-          <Button variant="hero" onClick={() => { setCreateDefaultCategory(undefined); setCreateOpen(true); }}>
-            <Plus className="h-4 w-4" /> Novo conteúdo
+          <Button variant="hero" onClick={() => setNewFolderOpen(true)}>
+            <Plus className="h-4 w-4" /> Nova pasta
           </Button>
         </div>
       </header>
