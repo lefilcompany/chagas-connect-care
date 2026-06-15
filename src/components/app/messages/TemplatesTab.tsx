@@ -25,6 +25,7 @@ export default function TemplatesTab({
 }) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { categories: folderCategories } = useFolders();
   const { data: templates = [] } = useQuery<MessageTemplate[]>({
     queryKey: qk.templates,
     queryFn: fetchers.templates as () => Promise<MessageTemplate[]>,
@@ -116,7 +117,7 @@ export default function TemplatesTab({
           <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todas categorias</SelectItem>
-            {TEMPLATE_CATEGORIES.map((c) => (
+            {folderCategories.map((c) => (
               <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
             ))}
           </SelectContent>
