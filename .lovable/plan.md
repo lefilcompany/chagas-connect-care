@@ -1,99 +1,60 @@
-## Visão geral
+## Objetivo
 
-1. **Mensagens** vira **histórico puro** (sem disparo / cadastro). Três visualizações: linha do tempo, por paciente, tabela.
-2. **Conteúdos** vira **pastas por tema**. Cada pasta abre mostrando modelos de mensagem + conteúdos educativos daquele tema. Disparo de campanha sai daqui.
-3. **Envio direto** (1 paciente, 1+ familiares) sai da **ficha do paciente**, com modelo opcional.
-4. Nova segmentação: **"Pacientes específicos"** — escolho N pacientes e marco se quero atingir o paciente, familiares (filtrando por relação), cuidadores, médicos.
+Permitir:
+1. Segmentar campanhas para **familiares (ou cuidadores/médicos) de pacientes específicos**, não só "todos os familiares".
+2. Enviar uma mensagem (com ou sem modelo) para **um ou mais contatos** de um paciente, direto da ficha dele.
 
----
+A camada de dados já suporta `patient_ids` no `SegmentFilters` e `resolveRecipients` já aplica esse filtro. As mudanças são quase todas de UI e de fluxo no diálogo de envio.
 
-## Tela "Mensagens" — histórico
+## Mudanças
 
-Substitui a tela atual.
+### 1. `SegmentFiltersForm` — novo campo "Pacientes específicos"
+- Adiciona um `MultiSelect` (ou Command com busca) carregando todos os pacientes acessíveis (`patients` ordenados por nome).
+- Vincula em `filters.patient_ids`. Quando vazio, comportamento atual (todos).
+- Aparece no topo do form, com texto auxiliar: "Restringe o universo aos pacientes selecionados e seus contatos".
+- Usado automaticamente em: CampaignTab, TemplateEditorDialog (aba Segmentação) e SegmentEditor — não precisam de código novo.
 
-- Remove "Disparar mensagem", "Novo paciente", aba de Campanhas.
-- Cabeçalho "Histórico de mensagens" + filtros já existentes (busca, paciente, canal, status) e chips de filtros ativos.
-- **Toggle de visualização** no topo (Tabs):
-  - **Linha do tempo** — lista cronológica agrupada por dia (atual).
-  - **Por paciente** — agrupado, mostra contagem e última interação; expandir abre as mensagens daquele paciente.
-  - **Tabela** — Data | Paciente | Destinatário | Canal | Status | Trecho.
-- Diálogo de detalhe da mensagem permanece, mas troca "Reenviar" por "Ver paciente" e "Abrir modelo" (quando originada de template).
-- Rota `/app/mensagens/historico` é descontinuada; `/app/mensagens` passa a ser o histórico.
+### 2. CampaignTab — atalho de "pacientes específicos"
+- Acima dos filtros, um botão "Restringir a pacientes específicos" que pré-foca o novo seletor (mesmo campo do form), apenas como atalho visual.
+- Nada novo na lógica: usa o mesmo `filters.patient_ids` que o form preenche.
 
----
+### 3. `UseTemplateDialog` — modo "contato" passa a ser multi-seleção
+- Renomeia internamente `contactId: string` para `contactIds: string[]`.
+- No passo 0, quando `mode === "contact"`:
+  - Mantém o select de paciente (1).
+  - Substitui o select único de contato por uma lista de contatos do paciente, cada um com checkbox + nome + relação + telefone.
+  - Mostra contagem ("3 contatos selecionados").
+- Variáveis (passo 1): se houver placeholders dependentes do contato (`{contato_nome}` etc.), o auto-fill usa o **primeiro** contato como referência. Adiciona aviso "Variáveis dependentes do contato serão preenchidas individualmente no envio".
+- Revisão (passo 2): lista os destinatários (até 5 + "e mais X") e o total.
+- Envio: faz um loop por contato chamando `queueAndSendFromTemplate` com `contact_id` e re-rodando `autofillVariables` por contato (para preservar `{contato_nome}` correto).
+- Telemetria: toast final "X mensagens enviadas, Y falhas" quando houver mais de um.
 
-## Tela "Conteúdos" — pastas por tema
+### 4. Botão "Enviar mensagem" na ficha do paciente (`PatientDetail`)
+- Adiciona um `DropdownMenu` no header da ficha com duas ações:
+  - **Enviar ao paciente** → abre `UseTemplateDialog` com `mode="patient"`, paciente travado, modelo opcional.
+  - **Enviar a familiares** → abre `UseTemplateDialog` com `mode="contact"`, paciente travado, multi-seleção de contatos.
+- Para suportar isso, `UseTemplateDialog` ganha props opcionais:
+  - `lockedPatientId?: string` — quando setado, esconde o select de paciente e força esse id.
+  - `initialMode?: Mode` — define o modo inicial e oculta os outros cartões (opcional). Quando vier `lockedPatientId`, o cartão "Segmento" é ocultado.
+- `template` passa a aceitar `null` com fluxo de "mensagem livre" simples: novo campo de textarea no passo 1 quando não há modelo. (Se preferir manter obrigatório modelo, removo esse pedaço — pergunto se aparecer dúvida.)
 
-Duas camadas, mesma rota com `?pasta=<categoria>`.
-
-### Camada 1 — grade de pastas
-
-- Cards grandes por categoria (Medicação, Alimentação, Sono, Atividade, Família, Consulta, Adesão, Orientação, Geral), com ícone, nome e contagem (modelos + conteúdos).
-- Busca global no topo (encontra modelos/conteúdos em qualquer pasta).
-
-### Camada 2 — dentro de uma pasta
-
-- Breadcrumb "Conteúdos / Medicação" + voltar.
-- Duas seções:
-  - **Modelos de mensagem** — cards (`TemplateCard`), ações Usar / Editar / Duplicar. "Usar" abre o `UseTemplateDialog` evoluído (ver abaixo).
-  - **Conteúdos educativos** — cards do `content_library`, ações Enviar / Editar.
-- Botões "Novo modelo" e "Novo conteúdo" já chegam com a categoria pré-selecionada.
-
----
-
-## Envio: dois caminhos para o mesmo diálogo
-
-Um único componente `SendMessageDialog` (evolução do atual `UseTemplateDialog`) atende todos os casos. Pontos de entrada:
-
-- **Pastas em Conteúdos** → "Usar modelo" no card (campanha em massa ou direcionada).
-- **Ficha do paciente** → botão "Enviar mensagem" (já entra com paciente pré-selecionado e modo "contatos deste paciente").
-
-### Modos de destinatário no diálogo
-
-1. **1 paciente** (envio direto ao paciente).
-2. **Familiares/contatos de 1 paciente** — multi-seleção dos contatos do paciente, com filtro por relação. **(novo)**
-3. **Pacientes específicos** — escolho N pacientes (busca com chips) + marco quem é alvo: o paciente, familiares (relações), cuidadores, médicos. **(novo)**
-4. **Por tipo de público** (familiar/cuidador/etc.) — como hoje.
-5. **Segmento salvo / Filtros personalizados** — como hoje.
-
-Modelo de mensagem é **opcional** em todos os modos (pode digitar texto livre). Quando vem da pasta, o modelo já está selecionado.
-
----
-
-## Mudanças de dados (segmentação)
-
-Sem alteração de schema. Acrescentamos campos opcionais ao tipo de filtros em código:
-
-- `SegmentFilters` ganha:
-  - `patient_ids?: string[]` — restringe o universo de pacientes alvo.
-  - `relations?: string[]` — para familiar/cuidador, filtra por relação (mãe, pai, cônjuge, cuidador, etc.).
-- `TargetingMode` ganha `"specific_patients"`.
-- `resolveRecipients` em `src/lib/segments.ts` passa a respeitar esses dois campos.
-- Persistido no JSONB `filters` já existente em `audience_segments`, `message_templates`, `message_batches`, `content_library`.
-
----
+### 5. Pequenos ajustes
+- `qk` ganha (se não existir) chave para invalidar `dialog-contacts` ao mudar paciente.
+- `Recipient` e `resolveRecipients`: nenhuma mudança necessária.
+- Testes manuais nos cenários: (a) campanha para familiares de 2 pacientes, (b) ficha → enviar a 3 familiares, (c) modelo salvo com `patient_ids` selecionado.
 
 ## Detalhes técnicos
 
-- **Rotas (`src/App.tsx`)**: remover `/app/mensagens/historico`; `/app/mensagens` renderiza `MessageHistory` renomeado para `Messages`. Manter `/app/conteudos`.
-- **Arquivos a tocar**:
-  - `src/pages/app/Messages.tsx` — substituir conteúdo pelo de `MessageHistory.tsx` + toggle de 3 vistas.
-  - `src/pages/app/MessageHistory.tsx` — remover (ou virar redirect).
-  - `src/pages/app/Content.tsx` — refatorar em grade de pastas + visão de pasta (`useSearchParams("pasta")`).
-  - `src/pages/app/PatientDetail.tsx` — adicionar botão "Enviar mensagem" que abre `SendMessageDialog` com paciente fixo.
-  - `src/components/app/messages/UseTemplateDialog.tsx` → evoluir/renomear para `SendMessageDialog`, com os 5 modos acima e contato multi-select.
-  - `src/components/app/SegmentFilters.tsx` — UI para `patient_ids` (busca + chips de pacientes) e `relations` (chips).
-  - `src/lib/segments.ts` — novos campos + lógica em `resolveRecipients`.
-  - `src/lib/templates.ts` — unificar lista canônica de categorias com as de conteúdo, em `src/lib/content-folders.ts`.
-  - `CampaignTab` deixa de ser montado em Mensagens; sua lógica é absorvida por `SendMessageDialog` ou disparada a partir das pastas.
-- **AppLayout**: nada muda nos itens do menu.
-- **Compatibilidade**: dados antigos continuam funcionando (campos novos opcionais). `normalizeFilters` em `src/lib/queries.ts` ganha defaults `[]` para `patient_ids` e `relations`.
+- Componente novo `PatientMultiSelect` (em `src/components/app/PatientMultiSelect.tsx`) reutilizado pelo `SegmentFiltersForm` e pelo `CampaignTab`. Carrega via `qk.patients`.
+- `UseTemplateDialog`: refactor pequeno, isolado. Loop de envio sequencial (não paralelo) para não estourar rate-limit do WhatsApp; cada chamada usa `await`.
+- `PatientDetail`: importa `UseTemplateDialog`, gerencia `open` e `initialMode` localmente.
 
----
+## Arquivos
 
-## Fora do escopo desta entrega
+- `src/components/app/PatientMultiSelect.tsx` (novo)
+- `src/components/app/SegmentFilters.tsx`
+- `src/components/app/messages/CampaignTab.tsx`
+- `src/components/app/messages/UseTemplateDialog.tsx`
+- `src/pages/app/PatientDetail.tsx`
 
-- Mudanças de schema do banco.
-- Exportação CSV do histórico (pode ser uma próxima entrega).
-- "Calendário" de envios.
-- Notificações/automação de novas mensagens.
+Sem migrações, sem mudanças em edge functions.
