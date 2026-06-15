@@ -22,6 +22,12 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
+import { fetchers, qk } from "@/lib/queries";
+import type { MessageTemplate } from "@/lib/templates";
 
 function formatPhone(v: string) {
   const digits = v.replace(/\D/g, "");
@@ -47,6 +53,17 @@ export default function PatientDetail() {
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
   const [msgToDelete, setMsgToDelete] = useState<string | null>(null);
   const [sendDialog, setSendDialog] = useState<null | { mode: "patient" | "contact" }>(null);
+  const [pickedTemplate, setPickedTemplate] = useState<MessageTemplate | null>(null);
+
+  const { data: allTemplates = [] } = useQuery<MessageTemplate[]>({
+    queryKey: qk.templates,
+    queryFn: fetchers.templates as () => Promise<MessageTemplate[]>,
+    enabled: !!sendDialog,
+  });
+  const activeTemplates = useMemo(
+    () => allTemplates.filter((t) => t.is_active),
+    [allTemplates],
+  );
 
   const loadAll = async () => {
     if (!id) return;
