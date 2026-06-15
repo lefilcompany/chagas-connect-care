@@ -13,6 +13,7 @@ import { Plus, Search } from "lucide-react";
 import {
   TEMPLATE_CATEGORIES, type MessageTemplate,
 } from "@/lib/templates";
+import { useFolders } from "@/hooks/useFolders";
 import { StartBlankCard, TemplateCard } from "./TemplateCard";
 import { TemplateEditorDialog } from "./TemplateEditorDialog";
 import { UseTemplateDialog } from "./UseTemplateDialog";
