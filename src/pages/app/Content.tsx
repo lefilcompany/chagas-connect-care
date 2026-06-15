@@ -276,11 +276,6 @@ export default function Content() {
                     <MessageSquare className="h-3.5 w-3.5 text-brand" />
                     <span className="tabular-nums font-medium">{f.templates}</span> modelo{f.templates === 1 ? "" : "s"}
                   </span>
-                  <span className="text-muted-foreground/40">·</span>
-                  <span className="inline-flex items-center gap-1">
-                    <BookOpen className="h-3.5 w-3.5 text-brand" />
-                    <span className="tabular-nums font-medium">{f.contents}</span> conteúdo{f.contents === 1 ? "" : "s"}
-                  </span>
                   <span className="ml-auto inline-flex items-center gap-1 text-brand font-medium opacity-0 transition-opacity group-hover:opacity-100">
                     Abrir <ArrowRight className="h-3.5 w-3.5" />
                   </span>
