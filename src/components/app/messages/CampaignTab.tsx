@@ -488,24 +488,23 @@ export default function CampaignTab({
               </div>
             )}
           </div>
+
+          <div className="space-y-2 pt-2 border-t border-border">
+            <Label className="text-xs uppercase">Destinatários</Label>
+            <p className="text-xs text-muted-foreground">
+              Confira a lista resultante e remova quem não deve receber.
+            </p>
+            <RecipientPreview
+              recipients={recipients}
+              loading={previewLoading}
+              selectedKeys={selected}
+              onChange={setSelected}
+            />
+          </div>
         </div>
       )}
 
       {step === 2 && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Confira a lista de destinatários e remova quem não deve receber.
-          </p>
-          <RecipientPreview
-            recipients={recipients}
-            loading={previewLoading}
-            selectedKeys={selected}
-            onChange={setSelected}
-          />
-        </div>
-      )}
-
-      {step === 3 && (
         <div className="space-y-4">
           {usesMedication && patientsWithoutMeds.length > 0 && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
@@ -652,7 +651,7 @@ export default function CampaignTab({
         </div>
       )}
 
-      {step === 4 && (
+      {step === 3 && (
         <div className="space-y-4 text-center py-6">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Send className="h-7 w-7" />
