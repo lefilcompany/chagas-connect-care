@@ -80,7 +80,18 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  // Fetch the message
+  // Authorization: fetch through the caller's RLS-scoped client to ensure
+  // the user has access to this message (same institution / owner).
+  const { data: authorized, error: authzErr } = await authClient
+    .from("messages")
+    .select("id")
+    .eq("id", body.message_id)
+    .maybeSingle();
+  if (authzErr || !authorized) {
+    return json(403, { error: "Forbidden" });
+  }
+
+  // Fetch the message with admin client for full field access
   const { data: msg, error: msgErr } = await admin
     .from("messages")
     .select("id, patient_id, contact_id, channel, body, status, template_id, template_variables, send_attempts")
