@@ -8,6 +8,7 @@ import { SegmentFilters } from "@/lib/segments";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PatientMultiSelect } from "@/components/app/PatientMultiSelect";
 
 const UF_LIST: { value: string; label: string }[] = [
   { value: "AC", label: "Acre" }, { value: "AL", label: "Alagoas" }, { value: "AP", label: "Amapá" },
@@ -203,6 +204,19 @@ export function SegmentFiltersForm({
 
   return (
     <div className="space-y-5">
+      <div className="space-y-1.5">
+        <Label>Pacientes específicos</Label>
+        <PatientMultiSelect
+          selected={filters.patient_ids ?? []}
+          onChange={(ids) => onFiltersChange({ ...filters, patient_ids: ids })}
+          placeholder="Todos os pacientes (sem restrição)"
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Restringe o universo a estes pacientes e seus contatos vinculados.
+          Deixe vazio para considerar todos.
+        </p>
+      </div>
+
       <div className="space-y-2">
         <Label>Etapa do paciente</Label>
         <div className="flex flex-wrap gap-2">

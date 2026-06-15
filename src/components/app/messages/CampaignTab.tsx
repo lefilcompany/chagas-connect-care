@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
 import { RecipientPreview } from "@/components/app/RecipientPreview";
+import { PatientMultiSelect } from "@/components/app/PatientMultiSelect";
 import {
   ALL_AUDIENCES, AUDIENCE_LABELS, AudienceType, Recipient, SegmentDef,
   SegmentFilters, TargetingMode, emptyFilters, resolveRecipients,
@@ -57,6 +58,8 @@ export default function CampaignTab({
   const [aud, setAud] = useState<AudienceType[]>(["paciente"]);
   const [segmentId, setSegmentId] = useState<string | null>(null);
   const [filters, setFilters] = useState<SegmentFilters>(emptyFilters());
+  // Patient restriction is independent of `mode` — always merged into effective filters.
+  const [patientIds, setPatientIds] = useState<string[]>([]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
@@ -139,13 +142,18 @@ export default function CampaignTab({
   }, [mode, aud, segmentId, segments]);
 
   const previewFilters = useMemo<SegmentFilters>(() => {
-    if (mode === "filters") return filters;
-    if (mode === "segment") {
+    let base: SegmentFilters;
+    if (mode === "filters") base = filters;
+    else if (mode === "segment") {
       const s = segments.find((x) => x.id === segmentId);
-      return (s?.filters as SegmentFilters) ?? emptyFilters();
+      base = (s?.filters as SegmentFilters) ?? emptyFilters();
+    } else base = emptyFilters();
+    if (patientIds.length) {
+      const merged = new Set([...(base.patient_ids ?? []), ...patientIds]);
+      return { ...base, patient_ids: Array.from(merged) };
     }
-    return emptyFilters();
-  }, [mode, filters, segmentId, segments]);
+    return base;
+  }, [mode, filters, segmentId, segments, patientIds]);
 
   const { data: recipients = [], isLoading: previewLoading } = useQuery<Recipient[]>({
     queryKey: ["campaign-recipients", previewAud, previewFilters],
@@ -297,7 +305,11 @@ export default function CampaignTab({
       targeting_mode: mode,
       audience_types: previewAud,
       segment_id: mode === "segment" ? segmentId : null,
-      filters: mode === "filters" ? (filters as any) : {},
+      filters: (mode === "filters"
+        ? { ...filters, patient_ids: previewFilters.patient_ids ?? [] }
+        : patientIds.length
+          ? { patient_ids: patientIds }
+          : {}) as any,
       created_by: user?.id ?? null,
       medication_mode: medicationMode,
     });
@@ -318,6 +330,7 @@ export default function CampaignTab({
     setCampaignName("");
     setVars({});
     setSelected(new Set());
+    setPatientIds([]);
   };
 
   return (
@@ -395,6 +408,19 @@ export default function CampaignTab({
               onChange={(e) => setCampaignName(e.target.value)}
               placeholder="Ex: Lembrete consulta — março"
             />
+          </div>
+
+          <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3">
+            <Label className="text-xs uppercase">Restringir a pacientes específicos</Label>
+            <PatientMultiSelect
+              selected={patientIds}
+              onChange={setPatientIds}
+              placeholder="Todos os pacientes (sem restrição)"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Quando preenchido, o disparo (e os contatos vinculados) fica limitado a
+              estes pacientes — combina com qualquer modo de público abaixo.
+            </p>
           </div>
 
           <div className="space-y-2">

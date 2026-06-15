@@ -14,10 +14,20 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Plus, CheckCircle2, XCircle,
   Users, Pill, MessageSquare, Activity, Phone, Building2,
-  Save, Trash2, Check, CheckCheck, Clock,
+  Save, Trash2, Check, CheckCheck, Clock, Send, ChevronDown,
 } from "lucide-react";
 import { z } from "zod";
 import { queueAndSend } from "@/lib/whatsapp";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
+import { fetchers, qk } from "@/lib/queries";
+import type { MessageTemplate } from "@/lib/templates";
 
 function formatPhone(v: string) {
   const digits = v.replace(/\D/g, "");
@@ -42,6 +52,18 @@ export default function PatientDetail() {
   const [medDoseValue, setMedDoseValue] = useState("");
   const [medDoseUnit, setMedDoseUnit] = useState("mg");
   const [msgToDelete, setMsgToDelete] = useState<string | null>(null);
+  const [sendDialog, setSendDialog] = useState<null | { mode: "patient" | "contact" }>(null);
+  const [pickedTemplate, setPickedTemplate] = useState<MessageTemplate | null>(null);
+
+  const { data: allTemplates = [] } = useQuery<MessageTemplate[]>({
+    queryKey: qk.templates,
+    queryFn: fetchers.templates as () => Promise<MessageTemplate[]>,
+    enabled: !!sendDialog,
+  });
+  const activeTemplates = useMemo(
+    () => allTemplates.filter((t) => t.is_active),
+    [allTemplates],
+  );
 
   const loadAll = async () => {
     if (!id) return;
@@ -219,9 +241,27 @@ export default function PatientDetail() {
               {stageLabels[form.stage] ?? form.stage}
             </span>
           </div>
-          <Button size="sm" variant="hero" onClick={savePatient} disabled={saving || !hasChanges}>
-            <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar alterações"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Send className="h-4 w-4" /> Enviar mensagem
+                  <ChevronDown className="h-4 w-4 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => setSendDialog({ mode: "patient" })}>
+                  <Users className="h-4 w-4" /> Enviar ao paciente
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSendDialog({ mode: "contact" })}>
+                  <Users className="h-4 w-4" /> Enviar a familiares/contatos
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" variant="hero" onClick={savePatient} disabled={saving || !hasChanges}>
+              <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar alterações"}
+            </Button>
+          </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
@@ -563,6 +603,58 @@ export default function PatientDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Step 1: pick a template */}
+      <Dialog
+        open={!!sendDialog && !pickedTemplate}
+        onOpenChange={(o) => { if (!o) setSendDialog(null); }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {sendDialog?.mode === "contact"
+                ? "Enviar a familiares de " + (patient?.full_name ?? "paciente")
+                : "Enviar ao paciente " + (patient?.full_name ?? "")}
+            </DialogTitle>
+            <DialogDescription>Escolha um modelo de mensagem para continuar.</DialogDescription>
+          </DialogHeader>
+          {activeTemplates.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum modelo ativo cadastrado. Crie um em <strong>Conteúdos</strong>.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border rounded-md border border-border max-h-[60vh] overflow-y-auto">
+              {activeTemplates.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => setPickedTemplate(t)}
+                    className="w-full text-left p-3 hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="font-medium text-sm">{t.name}</div>
+                    <div className="text-xs text-muted-foreground line-clamp-2">{t.body}</div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Step 2: actual UseTemplateDialog */}
+      <UseTemplateDialog
+        open={!!sendDialog && !!pickedTemplate}
+        onOpenChange={(o) => {
+          if (!o) {
+            setPickedTemplate(null);
+            setSendDialog(null);
+            loadAll();
+          }
+        }}
+        template={pickedTemplate}
+        lockedPatientId={id}
+        initialMode={sendDialog?.mode}
+      />
     </div>
   );
 }
