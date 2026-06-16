@@ -5,6 +5,7 @@ import { fetchers, qk } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PatientMultiSelect } from "@/components/app/PatientMultiSelect";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -55,15 +56,29 @@ export default function Messages() {
 
   const [view, setView] = useState<ViewMode>("timeline");
   const [q, setQ] = useState("");
-  const [patientFilter, setPatientFilter] = useState<string>("todos");
+  const [patientFilter, setPatientFilter] = useState<string[]>([]);
+  const [recipientTypeFilter, setRecipientTypeFilter] = useState<string>("todos");
   const [channelFilter, setChannelFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [detail, setDetail] = useState<any | null>(null);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
+    const patientSet = new Set(patientFilter);
     return msgs.filter((m: any) => {
-      if (patientFilter !== "todos" && m.patient_id !== patientFilter) return false;
+      if (patientSet.size > 0 && !patientSet.has(m.patient_id)) return false;
+      if (recipientTypeFilter !== "todos") {
+        const relation = (m.contact?.relation ?? "").toLowerCase();
+        if (recipientTypeFilter === "paciente") {
+          if (m.contact) return false;
+        } else if (recipientTypeFilter === "familiar") {
+          if (!m.contact || !["familiar", "família", "familia"].includes(relation)) return false;
+        } else if (recipientTypeFilter === "cuidador") {
+          if (!m.contact || relation !== "cuidador") return false;
+        } else if (recipientTypeFilter === "familiar_cuidador") {
+          if (!m.contact || !["familiar", "família", "familia", "cuidador"].includes(relation)) return false;
+        }
+      }
       if (channelFilter !== "todos" && m.channel !== channelFilter) return false;
       if (statusFilter !== "todos") {
         const meta = statusMeta[m.status];
@@ -77,17 +92,41 @@ export default function Messages() {
         (m.contact?.full_name ?? "").toLowerCase().includes(term)
       );
     });
-  }, [msgs, q, patientFilter, channelFilter, statusFilter]);
+  }, [msgs, q, patientFilter, recipientTypeFilter, channelFilter, statusFilter]);
 
   const recipientLabel = (m: any) =>
     m.contact ? `${m.contact.full_name} (${m.contact.relation})` : m.patients?.full_name ?? "—";
   const recipientPhone = (m: any) => m.contact?.phone ?? m.patients?.phone ?? "—";
 
-  const patientLabel = patients.find((p) => p.id === patientFilter)?.full_name;
+  const patientNameById = useMemo(
+    () => new Map(patients.map((p) => [p.id, p.full_name])),
+    [patients],
+  );
+  const recipientTypeLabels: Record<string, string> = {
+    paciente: "Apenas pacientes",
+    familiar: "Apenas familiares",
+    cuidador: "Apenas cuidadores",
+    familiar_cuidador: "Familiares e cuidadores",
+  };
   const activeFilters: { key: string; label: string; value: string; clear: () => void }[] = [
     ...(q ? [{ key: "q", label: "Busca", value: q, clear: () => setQ("") }] : []),
-    ...(patientFilter !== "todos" && patientLabel
-      ? [{ key: "p", label: "Paciente", value: patientLabel, clear: () => setPatientFilter("todos") }]
+    ...(patientFilter.length > 0
+      ? [{
+          key: "p",
+          label: patientFilter.length === 1 ? "Paciente" : "Pacientes",
+          value: patientFilter.length === 1
+            ? (patientNameById.get(patientFilter[0]) ?? "—")
+            : `${patientFilter.length} selecionados`,
+          clear: () => setPatientFilter([]),
+        }]
+      : []),
+    ...(recipientTypeFilter !== "todos"
+      ? [{
+          key: "rt",
+          label: "Destinatário",
+          value: recipientTypeLabels[recipientTypeFilter] ?? recipientTypeFilter,
+          clear: () => setRecipientTypeFilter("todos"),
+        }]
       : []),
     ...(channelFilter !== "todos"
       ? [{ key: "c", label: "Canal", value: channelFilter, clear: () => setChannelFilter("todos") }]
@@ -97,7 +136,11 @@ export default function Messages() {
       : []),
   ];
   const clearAllFilters = () => {
-    setQ(""); setPatientFilter("todos"); setChannelFilter("todos"); setStatusFilter("todos");
+    setQ("");
+    setPatientFilter([]);
+    setRecipientTypeFilter("todos");
+    setChannelFilter("todos");
+    setStatusFilter("todos");
   };
 
   return (
@@ -117,7 +160,7 @@ export default function Messages() {
 
       <div className="rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-          <div className="flex flex-col gap-1 lg:col-span-5 sm:col-span-2">
+          <div className="flex flex-col gap-1 lg:col-span-4 sm:col-span-2">
             <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Buscar</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -140,18 +183,27 @@ export default function Messages() {
             </div>
           </div>
           <div className="flex flex-col gap-1 min-w-0 lg:col-span-3">
-            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Paciente</Label>
-            <Select value={patientFilter} onValueChange={setPatientFilter}>
+            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Pacientes</Label>
+            <PatientMultiSelect
+              selected={patientFilter}
+              onChange={setPatientFilter}
+              placeholder="Todos os pacientes"
+            />
+          </div>
+          <div className="flex flex-col gap-1 min-w-0 lg:col-span-3">
+            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Destinatário</Label>
+            <Select value={recipientTypeFilter} onValueChange={setRecipientTypeFilter}>
               <SelectTrigger className="h-10 bg-background w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos os pacientes</SelectItem>
-                {patients.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                ))}
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="paciente">Apenas pacientes</SelectItem>
+                <SelectItem value="familiar_cuidador">Familiares e cuidadores</SelectItem>
+                <SelectItem value="familiar">Apenas familiares</SelectItem>
+                <SelectItem value="cuidador">Apenas cuidadores</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-1 min-w-0 lg:col-span-2">
+          <div className="flex flex-col gap-1 min-w-0 lg:col-span-1">
             <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Canal</Label>
             <Select value={channelFilter} onValueChange={setChannelFilter}>
               <SelectTrigger className="h-10 bg-background w-full"><SelectValue /></SelectTrigger>
