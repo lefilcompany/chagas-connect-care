@@ -69,17 +69,14 @@ export default function Messages() {
     const patientSet = new Set(patientFilter);
     return msgs.filter((m: any) => {
       if (patientSet.size > 0 && !patientSet.has(m.patient_id)) return false;
-      if (recipientTypeFilter !== "todos") {
+      if (recipientTypeFilter.length > 0) {
         const relation = (m.contact?.relation ?? "").toLowerCase();
-        if (recipientTypeFilter === "paciente") {
-          if (m.contact) return false;
-        } else if (recipientTypeFilter === "familiar") {
-          if (!m.contact || !["familiar", "família", "familia"].includes(relation)) return false;
-        } else if (recipientTypeFilter === "cuidador") {
-          if (!m.contact || relation !== "cuidador") return false;
-        } else if (recipientTypeFilter === "familiar_cuidador") {
-          if (!m.contact || !["familiar", "família", "familia", "cuidador"].includes(relation)) return false;
-        }
+        let matches = false;
+        if (recipientTypeFilter.includes("paciente") && !m.contact) matches = true;
+        if (recipientTypeFilter.includes("familiar") && m.contact && ["familiar", "família", "familia"].includes(relation)) matches = true;
+        if (recipientTypeFilter.includes("cuidador") && m.contact && relation === "cuidador") matches = true;
+        if (recipientTypeFilter.includes("familiar_cuidador") && m.contact && ["familiar", "família", "familia", "cuidador"].includes(relation)) matches = true;
+        if (!matches) return false;
       }
       if (channelFilter !== "todos" && m.channel !== channelFilter) return false;
       if (statusFilter !== "todos") {
