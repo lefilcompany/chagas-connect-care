@@ -160,7 +160,7 @@ export default function Messages() {
 
       <div className="rounded-2xl border border-border bg-card p-3 sm:p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-          <div className="flex flex-col gap-1 lg:col-span-4 sm:col-span-2">
+          <div className="flex flex-col gap-1 lg:col-span-3 sm:col-span-2">
             <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Buscar</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -190,7 +190,7 @@ export default function Messages() {
               placeholder="Todos os pacientes"
             />
           </div>
-          <div className="flex flex-col gap-1 min-w-0 lg:col-span-3">
+          <div className="flex flex-col gap-1 min-w-0 lg:col-span-2">
             <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Destinatário</Label>
             <Select value={recipientTypeFilter} onValueChange={setRecipientTypeFilter}>
               <SelectTrigger className="h-10 bg-background w-full"><SelectValue /></SelectTrigger>
@@ -203,7 +203,7 @@ export default function Messages() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-1 min-w-0 lg:col-span-1">
+          <div className="flex flex-col gap-1 min-w-0 lg:col-span-2">
             <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Canal</Label>
             <Select value={channelFilter} onValueChange={setChannelFilter}>
               <SelectTrigger className="h-10 bg-background w-full"><SelectValue /></SelectTrigger>
