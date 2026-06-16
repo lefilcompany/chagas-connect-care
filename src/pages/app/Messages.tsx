@@ -59,7 +59,7 @@ export default function Messages() {
   const [view, setView] = useState<ViewMode>("timeline");
   const [q, setQ] = useState("");
   const [patientFilter, setPatientFilter] = useState<string[]>([]);
-  const [recipientTypeFilter, setRecipientTypeFilter] = useState<string>("todos");
+  const [recipientTypeFilter, setRecipientTypeFilter] = useState<string[]>([]);
   const [channelFilter, setChannelFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [detail, setDetail] = useState<any | null>(null);
