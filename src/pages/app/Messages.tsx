@@ -139,7 +139,7 @@ export default function Messages() {
   const clearAllFilters = () => {
     setQ("");
     setPatientFilter([]);
-    setRecipientTypeFilter("todos");
+    setRecipientTypeFilter([]);
     setChannelFilter("todos");
     setStatusFilter("todos");
   };
