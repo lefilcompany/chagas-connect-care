@@ -12,6 +12,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Search, History as HistoryIcon, Check, CheckCheck, Clock,
   X, ArrowRight, ChevronDown, ChevronUp, User as UserIcon,
