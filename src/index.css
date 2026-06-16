@@ -113,3 +113,20 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/**
+ * Prevent layout shift / flicker when Radix overlays (Select, Popover,
+ * Dialog, DropdownMenu) lock body scroll. Without this, opening an
+ * overlay removes the scrollbar and adds compensating padding, causing
+ * the whole page to jump horizontally on every interaction.
+ */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Radix sets `padding-right` on body when it locks scroll — neutralize it
+   because the gutter above already reserves the space. */
+body[data-scroll-locked] {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
+}
