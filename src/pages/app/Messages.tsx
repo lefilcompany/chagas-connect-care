@@ -102,9 +102,9 @@ export default function Messages() {
     [patients],
   );
   const recipientTypeLabels: Record<string, string> = {
-    paciente: "Apenas pacientes",
-    familiar: "Apenas familiares",
-    cuidador: "Apenas cuidadores",
+    paciente: "Pacientes",
+    familiar: "Familiares",
+    cuidador: "Cuidadores",
     familiar_cuidador: "Familiares e cuidadores",
   };
   const activeFilters: { key: string; label: string; value: string; clear: () => void }[] = [
