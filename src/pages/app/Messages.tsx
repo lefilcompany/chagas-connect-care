@@ -49,6 +49,71 @@ function StatusBadge({ status }: { status: string }) {
 
 type ViewMode = "timeline" | "patient" | "table";
 
+const recipientTypeOptions = [
+  { value: "paciente", label: "Pacientes" },
+  { value: "familiar", label: "Familiares" },
+  { value: "cuidador", label: "Cuidadores" },
+  { value: "familiar_cuidador", label: "Familiares e cuidadores" },
+];
+
+function RecipientTypeMultiSelect({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedSet = new Set(selected);
+  const toggle = (value: string) => {
+    if (selectedSet.has(value)) {
+      onChange(selected.filter((v) => v !== value));
+    } else {
+      onChange([...selected, value]);
+    }
+  };
+  const displayText =
+    selected.length === 0
+      ? "Todos os destinatários"
+      : selected.length === 1
+        ? (recipientTypeOptions.find((o) => o.value === selected[0])?.label ?? selected[0])
+        : `${selected.length} selecionados`;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="h-10 bg-background w-full justify-between font-normal text-sm px-3"
+        >
+          <span className="truncate">{displayText}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2" align="start">
+        <div className="space-y-0.5">
+          {recipientTypeOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggle(opt.value)}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+            >
+              <Checkbox
+                checked={selectedSet.has(opt.value)}
+                onCheckedChange={() => toggle(opt.value)}
+                className="pointer-events-none"
+              />
+              <span className="flex-1 text-left">{opt.label}</span>
+              {selectedSet.has(opt.value) && <Check className="h-4 w-4 shrink-0 text-primary" />}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function Messages() {
   const { data: msgs = [] } = useQuery({ queryKey: qk.messages, queryFn: fetchers.messages });
   const { data: patients = [] } = useQuery({
