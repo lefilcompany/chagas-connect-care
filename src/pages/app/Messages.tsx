@@ -119,12 +119,14 @@ export default function Messages() {
           clear: () => setPatientFilter([]),
         }]
       : []),
-    ...(recipientTypeFilter !== "todos"
+    ...(recipientTypeFilter.length > 0
       ? [{
           key: "rt",
           label: "Destinatário",
-          value: recipientTypeLabels[recipientTypeFilter] ?? recipientTypeFilter,
-          clear: () => setRecipientTypeFilter("todos"),
+          value: recipientTypeFilter.length === 1
+            ? (recipientTypeLabels[recipientTypeFilter[0]] ?? recipientTypeFilter[0])
+            : `${recipientTypeFilter.length} selecionados`,
+          clear: () => setRecipientTypeFilter([]),
         }]
       : []),
     ...(channelFilter !== "todos"
