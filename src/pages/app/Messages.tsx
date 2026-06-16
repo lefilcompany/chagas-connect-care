@@ -193,16 +193,7 @@ export default function Messages() {
           </div>
           <div className="flex flex-col gap-1 min-w-0 lg:col-span-2">
             <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Destinatário</Label>
-            <Select value={recipientTypeFilter} onValueChange={setRecipientTypeFilter}>
-              <SelectTrigger className="h-10 bg-background w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="paciente">Apenas pacientes</SelectItem>
-                <SelectItem value="familiar_cuidador">Familiares e cuidadores</SelectItem>
-                <SelectItem value="familiar">Apenas familiares</SelectItem>
-                <SelectItem value="cuidador">Apenas cuidadores</SelectItem>
-              </SelectContent>
-            </Select>
+            <RecipientTypeMultiSelect selected={recipientTypeFilter} onChange={setRecipientTypeFilter} />
           </div>
           <div className="flex flex-col gap-1 min-w-0 lg:col-span-2">
             <Label className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Canal</Label>
