@@ -11,11 +11,29 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 /** Heuristic: variable name suggests a calendar date. */
 export function isDateVariable(key: string): boolean {
   const k = key.toLowerCase();
-  if (/(hora|horario|hour|time)/.test(k)) return false;
+  if (/(hora|horario|hour|time|horario_inicio|horario_fim|horario_consulta|hora_consulta|hora_medicacao)/.test(k)) return false;
   return /(^|_)(data|date|dia|vencimento|prazo|agendamento|retorno|consulta_em|nascimento)(_|$)/.test(k)
     || k === "data"
     || k.startsWith("data_")
     || k.endsWith("_data");
+}
+
+/** Heuristic: variable name suggests a time (hour). */
+export function isTimeVariable(key: string): boolean {
+  const k = key.toLowerCase();
+  return /(^|_)(hora|horario|hour|time)(_|$)/.test(k)
+    || k.startsWith("hora_")
+    || k.startsWith("horario_")
+    || k.endsWith("_hora")
+    || k.endsWith("_horario");
+}
+
+function formatTimeInput(raw: string): string {
+  // Remove non-digits
+  const digits = raw.replace(/\D/g, "");
+  // Format as HH:mm
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2, 4)}`;
 }
 
 const DATE_FMT = "dd/MM/yyyy";
