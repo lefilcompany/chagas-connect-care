@@ -59,7 +59,14 @@ export function CepAddressFields({ defaultCep = "", defaultAddress = "", default
               onChange={(e) => {
                 const v = formatCep(e.target.value);
                 setCep(v);
-                if (v.replace(/\D/g, "").length === 8) lookup(v);
+                const digits = v.replace(/\D/g, "");
+                if (digits.length === 8) {
+                  lookup(v);
+                } else if (digits.length === 0) {
+                  setAddress("");
+                  setCity("");
+                  setStateUf("");
+                }
               }}
               onBlur={(e) => lookup(e.target.value)}
             />
