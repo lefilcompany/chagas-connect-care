@@ -15,6 +15,9 @@ export type MessageTemplate = {
   description: string;
   category: string;
   body: string;
+  body_patient?: string | null;
+  body_contact?: string | null;
+  body_segment?: string | null;
   variables: string[];
   targeting_mode: TargetingMode;
   audience_types: AudienceType[];
@@ -34,6 +37,32 @@ export type MessageTemplate = {
   created_at: string;
   updated_at: string;
 };
+
+/** Recipient variants supported by an objetivo (template). */
+export type TemplateVariant = "patient" | "contact" | "segment";
+
+export const VARIANT_LABEL: Record<TemplateVariant, string> = {
+  patient: "Paciente",
+  contact: "Familiar/Cuidador",
+  segment: "Segmento",
+};
+
+/**
+ * Returns the body for the requested variant with sensible fallbacks:
+ * requested variant → body_patient → legacy body. Never returns null.
+ */
+export function pickVariantBody(
+  template: Pick<MessageTemplate, "body" | "body_patient" | "body_contact" | "body_segment">,
+  variant: TemplateVariant,
+): string {
+  const key = (
+    { patient: "body_patient", contact: "body_contact", segment: "body_segment" } as const
+  )[variant];
+  const v = (template as any)[key];
+  if (typeof v === "string" && v.trim().length > 0) return v;
+  if (template.body_patient && template.body_patient.trim().length > 0) return template.body_patient;
+  return template.body ?? "";
+}
 
 const VAR_RE = /\{([a-zA-Z0-9_]+)\}/g;
 
