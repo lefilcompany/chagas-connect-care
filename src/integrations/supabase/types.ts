@@ -364,6 +364,9 @@ export type Database = {
         Row: {
           audience_types: string[]
           body: string
+          body_contact: string | null
+          body_patient: string | null
+          body_segment: string | null
           category: string
           channel: string
           created_at: string
@@ -389,6 +392,9 @@ export type Database = {
         Insert: {
           audience_types?: string[]
           body: string
+          body_contact?: string | null
+          body_patient?: string | null
+          body_segment?: string | null
           category?: string
           channel?: string
           created_at?: string
@@ -414,6 +420,9 @@ export type Database = {
         Update: {
           audience_types?: string[]
           body?: string
+          body_contact?: string | null
+          body_patient?: string | null
+          body_segment?: string | null
           category?: string
           channel?: string
           created_at?: string
