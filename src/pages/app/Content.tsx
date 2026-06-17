@@ -213,7 +213,7 @@ export default function Content() {
         <div>
           <h1 className="font-display text-3xl font-bold text-brand">Conteúdos educativos</h1>
           <p className="text-muted-foreground mt-1">
-            Modelos de mensagem e materiais educativos organizados por tema. Abra uma pasta para enviar ou gerenciar conteúdos daquele tema.
+            Objetivos de mensagem e materiais educativos organizados por tema. Abra uma pasta para enviar ou gerenciar conteúdos daquele tema.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -234,7 +234,7 @@ export default function Content() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar em todas as pastas (modelos e conteúdos)..."
+            placeholder="Buscar em todas as pastas (objetivos e conteúdos)..."
             className="pl-9 w-full"
           />
           {q && (
@@ -288,7 +288,7 @@ export default function Content() {
                           className="text-destructive focus:text-destructive"
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (!confirm(`Excluir a pasta "${f.label}"? Modelos e conteúdos dentro dela permanecerão, mas voltarão à pasta Geral.`)) return;
+                            if (!confirm(`Excluir a pasta "${f.label}"? Objetivos e conteúdos dentro dela permanecerão, mas voltarão à pasta Geral.`)) return;
                             const { error } = await supabase.from("content_folders").delete().eq("id", folderId);
                             if (error) return toast.error(error.message);
                             toast.success("Pasta excluída");
@@ -384,7 +384,7 @@ function SearchResults({
       {templates.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Modelos · {templates.length}
+            Objetivos · {templates.length}
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {templates.map((t) => (
@@ -490,6 +490,9 @@ function FolderDetail({
       description: t.description,
       category: t.category,
       body: t.body,
+      body_patient: t.body_patient ?? t.body,
+      body_contact: t.body_contact ?? null,
+      body_segment: t.body_segment ?? null,
       variables: t.variables,
       template_kind: "internal",
       meta_language: t.meta_language,
@@ -502,7 +505,7 @@ function FolderDetail({
       is_default: false,
     } as any);
     if (error) return toast.error(error.message);
-    toast.success("Modelo duplicado");
+    toast.success("Objetivo duplicado");
     qc.invalidateQueries({ queryKey: qk.templates });
   };
 
@@ -539,7 +542,7 @@ function FolderDetail({
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-display text-lg font-bold text-brand inline-flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" /> Modelos de mensagem
+            <MessageSquare className="h-5 w-5" /> Objetivos de mensagem
             <span className="text-xs font-normal text-muted-foreground">({sortedTemplates.length})</span>
           </h2>
           <div className="flex items-center gap-2">
@@ -555,7 +558,7 @@ function FolderDetail({
               size="sm"
               onClick={() => { setEditingTpl(null); setEditorOpen(true); }}
             >
-              <Plus className="h-4 w-4" /> Novo modelo
+              <Plus className="h-4 w-4" /> Novo objetivo
             </Button>
           </div>
         </div>
@@ -573,7 +576,7 @@ function FolderDetail({
         </div>
         {sortedTemplates.length === 0 && (
           <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-            Nenhum modelo nesta pasta ainda. Clique em <strong className="text-brand">Novo modelo</strong> para criar.
+            Nenhum objetivo nesta pasta ainda. Clique em <strong className="text-brand">Novo objetivo</strong> para criar.
           </div>
         )}
       </section>

@@ -22,6 +22,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Save, SendHorizontal } from "lu
 import {
   TEMPLATE_CATEGORIES, META_STATUS_LABEL, VARIABLE_SUGGESTIONS,
   extractVariables, type MessageTemplate, type TemplateKind, type MetaStatus,
+  type TemplateVariant, VARIANT_LABEL,
 } from "@/lib/templates";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
@@ -34,7 +35,9 @@ type Form = {
   name: string;
   description: string;
   category: string;
-  body: string;
+  body_patient: string;
+  body_contact: string;
+  body_segment: string;
   template_kind: TemplateKind;
   meta_template_name: string;
   meta_language: string;
@@ -49,7 +52,9 @@ const emptyForm = (): Form => ({
   name: "",
   description: "",
   category: "geral",
-  body: "",
+  body_patient: "",
+  body_contact: "",
+  body_segment: "",
   template_kind: "internal",
   meta_template_name: "",
   meta_language: "pt_BR",
@@ -84,6 +89,7 @@ export function TemplateEditorDialog({
   const [form, setForm] = useState<Form>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [institution, setInstitution] = useState("");
+  const [activeVariant, setActiveVariant] = useState<TemplateVariant>("patient");
 
   useEffect(() => {
     if (user) {
@@ -100,7 +106,9 @@ export function TemplateEditorDialog({
         name: editing.name,
         description: editing.description ?? "",
         category: editing.category,
-        body: editing.body,
+        body_patient: editing.body_patient ?? editing.body ?? "",
+        body_contact: editing.body_contact ?? "",
+        body_segment: editing.body_segment ?? "",
         template_kind: editing.template_kind,
         meta_template_name: editing.meta_template_name ?? "",
         meta_language: editing.meta_language ?? "pt_BR",
@@ -113,18 +121,36 @@ export function TemplateEditorDialog({
     } else {
       setForm({ ...emptyForm(), category: defaultCategory ?? "geral" });
     }
+    setActiveVariant("patient");
   }, [open, editing, defaultCategory]);
 
-  const variables = useMemo(() => extractVariables(form.body), [form.body]);
+  const currentBody =
+    activeVariant === "patient" ? form.body_patient :
+    activeVariant === "contact" ? form.body_contact :
+    form.body_segment;
+
+  const variables = useMemo(
+    () => extractVariables(
+      `${form.body_patient}\n${form.body_contact}\n${form.body_segment}`,
+    ),
+    [form.body_patient, form.body_contact, form.body_segment],
+  );
 
   const insertVar = (key: string) => {
-    setForm((f) => ({ ...f, body: `${f.body}${f.body.endsWith(" ") || !f.body ? "" : " "}{${key}}` }));
+    const field =
+      activeVariant === "patient" ? "body_patient" :
+      activeVariant === "contact" ? "body_contact" : "body_segment";
+    setForm((f) => {
+      const cur = (f as any)[field] as string;
+      const next = `${cur}${cur.endsWith(" ") || !cur ? "" : " "}{${key}}`;
+      return { ...f, [field]: next } as Form;
+    });
   };
 
   const stepValid = (i: number): boolean => {
     if (i === 0) return form.name.trim().length > 1 && !!form.category;
     if (i === 1) {
-      if (form.body.trim().length < 3) return false;
+      if (form.body_patient.trim().length < 3) return false;
       if (form.template_kind === "meta" && !form.meta_template_name.trim()) return false;
       return true;
     }
@@ -133,13 +159,20 @@ export function TemplateEditorDialog({
 
   const save = async (alsoUse: boolean) => {
     if (!stepValid(0)) return toast.error("Informe nome e categoria");
-    if (!stepValid(1)) return toast.error("Mensagem incompleta");
+    if (!stepValid(1)) return toast.error("Preencha pelo menos a variante 'Paciente'");
     setSaving(true);
+    // Fallback: variantes vazias herdam o texto do paciente
+    const bodyPatient = form.body_patient.trim();
+    const bodyContact = form.body_contact.trim() || bodyPatient;
+    const bodySegment = form.body_segment.trim() || bodyPatient;
     const payload: Record<string, unknown> = {
       name: form.name.trim(),
       description: form.description.trim(),
       category: form.category,
-      body: form.body,
+      body: bodyPatient,
+      body_patient: bodyPatient,
+      body_contact: bodyContact,
+      body_segment: bodySegment,
       variables,
       template_kind: form.template_kind,
       meta_template_name: form.template_kind === "meta" ? form.meta_template_name.trim() : null,
@@ -171,7 +204,7 @@ export function TemplateEditorDialog({
     }
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(editing ? "Modelo atualizado" : "Modelo criado");
+    toast.success(editing ? "Objetivo atualizado" : "Objetivo criado");
     qc.invalidateQueries({ queryKey: qk.templates });
     onOpenChange(false);
     if (alsoUse && editing) {
@@ -184,7 +217,7 @@ export function TemplateEditorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editing ? "Editar modelo" : "Novo modelo de mensagem"}</DialogTitle>
+          <DialogTitle>{editing ? "Editar objetivo" : "Novo objetivo de mensagem"}</DialogTitle>
         </DialogHeader>
 
         <Stepper step={step} />
@@ -192,7 +225,7 @@ export function TemplateEditorDialog({
         {step === 0 && (
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Nome do modelo</Label>
+              <Label>Nome do objetivo</Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -222,11 +255,11 @@ export function TemplateEditorDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>Tipo de modelo</Label>
+              <Label>Tipo de objetivo</Label>
               <div className="grid gap-2 sm:grid-cols-2">
                 <KindOption
                   selected={form.template_kind === "internal"}
-                  title="Modelo interno"
+                  title="Objetivo interno"
                   desc="Para organizar textos e enviar em conversas permitidas."
                   onClick={() => setForm({ ...form, template_kind: "internal" })}
                 />
@@ -237,6 +270,11 @@ export function TemplateEditorDialog({
                   onClick={() => setForm({ ...form, template_kind: "meta" })}
                 />
               </div>
+              {form.template_kind === "meta" && (
+                <p className="text-[11px] text-muted-foreground">
+                  Templates Meta usam um único texto aprovado — apenas a variante <b>Paciente</b> será considerada.
+                </p>
+              )}
             </div>
 
             {form.template_kind === "meta" && (
@@ -287,12 +325,49 @@ export function TemplateEditorDialog({
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Mensagem</Label>
+                <Label className="text-xs uppercase">Variante por destinatário</Label>
+                <div className="inline-flex rounded-full border border-border bg-card p-1 text-xs">
+                  {(["patient", "contact", "segment"] as TemplateVariant[]).map((v) => {
+                    const disabled = form.template_kind === "meta" && v !== "patient";
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => setActiveVariant(v)}
+                        className={`rounded-full px-3 py-1.5 font-medium transition-colors ${
+                          activeVariant === v
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                      >
+                        {VARIANT_LABEL[v]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Cada variante define o texto enviado conforme o destinatário escolhido. As variantes em branco herdam o texto do paciente.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Mensagem — {VARIANT_LABEL[activeVariant]}</Label>
                 <Textarea
                   rows={8}
-                  value={form.body}
-                  onChange={(e) => setForm({ ...form, body: e.target.value })}
-                  placeholder="Olá, {nome_destinatario}. Lembramos que você tem uma consulta em {data_consulta}..."
+                  value={currentBody}
+                  onChange={(e) => {
+                    const field =
+                      activeVariant === "patient" ? "body_patient" :
+                      activeVariant === "contact" ? "body_contact" : "body_segment";
+                    setForm({ ...form, [field]: e.target.value } as Form);
+                  }}
+                  placeholder={
+                    activeVariant === "patient"
+                      ? "Olá, {nome_paciente}. Lembramos que você tem uma consulta em {data_consulta}..."
+                      : activeVariant === "contact"
+                        ? "Olá, {nome_contato}. {nome_paciente} tem uma consulta em {data_consulta}..."
+                        : "Olá, {nome_destinatario}. Aviso coletivo: ..."
+                  }
                 />
               </div>
               <div className="space-y-2">
@@ -324,7 +399,7 @@ export function TemplateEditorDialog({
             </div>
             <div className="space-y-2">
               <Label className="text-xs uppercase">Pré-visualização</Label>
-              <WhatsAppPreview body={form.body} recipientName="Paciente" />
+              <WhatsAppPreview body={currentBody} recipientName={VARIANT_LABEL[activeVariant]} />
             </div>
           </div>
         )}
@@ -371,11 +446,17 @@ export function TemplateEditorDialog({
               <div className="space-y-2 text-sm">
                 <h4 className="font-semibold text-brand">Revisão</h4>
                 <p><span className="text-muted-foreground">Nome:</span> {form.name}</p>
-                <p><span className="text-muted-foreground">Categoria:</span> {TEMPLATE_CATEGORIES.find(c => c.value === form.category)?.label}</p>
+                <p><span className="text-muted-foreground">Pasta:</span> {TEMPLATE_CATEGORIES.find(c => c.value === form.category)?.label ?? form.category}</p>
                 <p>
                   <span className="text-muted-foreground">Tipo:</span>{" "}
-                  {form.template_kind === "meta" ? "Template Meta" : "Modelo interno"}
+                  {form.template_kind === "meta" ? "Template Meta" : "Objetivo interno"}
                 </p>
+                <p className="text-muted-foreground text-xs pt-2">Variantes preenchidas:</p>
+                <ul className="text-xs space-y-0.5">
+                  <li>• Paciente: {form.body_patient.trim() ? "✓" : "—"}</li>
+                  <li>• Familiar/Cuidador: {form.body_contact.trim() ? "✓" : "herda do paciente"}</li>
+                  <li>• Segmento: {form.body_segment.trim() ? "✓" : "herda do paciente"}</li>
+                </ul>
                 {variables.length > 0 && (
                   <p>
                     <span className="text-muted-foreground">Variáveis:</span>{" "}
@@ -385,7 +466,7 @@ export function TemplateEditorDialog({
                   </p>
                 )}
               </div>
-              <WhatsAppPreview body={form.body} recipientName={form.name || "Paciente"} />
+              <WhatsAppPreview body={form.body_patient} recipientName={form.name || "Paciente"} />
             </div>
           </div>
         )}
@@ -410,7 +491,7 @@ export function TemplateEditorDialog({
             ) : (
               <>
                 <Button variant="outline" onClick={() => save(false)} disabled={saving}>
-                  <Save className="h-4 w-4" /> Salvar modelo
+                  <Save className="h-4 w-4" /> Salvar objetivo
                 </Button>
                 {!editing && (
                   <Button variant="hero" onClick={() => save(true)} disabled={saving}>

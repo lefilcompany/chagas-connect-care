@@ -73,6 +73,9 @@ export default function TemplatesTab({
       description: t.description,
       category: t.category,
       body: t.body,
+      body_patient: t.body_patient ?? t.body,
+      body_contact: t.body_contact ?? null,
+      body_segment: t.body_segment ?? null,
       variables: t.variables,
       template_kind: "internal",
       meta_language: t.meta_language,
@@ -85,7 +88,7 @@ export default function TemplatesTab({
       is_default: false,
     } as any);
     if (error) return toast.error(error.message);
-    toast.success("Modelo duplicado");
+    toast.success("Objetivo duplicado");
     qc.invalidateQueries({ queryKey: qk.templates });
   };
 
@@ -107,7 +110,7 @@ export default function TemplatesTab({
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar modelo por nome ou texto..."
+            placeholder="Buscar objetivo por nome ou texto..."
             className="pl-9"
           />
         </div>
@@ -121,7 +124,7 @@ export default function TemplatesTab({
           </SelectContent>
         </Select>
         <Button variant="outline" onClick={() => openEdit(null)}>
-          <Plus className="h-4 w-4" /> Novo modelo
+          <Plus className="h-4 w-4" /> Novo objetivo
         </Button>
       </div>
 

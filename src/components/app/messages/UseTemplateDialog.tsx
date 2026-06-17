@@ -18,7 +18,8 @@ import {
   ChevronLeft, ChevronRight, Send, AlertTriangle, Users, User as UserIcon,
 } from "lucide-react";
 import {
-  extractVariables, renderTemplate, autofillVariables, type MessageTemplate,
+  extractVariables, renderTemplate, autofillVariables, pickVariantBody,
+  VARIANT_LABEL, type MessageTemplate, type TemplateVariant,
 } from "@/lib/templates";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 import { queueAndSendFromTemplate } from "@/lib/whatsapp";
@@ -54,6 +55,7 @@ export function UseTemplateDialog({
 
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState<Mode>("patient");
+  const [variantOverride, setVariantOverride] = useState<TemplateVariant | null>(null);
   const [patientId, setPatientId] = useState<string>("");
   const [contactIds, setContactIds] = useState<string[]>([]);
   const [vars, setVars] = useState<Record<string, string>>({});
@@ -95,9 +97,17 @@ export function UseTemplateDialog({
     },
   });
 
+  // Active variant follows the mode unless user overrides it manually.
+  const activeVariant: TemplateVariant = variantOverride ?? mode;
+
+  const activeBody = useMemo(
+    () => (template ? pickVariantBody(template, activeVariant) : ""),
+    [template, activeVariant],
+  );
+
   const detectedVars = useMemo(
-    () => (template ? extractVariables(template.body) : []),
-    [template],
+    () => extractVariables(activeBody),
+    [activeBody],
   );
 
   // Reset on open / template change
@@ -105,6 +115,7 @@ export function UseTemplateDialog({
     if (!open) return;
     setStep(0);
     setMode(initialMode ?? "patient");
+    setVariantOverride(null);
     setPatientId(lockedPatientId ?? "");
     setContactIds([]);
     setVars({});
@@ -141,7 +152,7 @@ export function UseTemplateDialog({
     ? firstContact?.phone ?? ""
     : patient?.phone ?? "";
 
-  const renderedBody = renderTemplate(template.body, vars);
+  const renderedBody = renderTemplate(activeBody, vars);
 
   const canAdvance0 = mode === "segment"
     ? true
@@ -176,7 +187,7 @@ export function UseTemplateDialog({
       const result = await queueAndSendFromTemplate({
         template: {
           id: template.id,
-          body: template.body,
+          body: activeBody,
           template_kind: template.template_kind,
           meta_template_name: template.meta_template_name ?? null,
           channel: "whatsapp",
@@ -201,10 +212,34 @@ export function UseTemplateDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Usar modelo: {template.name}</DialogTitle>
+          <DialogTitle>Usar objetivo: {template.name}</DialogTitle>
         </DialogHeader>
 
         <Stepper step={step} />
+
+        {step > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+            <div className="text-xs">
+              <span className="text-muted-foreground">Variante ativa:</span>{" "}
+              <span className="font-semibold text-primary">{VARIANT_LABEL[activeVariant]}</span>
+              <span className="text-muted-foreground"> · texto adaptado para o destinatário</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] uppercase text-muted-foreground">Trocar:</span>
+              <Select
+                value={activeVariant}
+                onValueChange={(v) => setVariantOverride(v as TemplateVariant)}
+              >
+                <SelectTrigger className="h-7 w-[170px] text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="patient">{VARIANT_LABEL.patient}</SelectItem>
+                  <SelectItem value="contact">{VARIANT_LABEL.contact}</SelectItem>
+                  <SelectItem value="segment">{VARIANT_LABEL.segment}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
 
         {step === 0 && (
           <div className="space-y-4">
@@ -364,7 +399,8 @@ export function UseTemplateDialog({
                   <p><span className="text-muted-foreground">Telefone:</span> {recipientPhone || "—"}</p>
                 )}
                 <p><span className="text-muted-foreground">Canal:</span> WhatsApp</p>
-                <p><span className="text-muted-foreground">Modelo:</span> {template.name}</p>
+                <p><span className="text-muted-foreground">Objetivo:</span> {template.name}</p>
+                <p><span className="text-muted-foreground">Variante:</span> {VARIANT_LABEL[activeVariant]}</p>
                 {mode === "contact" && selectedContacts.length > 1 && (
                   <p><span className="text-muted-foreground">Total:</span> {selectedContacts.length} envios</p>
                 )}

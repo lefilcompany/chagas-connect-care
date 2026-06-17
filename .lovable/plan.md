@@ -1,60 +1,71 @@
-## Objetivo
+## Visão geral
 
-Permitir:
-1. Segmentar campanhas para **familiares (ou cuidadores/médicos) de pacientes específicos**, não só "todos os familiares".
-2. Enviar uma mensagem (com ou sem modelo) para **um ou mais contatos** de um paciente, direto da ficha dele.
+Transformar o conceito de "Modelo de mensagem" em **Objetivo** (ex.: Lembrete de medicação, Lembrete de consulta). Cada objetivo passa a ter **três variantes de corpo** — uma para Paciente, uma para Familiar/Cuidador e uma para Segmento. Quando o usuário escolhe o destinatário no envio, o texto da mensagem troca automaticamente, e a interface mostra claramente qual variante está sendo usada.
 
-A camada de dados já suporta `patient_ids` no `SegmentFilters` e `resolveRecipients` já aplica esse filtro. As mudanças são quase todas de UI e de fluxo no diálogo de envio.
+## Mudanças no banco
 
-## Mudanças
+Migração única que:
 
-### 1. `SegmentFiltersForm` — novo campo "Pacientes específicos"
-- Adiciona um `MultiSelect` (ou Command com busca) carregando todos os pacientes acessíveis (`patients` ordenados por nome).
-- Vincula em `filters.patient_ids`. Quando vazio, comportamento atual (todos).
-- Aparece no topo do form, com texto auxiliar: "Restringe o universo aos pacientes selecionados e seus contatos".
-- Usado automaticamente em: CampaignTab, TemplateEditorDialog (aba Segmentação) e SegmentEditor — não precisam de código novo.
+1. Adiciona 3 colunas em `message_templates`:
+   - `body_patient` text — corpo enviado quando destinatário = paciente
+   - `body_contact` text — corpo enviado para familiar/cuidador/médico
+   - `body_segment` text — corpo enviado em disparo segmentado
+   - A coluna `body` existente fica como fallback (caso uma variante esteja em branco).
+2. Renomeia a coluna interna: mantém `category` (compatível com pastas), mas **na UI** será chamada "Objetivo".
+3. Apaga todos os modelos existentes (`DELETE FROM message_templates`).
+4. Insere 9 objetivos padrão (`is_default = true`), cada um com as 3 variantes preenchidas:
+   - Lembrete de medicação · Lembrete de consulta · Confirmação de recebimento · Acompanhamento de adesão · Cuidados de rotina · Boas-vindas · Aviso do ambulatório · Alimentação saudável · Orientação de saúde
+   - O antigo "Mensagem para familiar/cuidador" deixa de existir — vira a variante `body_contact` dos demais.
 
-### 2. CampaignTab — atalho de "pacientes específicos"
-- Acima dos filtros, um botão "Restringir a pacientes específicos" que pré-foca o novo seletor (mesmo campo do form), apenas como atalho visual.
-- Nada novo na lógica: usa o mesmo `filters.patient_ids` que o form preenche.
+Exemplo (Lembrete de medicação):
+- Paciente: `Olá, {nome_paciente}. Lembrete da sua medicação: {medicacao}. Não esqueça do horário.`
+- Familiar: `Olá, {nome_contato}. Você é responsável pelo cuidado de {nome_paciente}. Lembrete da medicação dele(a): {medicacao}.`
+- Segmento: `Olá, {nome_destinatario}. Este é um lembrete coletivo sobre o uso correto da medicação: {medicacao}.`
 
-### 3. `UseTemplateDialog` — modo "contato" passa a ser multi-seleção
-- Renomeia internamente `contactId: string` para `contactIds: string[]`.
-- No passo 0, quando `mode === "contact"`:
-  - Mantém o select de paciente (1).
-  - Substitui o select único de contato por uma lista de contatos do paciente, cada um com checkbox + nome + relação + telefone.
-  - Mostra contagem ("3 contatos selecionados").
-- Variáveis (passo 1): se houver placeholders dependentes do contato (`{contato_nome}` etc.), o auto-fill usa o **primeiro** contato como referência. Adiciona aviso "Variáveis dependentes do contato serão preenchidas individualmente no envio".
-- Revisão (passo 2): lista os destinatários (até 5 + "e mais X") e o total.
-- Envio: faz um loop por contato chamando `queueAndSendFromTemplate` com `contact_id` e re-rodando `autofillVariables` por contato (para preservar `{contato_nome}` correto).
-- Telemetria: toast final "X mensagens enviadas, Y falhas" quando houver mais de um.
+## Mudanças no editor (TemplateEditorDialog)
 
-### 4. Botão "Enviar mensagem" na ficha do paciente (`PatientDetail`)
-- Adiciona um `DropdownMenu` no header da ficha com duas ações:
-  - **Enviar ao paciente** → abre `UseTemplateDialog` com `mode="patient"`, paciente travado, modelo opcional.
-  - **Enviar a familiares** → abre `UseTemplateDialog` com `mode="contact"`, paciente travado, multi-seleção de contatos.
-- Para suportar isso, `UseTemplateDialog` ganha props opcionais:
-  - `lockedPatientId?: string` — quando setado, esconde o select de paciente e força esse id.
-  - `initialMode?: Mode` — define o modo inicial e oculta os outros cartões (opcional). Quando vier `lockedPatientId`, o cartão "Segmento" é ocultado.
-- `template` passa a aceitar `null` com fluxo de "mensagem livre" simples: novo campo de textarea no passo 1 quando não há modelo. (Se preferir manter obrigatório modelo, removo esse pedaço — pergunto se aparecer dúvida.)
+- Título: "Novo objetivo de mensagem" / "Editar objetivo".
+- Campo "Nome do modelo" → "Nome do objetivo".
+- "Categoria" → "Pasta" (já vem das pastas de conteúdo).
+- Etapa 2 ("Mensagem") ganha **3 abas** (Paciente, Familiar/Cuidador, Segmento). Cada aba tem seu próprio textarea + preview do WhatsApp. As variáveis sugeridas continuam funcionando para a aba ativa.
+- Validação: pelo menos a variante "Paciente" precisa estar preenchida; as outras herdam dela se ficarem vazias.
 
-### 5. Pequenos ajustes
-- `qk` ganha (se não existir) chave para invalidar `dialog-contacts` ao mudar paciente.
-- `Recipient` e `resolveRecipients`: nenhuma mudança necessária.
-- Testes manuais nos cenários: (a) campanha para familiares de 2 pacientes, (b) ficha → enviar a 3 familiares, (c) modelo salvo com `patient_ids` selecionado.
+## Mudanças no envio (UseTemplateDialog)
+
+- Título: "Usar objetivo: {nome}".
+- Ao escolher o destinatário no passo 1, a variante correspondente é selecionada automaticamente:
+  - `patient` → `body_patient`
+  - `contact` → `body_contact`
+  - `segment` → `body_segment`
+- Acima do preview (passos 2 e 3) aparece um **badge visível** indicando a variante ativa, ex.: `Variante: Familiar/Cuidador`. O usuário pode trocar a variante manualmente via um seletor compacto ao lado do badge se quiser sobrescrever.
+- Variáveis detectadas e auto-preenchidas passam a vir da variante ativa.
+
+## Mudanças no disparo segmentado / batches
+
+- `CampaignTab` e `createBatch` (em `src/lib/whatsapp.ts`) escolhem `body_segment` por padrão quando há template; cai para `body_patient` ou `body` se faltar.
+- `process-message-batch` (edge function) **não muda** — o `body` final já é renderizado no cliente antes de inserir as mensagens.
+
+## Mudanças textuais na UI (renomeação)
+
+| Onde aparece "Modelo" hoje | Vira |
+|---|---|
+| Aba "Modelos" da página Mensagens | "Objetivos" |
+| Botão "Novo modelo" | "Novo objetivo" |
+| "Usar modelo" | "Usar objetivo" |
+| Resumo do envio: "Modelo:" | "Objetivo:" |
+| Toasts "Modelo criado/atualizado" | "Objetivo criado/atualizado" |
+| Cards de template | Mantêm visual, troca o rótulo |
+
+Arquivos tocados na renomeação: `TemplatesTab.tsx`, `TemplateCard.tsx`, `TemplateEditorDialog.tsx`, `UseTemplateDialog.tsx`, `CampaignTab.tsx`, `Messages.tsx`.
 
 ## Detalhes técnicos
 
-- Componente novo `PatientMultiSelect` (em `src/components/app/PatientMultiSelect.tsx`) reutilizado pelo `SegmentFiltersForm` e pelo `CampaignTab`. Carrega via `qk.patients`.
-- `UseTemplateDialog`: refactor pequeno, isolado. Loop de envio sequencial (não paralelo) para não estourar rate-limit do WhatsApp; cada chamada usa `await`.
-- `PatientDetail`: importa `UseTemplateDialog`, gerencia `open` e `initialMode` localmente.
+- Tipo `MessageTemplate` em `src/lib/templates.ts` ganha `body_patient`, `body_contact`, `body_segment` (todos opcionais para compatibilidade).
+- Novo helper `pickVariant(template, mode): string` que devolve a variante certa com fallback em cadeia: variante pedida → `body_patient` → `body`.
+- `queueAndSendFromTemplate` recebe um parâmetro `mode` e usa `pickVariant` para escolher o corpo. `extractVariables` roda sobre a variante escolhida.
+- Sem mudança na edge function, sem mudança nas políticas RLS, sem mudança no schema das outras tabelas.
 
-## Arquivos
+## Fora de escopo
 
-- `src/components/app/PatientMultiSelect.tsx` (novo)
-- `src/components/app/SegmentFilters.tsx`
-- `src/components/app/messages/CampaignTab.tsx`
-- `src/components/app/messages/UseTemplateDialog.tsx`
-- `src/pages/app/PatientDetail.tsx`
-
-Sem migrações, sem mudanças em edge functions.
+- Não mexe na biblioteca de conteúdos (`content_library`).
+- Não muda o fluxo da Meta (template aprovado continua sendo um único nome/idioma — variantes só valem para `template_kind = "internal"`; para `meta` as 3 abas ficam desabilitadas e só `body_patient` é usado).

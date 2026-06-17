@@ -616,7 +616,7 @@ export default function PatientDetail() {
                 ? "Enviar a familiares de " + (patient?.full_name ?? "paciente")
                 : "Enviar ao paciente " + (patient?.full_name ?? "")}
             </DialogTitle>
-            <DialogDescription>Escolha um modelo de mensagem para continuar.</DialogDescription>
+            <DialogDescription>Escolha um objetivo de mensagem para continuar.</DialogDescription>
           </DialogHeader>
           {activeTemplates.length === 0 ? (
             <p className="text-sm text-muted-foreground">
