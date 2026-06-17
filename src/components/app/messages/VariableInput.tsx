@@ -62,7 +62,21 @@ export function VariableInput({
   className?: string;
 }) {
   const isDate = isDateVariable(varKey);
+  const isTime = isTimeVariable(varKey);
   const [open, setOpen] = React.useState(false);
+
+  if (isTime) {
+    return (
+      <Input
+        value={value}
+        onChange={(e) => onChange(formatTimeInput(e.target.value))}
+        placeholder={placeholder ?? "HH:mm"}
+        className={className}
+        inputMode="numeric"
+        maxLength={5}
+      />
+    );
+  }
 
   if (!isDate) {
     return (
