@@ -223,7 +223,7 @@ export default function Content() {
             </Link>
           </Button>
           <Button variant="hero" onClick={() => setNewFolderOpen(true)}>
-            <Plus className="h-4 w-4" /> Nova pasta
+            <Plus className="h-4 w-4" /> Novo conteúdo
           </Button>
         </div>
       </header>
