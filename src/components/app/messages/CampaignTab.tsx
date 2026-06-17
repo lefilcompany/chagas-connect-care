@@ -21,7 +21,8 @@ import {
   SegmentFilters, TargetingMode, emptyFilters, resolveRecipients,
 } from "@/lib/segments";
 import {
-  extractVariables, renderTemplate, formatMedications, type MessageTemplate,
+  extractVariables, renderTemplate, formatMedications, pickVariantBody,
+  type MessageTemplate,
 } from "@/lib/templates";
 import { createBatch } from "@/lib/whatsapp";
 import { TemplateCard, StartBlankCard } from "./TemplateCard";
@@ -109,12 +110,17 @@ export default function CampaignTab({
     () => activeTemplates.find((t) => t.id === templateId) ?? null,
     [activeTemplates, templateId],
   );
+  // Em disparos segmentados usamos sempre a variante "Segmento" do objetivo.
+  const segmentBody = useMemo(
+    () => (selectedTemplate ? pickVariantBody(selectedTemplate, "segment") : ""),
+    [selectedTemplate],
+  );
 
   // When template changes, reset body/vars
   useEffect(() => {
     if (!selectedTemplate) return;
     if (!campaignName) setCampaignName(selectedTemplate.name);
-    const detected = extractVariables(selectedTemplate.body);
+    const detected = extractVariables(pickVariantBody(selectedTemplate, "segment"));
     setVars((cur) => {
       const next: Record<string, string> = {};
       detected.forEach((v) => (next[v] = cur[v] ?? ""));
@@ -161,7 +167,7 @@ export default function CampaignTab({
     enabled: previewAud.length > 0 && step >= 1,
   });
 
-  const body = selectedTemplate?.body ?? freeBody;
+  const body = selectedTemplate ? segmentBody : freeBody;
   const detectedVars = useMemo(() => extractVariables(body), [body]);
   const AUTO_RECIPIENT_VARS = [
     "nome_destinatario",
@@ -294,7 +300,7 @@ export default function CampaignTab({
       template: selectedTemplate
         ? {
             id: selectedTemplate.id,
-            body: selectedTemplate.body,
+            body: segmentBody,
             template_kind: selectedTemplate.template_kind,
             meta_template_name: selectedTemplate.meta_template_name,
           }
