@@ -23,6 +23,7 @@ import {
 } from "@/lib/templates";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 import { queueAndSendFromTemplate } from "@/lib/whatsapp";
+import { VariableInput } from "./VariableInput";
 
 type Patient = { id: string; full_name: string; phone: string; channel_pref: string };
 type Contact = { id: string; patient_id: string; full_name: string; phone: string; relation: string };
@@ -366,9 +367,10 @@ export function UseTemplateDialog({
                 detectedVars.map((v) => (
                   <div key={v} className="space-y-1.5">
                     <Label className="font-mono text-xs">{`{${v}}`}</Label>
-                    <Input
+                    <VariableInput
+                      varKey={v}
                       value={vars[v] ?? ""}
-                      onChange={(e) => setVars({ ...vars, [v]: e.target.value })}
+                      onChange={(val) => setVars({ ...vars, [v]: val })}
                       placeholder={`Preencha ${v.replace(/_/g, " ")}`}
                     />
                   </div>

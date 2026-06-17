@@ -27,6 +27,7 @@ import {
 import { createBatch } from "@/lib/whatsapp";
 import { TemplateCard, StartBlankCard } from "./TemplateCard";
 import { WhatsAppPreview } from "./WhatsAppPreview";
+import { VariableInput } from "./VariableInput";
 
 const STEPS = ["Modelo", "Destinatários", "Revisar", "Enviar"] as const;
 
@@ -559,9 +560,10 @@ export default function CampaignTab({
                 {manualVars.map((v) => (
                   <div key={v} className="space-y-1">
                     <Label className="font-mono text-xs">{`{${v}}`}</Label>
-                    <Input
+                    <VariableInput
+                      varKey={v}
                       value={vars[v] ?? ""}
-                      onChange={(e) => setVars({ ...vars, [v]: e.target.value })}
+                      onChange={(val) => setVars({ ...vars, [v]: val })}
                       placeholder={v.replace(/_/g, " ")}
                     />
                   </div>
