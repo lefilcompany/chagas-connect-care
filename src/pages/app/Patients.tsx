@@ -310,11 +310,7 @@ export default function Patients() {
                 <div className="space-y-2"><Label>Data de nascimento</Label><Input name="birth_date" type="date" /></div>
                 <div className="space-y-2"><Label>CPF</Label><Input name="cpf" placeholder="000.000.000-00" maxLength={14} /></div>
               </div>
-              <div className="space-y-2"><Label>Endereço</Label><Input name="address" placeholder="Rua, número, complemento" /></div>
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3">
-                <div className="space-y-2"><Label>Cidade</Label><Input name="city" placeholder="Ex: Recife" /></div>
-                <div className="space-y-2"><Label>Estado</Label><Input name="state" placeholder="SP" maxLength={2} className="uppercase" /></div>
-              </div>
+              <CepAddressFields />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Etapa</Label>
                   <Select name="stage" defaultValue="diagnostico">
