@@ -17,7 +17,7 @@ export function StartBlankCard({ onClick }: { onClick: () => void }) {
       <div>
         <h3 className="font-display text-lg font-bold text-brand">Começar em branco</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Crie um modelo do zero com o assistente guiado.
+          Crie um objetivo do zero com o assistente guiado.
         </p>
       </div>
     </button>
@@ -48,7 +48,7 @@ export function TemplateCard({
             <ShieldCheck className="mr-0.5 h-3 w-3" /> Template Meta
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-[10px]">Modelo interno</Badge>
+          <Badge variant="outline" className="text-[10px]">Objetivo interno</Badge>
         )}
         {isMeta ? (
           <Badge
@@ -104,14 +104,14 @@ export function TemplateCard({
 
       <div className="mt-auto flex items-center gap-1.5 pt-4">
         <Button variant="hero" size="sm" className="flex-1" onClick={onUse}>
-          <Send className="h-3.5 w-3.5" /> Usar modelo
+          <Send className="h-3.5 w-3.5" /> Usar objetivo
         </Button>
         <Button
           variant="ghost"
           size="icon"
           onClick={onEdit}
           disabled={isDefault}
-          title={isDefault ? "Modelo padrão. Duplique para editar." : "Editar"}
+          title={isDefault ? "Objetivo padrão. Duplique para editar." : "Editar"}
           aria-label="Editar"
         >
           <Edit3 className="h-4 w-4" />
