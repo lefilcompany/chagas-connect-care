@@ -366,7 +366,7 @@ export function UseTemplateDialog({
               ) : (
                 detectedVars.map((v) => (
                   <div key={v} className="space-y-1.5">
-                    <Label className="font-mono text-xs">{`{${v}}`}</Label>
+                    <Label className="text-xs font-medium">{getVariableLabel(v)}</Label>
                     <VariableInput
                       varKey={v}
                       value={vars[v] ?? ""}
