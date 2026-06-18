@@ -171,6 +171,7 @@ export const normalizeFilters = (f: SegmentFilters | null | undefined): SegmentF
   if (!f) return emptyFilters();
   return {
     ...f,
+    stages: toStrArr((f as any).stages),
     city: toStrArr(f.city),
     state: toStrArr(f.state),
     patient_ids: toStrArr((f as any).patient_ids),
