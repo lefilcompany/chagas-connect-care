@@ -86,7 +86,7 @@ export default function Segments() {
           </ul>
         </div>
       ) : segments.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center text-muted-1text-muted-foreground">
+        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
           Nenhum segmento criado ainda. Clique em <span className="font-medium text-brand">Novo segmento</span> para começar.
         </div>
       ) : (
