@@ -21,7 +21,7 @@ import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
 import { RecipientPreview } from "@/components/app/RecipientPreview";
 import {
   AUDIENCE_LABELS, AudienceType, SegmentDef, SegmentFilters,
-  emptyFilters, resolveRecipients,
+  emptyFilters, normalizeFilters, resolveRecipients,
 } from "@/lib/segments";
 
 const nameSchema = z.string().trim().min(2, "O nome precisa ter ao menos 2 caracteres").max(80, "Máximo de 80 caracteres");
@@ -77,7 +77,7 @@ export default function SegmentEditor() {
       }
       if (!Array.isArray(at)) at = at ? [at] : ["paciente"];
       setAudienceTypes(at as AudienceType[]);
-      setFilters(((data.filters as SegmentFilters) ?? emptyFilters()));
+      setFilters(normalizeFilters(data.filters as SegmentFilters | null | undefined));
       setLoading(false);
     })();
     return () => { active = false; };
@@ -390,14 +390,15 @@ function SummaryItem({ label, value }: { label: string; value: React.ReactNode }
 }
 
 function FiltersChips({ filters }: { filters: SegmentFilters }) {
+  const safeFilters = normalizeFilters(filters);
   const chips: string[] = [];
-  if (filters.stages?.length) chips.push(`Etapas: ${filters.stages.join(", ")}`);
-  if (filters.city?.length) chips.push(`Cidade: ${filters.city.join(", ")}`);
-  if (filters.state?.length) chips.push(`UF: ${filters.state.join(", ")}`);
-  if (filters.age_min != null) chips.push(`≥ ${filters.age_min} anos`);
-  if (filters.age_max != null) chips.push(`≤ ${filters.age_max} anos`);
-  if (filters.status) chips.push(`Status: ${filters.status}`);
-  if (filters.channel) chips.push(`Canal: ${filters.channel}`);
+  if (safeFilters.stages?.length) chips.push(`Etapas: ${safeFilters.stages.join(", ")}`);
+  if (safeFilters.city?.length) chips.push(`Cidade: ${safeFilters.city.join(", ")}`);
+  if (safeFilters.state?.length) chips.push(`UF: ${safeFilters.state.join(", ")}`);
+  if (safeFilters.age_min != null) chips.push(`≥ ${safeFilters.age_min} anos`);
+  if (safeFilters.age_max != null) chips.push(`≤ ${safeFilters.age_max} anos`);
+  if (safeFilters.status) chips.push(`Status: ${safeFilters.status}`);
+  if (safeFilters.channel) chips.push(`Canal: ${safeFilters.channel}`);
   
   if (!chips.length) return <span className="italic text-muted-foreground text-xs">Sem filtros — todos os registros do público.</span>;
   return (
