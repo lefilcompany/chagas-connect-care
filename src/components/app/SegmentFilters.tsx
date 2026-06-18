@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { SegmentFilters } from "@/lib/segments";
+import { normalizeFilters, SegmentFilters } from "@/lib/segments";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,22 @@ const STAGES = [
   { value: "cronico", label: "Crônico" },
 ];
 
+type IbgeCity = { nome?: string };
+
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      return toStringArray(JSON.parse(trimmed));
+    } catch {
+      return [trimmed];
+    }
+  }
+  return [];
+}
+
 function MultiSelect({
   options,
   selected,
@@ -37,7 +53,7 @@ function MultiSelect({
   disabled,
 }: {
   options: { value: string; label: string }[];
-  selected: string[];
+  selected: unknown;
   onChange: (vals: string[]) => void;
   placeholder: string;
   searchPlaceholder: string;
@@ -45,12 +61,13 @@ function MultiSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const safeSelected = useMemo(() => toStringArray(selected), [selected]);
 
   const toggle = (val: string) => {
-    if (selected.includes(val)) {
-      onChange(selected.filter((v) => v !== val));
+    if (safeSelected.includes(val)) {
+      onChange(safeSelected.filter((v) => v !== val));
     } else {
-      onChange([...selected, val]);
+      onChange([...safeSelected, val]);
     }
   };
 
@@ -60,7 +77,7 @@ function MultiSelect({
     return options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
   }, [options, search]);
 
-  const selectedMap = useMemo(() => new Set(selected), [selected]);
+  const selectedMap = useMemo(() => new Set(safeSelected), [safeSelected]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -74,11 +91,11 @@ function MultiSelect({
           )}
         >
           <span className="flex-1 truncate text-left">
-            {selected.length === 0 ? (
+            {safeSelected.length === 0 ? (
               <span className="text-muted-foreground">{placeholder}</span>
             ) : (
               <span className="flex flex-wrap gap-1">
-                {selected.map((s) => {
+                {safeSelected.map((s) => {
                   const opt = options.find((o) => o.value === s);
                   return (
                     <Badge key={s} variant="secondary" className="text-[10px] font-normal gap-1 pr-1">
@@ -133,13 +150,18 @@ export function SegmentFiltersForm({
   filters: SegmentFilters;
   onFiltersChange: (f: SegmentFilters) => void;
 }) {
-  const toggleStage = (s: string, on: boolean) => {
-    const cur = filters.stages ?? [];
-    onFiltersChange({ ...filters, stages: on ? Array.from(new Set([...cur, s])) : cur.filter((x) => x !== s) });
-  };
+  const safeFilters = useMemo(() => normalizeFilters(filters), [filters]);
+  const selectedStages = safeFilters.stages ?? [];
+  const selectedStates = safeFilters.state ?? [];
+  const selectedCities = safeFilters.city ?? [];
+  const selectedPatients = safeFilters.patient_ids ?? [];
 
-  const selectedStates = filters.state ?? [];
-  const selectedCities = filters.city ?? [];
+  const toggleStage = (s: string, on: boolean) => {
+    onFiltersChange({
+      ...safeFilters,
+      stages: on ? Array.from(new Set([...selectedStages, s])) : selectedStages.filter((x) => x !== s),
+    });
+  };
 
   const [citiesByUf, setCitiesByUf] = useState<Record<string, string[]>>({});
   const [loadingUfs, setLoadingUfs] = useState<string[]>([]);
@@ -155,7 +177,9 @@ export function SegmentFiltersForm({
       fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`, { signal: ctrl.signal })
         .then((r) => r.json())
         .then((data) => {
-          const names = (data ?? []).map((m: any) => m.nome);
+          const names = (Array.isArray(data) ? data : [])
+            .map((m: IbgeCity) => m.nome)
+            .filter((name): name is string => Boolean(name));
           setCitiesByUf((prev) => ({ ...prev, [uf]: names }));
         })
         .catch(() => {
@@ -183,7 +207,7 @@ export function SegmentFiltersForm({
     if (removedCityNames.length && selectedCities.length) {
       const stillValid = selectedCities.filter((c) => !removedCityNames.includes(c));
       if (stillValid.length !== selectedCities.length) {
-        onFiltersChange({ ...filters, city: stillValid });
+        onFiltersChange({ ...safeFilters, city: stillValid });
       }
     }
   }, [selectedStates]);
@@ -207,8 +231,8 @@ export function SegmentFiltersForm({
       <div className="space-y-1.5">
         <Label>Pacientes específicos</Label>
         <PatientMultiSelect
-          selected={filters.patient_ids ?? []}
-          onChange={(ids) => onFiltersChange({ ...filters, patient_ids: ids })}
+          selected={selectedPatients}
+          onChange={(ids) => onFiltersChange({ ...safeFilters, patient_ids: ids })}
           placeholder="Todos os pacientes (sem restrição)"
         />
         <p className="text-[11px] text-muted-foreground">
@@ -221,7 +245,7 @@ export function SegmentFiltersForm({
         <Label>Etapa do paciente</Label>
         <div className="flex flex-wrap gap-2">
           {STAGES.map((s) => {
-            const on = (filters.stages ?? []).includes(s.value);
+            const on = selectedStages.includes(s.value);
             return (
               <button
                 key={s.value}
@@ -244,7 +268,7 @@ export function SegmentFiltersForm({
           <MultiSelect
             options={UF_LIST.map((s) => ({ value: s.value, label: `${s.value} — ${s.label}` }))}
             selected={selectedStates}
-            onChange={(vals) => onFiltersChange({ ...filters, state: vals, city: [] })}
+            onChange={(vals) => onFiltersChange({ ...safeFilters, state: vals, city: [] })}
             placeholder="Selecione os estados"
             searchPlaceholder="Buscar estado..."
           />
@@ -254,7 +278,7 @@ export function SegmentFiltersForm({
           <MultiSelect
             options={allCityOptions}
             selected={selectedCities}
-            onChange={(vals) => onFiltersChange({ ...filters, city: vals })}
+            onChange={(vals) => onFiltersChange({ ...safeFilters, city: vals })}
             placeholder={selectedStates.length === 0 ? "Selecione estados primeiro" : loadingUfs.length ? "Carregando cidades..." : "Selecione as cidades"}
             searchPlaceholder="Buscar cidade..."
             disabled={selectedStates.length === 0 || loadingUfs.length > 0}
@@ -269,9 +293,9 @@ export function SegmentFiltersForm({
             type="number"
             min={0}
             max={130}
-            value={filters.age_min ?? ""}
+            value={safeFilters.age_min ?? ""}
             onChange={(e) =>
-              onFiltersChange({ ...filters, age_min: e.target.value === "" ? null : Number(e.target.value) })
+              onFiltersChange({ ...safeFilters, age_min: e.target.value === "" ? null : Number(e.target.value) })
             }
             placeholder="Sem mínimo"
           />
@@ -282,9 +306,9 @@ export function SegmentFiltersForm({
             type="number"
             min={0}
             max={130}
-            value={filters.age_max ?? ""}
+            value={safeFilters.age_max ?? ""}
             onChange={(e) =>
-              onFiltersChange({ ...filters, age_max: e.target.value === "" ? null : Number(e.target.value) })
+              onFiltersChange({ ...safeFilters, age_max: e.target.value === "" ? null : Number(e.target.value) })
             }
             placeholder="Sem máximo"
           />
@@ -292,8 +316,8 @@ export function SegmentFiltersForm({
         <div className="space-y-1.5 flex-1 min-w-[180px]">
           <Label>Status</Label>
           <select
-            value={filters.status || ""}
-            onChange={(e) => onFiltersChange({ ...filters, status: e.target.value as "ativo" | "inativo" | "" })}
+            value={safeFilters.status || ""}
+            onChange={(e) => onFiltersChange({ ...safeFilters, status: e.target.value as "ativo" | "inativo" | "" })}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <option value="">Todos</option>
@@ -304,8 +328,8 @@ export function SegmentFiltersForm({
         <div className="space-y-1.5 flex-1 min-w-[180px]">
           <Label>Canal preferido</Label>
           <select
-            value={filters.channel || ""}
-            onChange={(e) => onFiltersChange({ ...filters, channel: e.target.value as "whatsapp" | "sms" | "" })}
+            value={safeFilters.channel || ""}
+            onChange={(e) => onFiltersChange({ ...safeFilters, channel: e.target.value as "whatsapp" | "sms" | "" })}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <option value="">Todos</option>

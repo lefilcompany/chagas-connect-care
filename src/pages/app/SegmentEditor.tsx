@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { useAuth } from "@/lib/auth";
 import { qk } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,24 @@ import { cn } from "@/lib/utils";
 import { SegmentFiltersForm } from "@/components/app/SegmentFilters";
 import { RecipientPreview } from "@/components/app/RecipientPreview";
 import {
-  AUDIENCE_LABELS, AudienceType, SegmentDef, SegmentFilters,
-  emptyFilters, resolveRecipients,
+  AUDIENCE_LABELS, AudienceType, SegmentFilters,
+  emptyFilters, normalizeFilters, resolveRecipients,
 } from "@/lib/segments";
 
 const nameSchema = z.string().trim().min(2, "O nome precisa ter ao menos 2 caracteres").max(80, "Máximo de 80 caracteres");
+const AUDIENCE_VALUES: AudienceType[] = ["paciente", "familiar", "cuidador", "medico"];
+
+function normalizeAudienceTypes(value: unknown): AudienceType[] {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    try { parsed = JSON.parse(parsed); } catch { parsed = [parsed]; }
+  }
+  const values = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+  const normalized = values.filter((item): item is AudienceType => (
+    typeof item === "string" && AUDIENCE_VALUES.includes(item as AudienceType)
+  ));
+  return normalized.length ? normalized : ["paciente"];
+}
 
 type StepKey = "info" | "publico" | "filtros" | "revisao";
 
@@ -71,13 +85,8 @@ export default function SegmentEditor() {
       }
       setName(isDuplicate ? `${data.name} (cópia)` : data.name);
       setDescription(data.description ?? "");
-      let at: any = data.audience_types;
-      if (typeof at === "string") {
-        try { at = JSON.parse(at); } catch { at = [at]; }
-      }
-      if (!Array.isArray(at)) at = at ? [at] : ["paciente"];
-      setAudienceTypes(at as AudienceType[]);
-      setFilters(((data.filters as SegmentFilters) ?? emptyFilters()));
+      setAudienceTypes(normalizeAudienceTypes(data.audience_types));
+      setFilters(normalizeFilters(data.filters));
       setLoading(false);
     })();
     return () => { active = false; };
@@ -121,17 +130,17 @@ export default function SegmentEditor() {
     if (!nameOk) { setStep(0); return toast.error("Informe um nome válido"); }
     if (!audienceOk) { setStep(1); return toast.error("Selecione um público"); }
     setSaving(true);
-    const payload = {
+    const payload: Database["public"]["Tables"]["audience_segments"]["Insert"] = {
       name: name.trim(),
       description,
       audience_types: audienceTypes,
-      filters: filters as any,
+      filters: normalizeFilters(filters) as Json,
       institution,
       owner_id: user?.id ?? null,
     };
     const { error } = isEdit
       ? await supabase.from("audience_segments").update(payload).eq("id", id!)
-      : await supabase.from("audience_segments").insert(payload as any);
+      : await supabase.from("audience_segments").insert(payload);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success(isEdit ? "Segmento atualizado com sucesso" : "Segmento criado com sucesso");
@@ -390,14 +399,15 @@ function SummaryItem({ label, value }: { label: string; value: React.ReactNode }
 }
 
 function FiltersChips({ filters }: { filters: SegmentFilters }) {
+  const safeFilters = normalizeFilters(filters);
   const chips: string[] = [];
-  if (filters.stages?.length) chips.push(`Etapas: ${filters.stages.join(", ")}`);
-  if (filters.city?.length) chips.push(`Cidade: ${filters.city.join(", ")}`);
-  if (filters.state?.length) chips.push(`UF: ${filters.state.join(", ")}`);
-  if (filters.age_min != null) chips.push(`≥ ${filters.age_min} anos`);
-  if (filters.age_max != null) chips.push(`≤ ${filters.age_max} anos`);
-  if (filters.status) chips.push(`Status: ${filters.status}`);
-  if (filters.channel) chips.push(`Canal: ${filters.channel}`);
+  if (safeFilters.stages?.length) chips.push(`Etapas: ${safeFilters.stages.join(", ")}`);
+  if (safeFilters.city?.length) chips.push(`Cidade: ${safeFilters.city.join(", ")}`);
+  if (safeFilters.state?.length) chips.push(`UF: ${safeFilters.state.join(", ")}`);
+  if (safeFilters.age_min != null) chips.push(`≥ ${safeFilters.age_min} anos`);
+  if (safeFilters.age_max != null) chips.push(`≤ ${safeFilters.age_max} anos`);
+  if (safeFilters.status) chips.push(`Status: ${safeFilters.status}`);
+  if (safeFilters.channel) chips.push(`Canal: ${safeFilters.channel}`);
   
   if (!chips.length) return <span className="italic text-muted-foreground text-xs">Sem filtros — todos os registros do público.</span>;
   return (
