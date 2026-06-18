@@ -289,9 +289,9 @@ export function SegmentFiltersForm({
             type="number"
             min={0}
             max={130}
-            value={filters.age_min ?? ""}
+            value={safeFilters.age_min ?? ""}
             onChange={(e) =>
-              onFiltersChange({ ...filters, age_min: e.target.value === "" ? null : Number(e.target.value) })
+              onFiltersChange({ ...safeFilters, age_min: e.target.value === "" ? null : Number(e.target.value) })
             }
             placeholder="Sem mínimo"
           />
@@ -302,9 +302,9 @@ export function SegmentFiltersForm({
             type="number"
             min={0}
             max={130}
-            value={filters.age_max ?? ""}
+            value={safeFilters.age_max ?? ""}
             onChange={(e) =>
-              onFiltersChange({ ...filters, age_max: e.target.value === "" ? null : Number(e.target.value) })
+              onFiltersChange({ ...safeFilters, age_max: e.target.value === "" ? null : Number(e.target.value) })
             }
             placeholder="Sem máximo"
           />
@@ -312,8 +312,8 @@ export function SegmentFiltersForm({
         <div className="space-y-1.5 flex-1 min-w-[180px]">
           <Label>Status</Label>
           <select
-            value={filters.status || ""}
-            onChange={(e) => onFiltersChange({ ...filters, status: e.target.value as "ativo" | "inativo" | "" })}
+            value={safeFilters.status || ""}
+            onChange={(e) => onFiltersChange({ ...safeFilters, status: e.target.value as "ativo" | "inativo" | "" })}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <option value="">Todos</option>
@@ -324,8 +324,8 @@ export function SegmentFiltersForm({
         <div className="space-y-1.5 flex-1 min-w-[180px]">
           <Label>Canal preferido</Label>
           <select
-            value={filters.channel || ""}
-            onChange={(e) => onFiltersChange({ ...filters, channel: e.target.value as "whatsapp" | "sms" | "" })}
+            value={safeFilters.channel || ""}
+            onChange={(e) => onFiltersChange({ ...safeFilters, channel: e.target.value as "whatsapp" | "sms" | "" })}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <option value="">Todos</option>
