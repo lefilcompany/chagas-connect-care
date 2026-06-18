@@ -104,8 +104,8 @@ export const META_STATUS_LABEL: Record<MetaStatus, string> = {
 /** Common variable suggestions to display as chips in the editor. */
 export const VARIABLE_SUGGESTIONS: { key: string; hint: string }[] = [
   { key: "nome_destinatario", hint: "Nome do destinatário (paciente, familiar, cuidador, etc.)" },
-  { key: "nome_paciente", hint: "Nome do paciente (compatibilidade)" },
-  { key: "nome_contato", hint: "Nome do familiar/cuidador/médico (compatibilidade)" },
+  { key: "nome_paciente", hint: "Nome do paciente" },
+  { key: "nome_contato", hint: "Nome do familiar/cuidador/médico" },
   { key: "orientacao", hint: "Orientação genérica" },
   { key: "orientacao_rotina", hint: "Orientação de rotina" },
   { key: "orientacao_alimentacao", hint: "Orientação alimentar" },
@@ -114,6 +114,12 @@ export const VARIABLE_SUGGESTIONS: { key: string; hint: string }[] = [
   { key: "hora_consulta", hint: "Hora da consulta" },
   { key: "local_consulta", hint: "Local da consulta" },
 ];
+
+/** Returns a human-friendly label for a template variable key. */
+export function getVariableLabel(key: string): string {
+  const found = VARIABLE_SUGGESTIONS.find((s) => s.key === key);
+  return found ? found.hint : key.replace(/_/g, " ");
+}
 
 export type MedicationLike = {
   name?: string | null;
