@@ -93,22 +93,24 @@ export const resolveRecipients = async (
 ): Promise<Recipient[]> => {
   if (!audience_types.length) return [];
 
+  const f_active = normalizeFilters(filters);
+
   const { data: patientsData } = await supabase
     .from("patients")
     .select("id, full_name, phone, channel_pref, stage, city, state, status, birth_date");
   const patients = patientsData ?? [];
+  type PatientRow = (typeof patients)[number];
 
-  const matchPatient = (p: any) => {
+  const matchPatient = (p: PatientRow) => {
     if (f_active.patient_ids?.length && !f_active.patient_ids.includes(p.id)) return false;
     if (f_active.stages?.length && !f_active.stages.includes(p.stage)) return false;
     return matchesCommon(p, f_active);
   };
 
-  const f_active = filters ?? {};
   const out: Recipient[] = [];
 
   const patientPool = patients.filter(matchPatient);
-  const patientMap = new Map(patients.map((p: any) => [p.id, p]));
+  const patientMap = new Map<string, PatientRow>(patients.map((p) => [p.id, p]));
 
   if (audience_types.includes("paciente")) {
     for (const p of patientPool) {
@@ -135,14 +137,14 @@ export const resolveRecipients = async (
     const contacts = contactsData ?? [];
     for (const c of contacts) {
       if (!(contactRels as AudienceType[]).includes(c.relation as AudienceType)) continue;
-      const parent = patientMap.get(c.patient_id) as any;
+      const parent = patientMap.get(c.patient_id);
       if (!parent) continue;
       // Restrict to selected patients when patient_ids is set
       if (f_active.patient_ids?.length && !f_active.patient_ids.includes(c.patient_id)) continue;
       // patient-level filters (stage) still apply via parent
       if (f_active.stages?.length && !f_active.stages.includes(parent.stage)) continue;
       // contact-level filters
-      if (!matchesCommon(c as any, f_active)) continue;
+      if (!matchesCommon(c, f_active)) continue;
       out.push({
         key: `c:${c.id}`,
         kind: "contact",
