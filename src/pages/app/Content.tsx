@@ -549,13 +549,6 @@ function FolderDetail({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/app/conteudos/campanha`)}
-            >
-              <Megaphone className="h-4 w-4" /> Disparar campanha
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
               onClick={() => { setEditingTpl(null); setEditorOpen(true); }}
             >
               <Plus className="h-4 w-4" /> Novo objetivo
