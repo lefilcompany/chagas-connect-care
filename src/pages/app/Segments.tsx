@@ -22,7 +22,7 @@ import {
 export default function Segments() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { data: segments = [] } = useQuery<SegmentDef[]>({
+  const { data: segments = [], isLoading } = useQuery<SegmentDef[]>({
     queryKey: qk.segments,
     queryFn: fetchers.segments as () => Promise<SegmentDef[]>,
   });
