@@ -60,8 +60,14 @@ const ageFromBirth = (birth: string | null | undefined): number | null => {
 const norm = (v?: string | null) => (v ?? "").trim().toLowerCase();
 
 const toStrArr = (v: unknown): string[] => {
-  if (Array.isArray(v)) return v as string[];
-  if (typeof v === "string" && v) return [v];
+  if (Array.isArray(v)) return v.map(String).filter(Boolean);
+  if (typeof v === "string" && v.trim()) {
+    try {
+      return toStrArr(JSON.parse(v));
+    } catch {
+      return [v.trim()];
+    }
+  }
   return [];
 };
 
@@ -167,14 +173,18 @@ export const emptyFilters = (): SegmentFilters => ({
   patient_ids: [],
 });
 
-export const normalizeFilters = (f: SegmentFilters | null | undefined): SegmentFilters => {
+export const normalizeFilters = (f: unknown): SegmentFilters => {
   if (!f) return emptyFilters();
+  const raw = typeof f === "string"
+    ? (() => { try { return JSON.parse(f); } catch { return {}; } })()
+    : f;
+  const source = raw && typeof raw === "object" ? raw as Partial<SegmentFilters> : {};
   return {
-    ...f,
-    stages: toStrArr((f as any).stages),
-    city: toStrArr(f.city),
-    state: toStrArr(f.state),
-    patient_ids: toStrArr((f as any).patient_ids),
+    ...source,
+    stages: toStrArr(source.stages),
+    city: toStrArr(source.city),
+    state: toStrArr(source.state),
+    patient_ids: toStrArr(source.patient_ids),
   };
 };
 
