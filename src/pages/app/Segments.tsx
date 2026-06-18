@@ -58,7 +58,7 @@ export default function Segments() {
                 {s.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{s.description}</p>}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {s.audience_types.map((a) => (
+                {(Array.isArray(s.audience_types) ? s.audience_types : []).map((a) => (
                   <Badge key={a} variant="secondary">{AUDIENCE_LABELS[a]}</Badge>
                 ))}
               </div>

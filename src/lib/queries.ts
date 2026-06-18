@@ -89,7 +89,14 @@ export const fetchers = {
       .from("audience_segments")
       .select("*")
       .order("created_at", { ascending: false });
-    return (data ?? []).map((s: any) => ({ ...s, filters: normalizeFilters(s.filters) }));
+    return (data ?? []).map((s: any) => {
+      let at = s.audience_types;
+      if (typeof at === "string") {
+        try { at = JSON.parse(at); } catch { at = [at]; }
+      }
+      if (!Array.isArray(at)) at = at ? [at] : [];
+      return { ...s, audience_types: at, filters: normalizeFilters(s.filters) };
+    });
   },
   templates: async () => {
     const { data } = await supabase
