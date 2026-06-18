@@ -542,7 +542,7 @@ function FolderDetail({
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-display text-lg font-bold text-brand inline-flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" /> Objetivos de mensagem
+            Objetivos de mensagem
             <span className="text-xs font-normal text-muted-foreground">({sortedTemplates.length})</span>
           </h2>
           <div className="flex items-center gap-2">
