@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchers, qk } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Plus, Copy, Trash2, Pencil, Users, MoreVertical, Eye } from "lucide-react";
 import {
