@@ -71,7 +71,12 @@ export default function SegmentEditor() {
       }
       setName(isDuplicate ? `${data.name} (cópia)` : data.name);
       setDescription(data.description ?? "");
-      setAudienceTypes(((data.audience_types as AudienceType[]) ?? ["paciente"]));
+      let at: any = data.audience_types;
+      if (typeof at === "string") {
+        try { at = JSON.parse(at); } catch { at = [at]; }
+      }
+      if (!Array.isArray(at)) at = at ? [at] : ["paciente"];
+      setAudienceTypes(at as AudienceType[]);
       setFilters(((data.filters as SegmentFilters) ?? emptyFilters()));
       setLoading(false);
     })();
