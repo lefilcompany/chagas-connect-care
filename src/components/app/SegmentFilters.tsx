@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { SegmentFilters } from "@/lib/segments";
+import { normalizeFilters, SegmentFilters } from "@/lib/segments";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,8 @@ const STAGES = [
   { value: "agudo", label: "Agudo" },
   { value: "cronico", label: "Crônico" },
 ];
+
+type IbgeCity = { nome?: string };
 
 function toStringArray(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
@@ -148,11 +150,11 @@ export function SegmentFiltersForm({
   filters: SegmentFilters;
   onFiltersChange: (f: SegmentFilters) => void;
 }) {
-  const safeFilters = (filters ?? {}) as SegmentFilters;
-  const selectedStages = toStringArray((safeFilters as any).stages);
-  const selectedStates = toStringArray((safeFilters as any).state);
-  const selectedCities = toStringArray((safeFilters as any).city);
-  const selectedPatients = toStringArray((safeFilters as any).patient_ids);
+  const safeFilters = useMemo(() => normalizeFilters(filters), [filters]);
+  const selectedStages = safeFilters.stages ?? [];
+  const selectedStates = safeFilters.state ?? [];
+  const selectedCities = safeFilters.city ?? [];
+  const selectedPatients = safeFilters.patient_ids ?? [];
 
   const toggleStage = (s: string, on: boolean) => {
     onFiltersChange({
@@ -175,7 +177,9 @@ export function SegmentFiltersForm({
       fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`, { signal: ctrl.signal })
         .then((r) => r.json())
         .then((data) => {
-          const names = (data ?? []).map((m: any) => m.nome);
+          const names = (Array.isArray(data) ? data : [])
+            .map((m: IbgeCity) => m.nome)
+            .filter((name): name is string => Boolean(name));
           setCitiesByUf((prev) => ({ ...prev, [uf]: names }));
         })
         .catch(() => {
