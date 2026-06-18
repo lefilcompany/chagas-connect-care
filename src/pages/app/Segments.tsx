@@ -131,22 +131,21 @@ export default function Segments() {
 }
 
 function SegmentFilterSummary({ filters }: { filters: SegmentFilters }) {
-  const chips: string[] = [];
-  if (filters.stages?.length) chips.push(`Etapas: ${filters.stages.join(", ")}`);
-  if (filters.city?.length) chips.push(`Cidade: ${filters.city.join(", ")}`);
-  if (filters.state?.length) chips.push(`UF: ${filters.state.join(", ")}`);
-  if (filters.age_min != null) chips.push(`≥ ${filters.age_min} anos`);
-  if (filters.age_max != null) chips.push(`≤ ${filters.age_max} anos`);
-  if (filters.status) chips.push(`Status: ${filters.status}`);
-  if (filters.channel) chips.push(`Canal: ${filters.channel}`);
+  let count = 0;
+  if (filters.stages?.length) count++;
+  if (filters.city?.length) count++;
+  if (filters.state?.length) count++;
+  if (filters.age_min != null) count++;
+  if (filters.age_max != null) count++;
+  if (filters.status) count++;
+  if (filters.channel) count++;
 
-  if (!chips.length) return <span className="text-[11px] text-muted-foreground italic">sem filtros</span>;
+  if (count === 0) return <span className="text-[11px] text-muted-foreground italic">sem filtros</span>;
+
   return (
-    <>
-      {chips.map((c) => (
-        <Badge key={c} variant="outline" className="text-[10px] font-normal">{c}</Badge>
-      ))}
-    </>
+    <Badge variant="outline" className="text-[10px] font-normal">
+      {count} filtro{count > 1 ? "s" : ""}
+    </Badge>
   );
 }
 
