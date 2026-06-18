@@ -49,7 +49,7 @@ export function TemplateCard({
         )}
       </div>
       {template.description && (
-        <div className="mt-2 rounded-lg bg-primary/5 px-3 py-2">
+        <div className="mt-2 rounded-lg bg-primary/5 py-2">
           <p className="text-sm leading-relaxed text-foreground">
             {getTemplateDescription(template.name, template.description)}
           </p>
