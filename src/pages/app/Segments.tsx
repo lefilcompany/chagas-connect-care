@@ -103,20 +103,20 @@ export default function Segments() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuItem onClick={() => edit(s)}>
-                        <Eye className="h-4 w-4" /> Ver destinatários
+                        <Eye className="h-4 w-4 mr-2" /> Ver destinatários
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => edit(s)}>
-                        <Pencil className="h-4 w-4" /> Editar
+                        <Pencil className="h-4 w-4 mr-2" /> Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => duplicate(s)}>
-                        <Copy className="h-4 w-4" /> Duplicar
+                        <Copy className="h-4 w-4 mr-2" /> Duplicar
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => remove(s.id)}
                         className="text-destructive focus:text-destructive"
                       >
-                        <Trash2 className="h-4 w-4" /> Excluir segmento
+                        <Trash2 className="h-4 w-4 mr-2" /> Excluir segmento
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
