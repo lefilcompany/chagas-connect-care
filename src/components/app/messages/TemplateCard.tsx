@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Copy, Edit3, Send, FilePlus2, Lock } from "lucide-react";
 import { type MessageTemplate } from "@/lib/templates";
+import { getTemplateDescription } from "@/lib/templateDescriptions";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 
 export function StartBlankCard({ onClick }: { onClick: () => void }) {
@@ -48,7 +49,9 @@ export function TemplateCard({
         )}
       </div>
       {template.description && (
-        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{template.description}</p>
+        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+          {getTemplateDescription(template.name, template.description)}
+        </p>
       )}
 
       <div className="mt-3">
