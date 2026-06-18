@@ -104,30 +104,32 @@ export default function Segments() {
                 key={s.id}
                 className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_140px_160px_56px] gap-3 md:gap-4 px-5 py-4 items-center hover:bg-muted/30 transition-colors"
               >
-                <div className="min-w-0">
-                  <button
-                    onClick={() => edit(s)}
-                    className="text-left font-display font-semibold text-brand hover:underline truncate block w-full"
-                  >
-                    {s.name}
-                  </button>
-                  {s.description && (
-                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{s.description}</p>
-                  )}
+                <div className="min-w-0 flex items-center">
+                  <div>
+                    <button
+                      onClick={() => edit(s)}
+                      className="text-left font-display font-semibold text-brand hover:underline truncate block w-full"
+                    >
+                      {s.name}
+                    </button>
+                    {s.description && (
+                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{s.description}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="min-w-0 flex flex-wrap gap-1.5">
+                <div className="min-w-0 flex flex-wrap items-center gap-1.5">
                   {(Array.isArray(s.audience_types) ? s.audience_types : []).map((a) => (
                     <Badge key={a} variant="secondary" className="text-[10px]">{AUDIENCE_LABELS[a]}</Badge>
                   ))}
                   <SegmentFilterSummary filters={s.filters} />
                 </div>
                 <SegmentCount audience_types={s.audience_types} filters={s.filters} />
-                <div className="text-sm text-muted-foreground">
+                <div className="text-sm text-muted-foreground flex items-center">
                   {s.updated_at
                     ? new Date(s.updated_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
                     : "—"}
                 </div>
-                <div className="flex justify-end">
+                <div className="flex items-center justify-end">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" aria-label="Mais ações">
@@ -189,7 +191,7 @@ function SegmentCount({ audience_types, filters }: { audience_types: AudienceTyp
     staleTime: 30_000,
   });
   return (
-    <div className="inline-flex w-fit items-center gap-1.5 self-start rounded-full bg-muted/50 px-2.5 py-1 text-xs font-medium text-brand">
+    <div className="inline-flex w-fit items-center gap-1.5 rounded-full bg-muted/50 px-2.5 py-1 text-xs font-medium text-brand">
       <Users className="h-3.5 w-3.5" />
       {isLoading ? "..." : `${data.length} destinatário${data.length === 1 ? "" : "s"}`}
     </div>
