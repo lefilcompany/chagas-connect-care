@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchers, qk } from "@/lib/queries";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Reports() {
-  const { data } = useQuery({ queryKey: qk.reports, queryFn: fetchers.reports });
+  const { data, isLoading } = useQuery({ queryKey: qk.reports, queryFn: fetchers.reports });
   const byPatient = data?.byPatient ?? [];
   const totals = data?.totals ?? { ok: 0, miss: 0, msgs: 0 };
+  const ready = !isLoading && !!data;
 
   return (
     <div className="space-y-6">
@@ -14,7 +16,12 @@ export default function Reports() {
         <p className="text-muted-foreground mt-1">Adesão e engajamento dos últimos 30 dias.</p>
       </header>
       <div className="grid gap-4 sm:grid-cols-3">
-        {[
+        {!ready ? Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="rounded-2xl border border-border bg-card p-6 shadow-card space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-8 w-16" />
+          </div>
+        )) : [
           { label: "Doses confirmadas", v: totals.ok },
           { label: "Doses perdidas", v: totals.miss },
           { label: "Mensagens enviadas", v: totals.msgs },
@@ -27,7 +34,9 @@ export default function Reports() {
       </div>
       <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
         <h2 className="font-display text-lg font-bold text-brand mb-4">Adesão por paciente (%)</h2>
-        {byPatient.length === 0 ? (
+        {!ready ? (
+          <Skeleton className="h-[320px] w-full rounded-xl" />
+        ) : byPatient.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">Ainda não há dados de adesão.</div>
         ) : (
           <ResponsiveContainer width="100%" height={320}>

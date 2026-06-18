@@ -8,10 +8,13 @@ import {
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
-  const { data: stats = { patients: 0, messagesToday: 0, adherence30: 0, meds: 0, messagesTotal: 0, adherenceEvents: 0 } } =
+  const { data, isLoading } =
     useQuery({ queryKey: qk.dashboard, queryFn: fetchers.dashboard });
+  const stats = data ?? { patients: 0, messagesToday: 0, adherence30: 0, meds: 0, messagesTotal: 0, adherenceEvents: 0 };
+  const ready = !isLoading && !!data;
 
   const cards = [
     { label: "Pacientes ativos", value: stats.patients, icon: Users, to: "/app/pacientes" },
@@ -73,7 +76,19 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((c) => (
+        {!ready ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-border bg-card p-6 shadow-card">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-8 w-16" />
+                </div>
+                <Skeleton className="h-10 w-10 rounded-xl" />
+              </div>
+            </div>
+          ))
+        ) : cards.map((c) => (
           <Link key={c.label} to={c.to} className="rounded-2xl border border-border bg-card p-6 shadow-card hover:shadow-soft hover:-translate-y-0.5 transition-smooth">
             <div className="flex items-center justify-between">
               <div>
@@ -92,7 +107,22 @@ export default function Dashboard() {
         <h2 className="font-display text-base sm:text-lg font-bold text-brand">Próximos passos</h2>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">Siga a jornada na ordem.</p>
         <ol className="mt-4 grid gap-2.5 sm:gap-3 lg:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          {steps.map((s, i) => {
+          {!ready ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <li key={i} className="rounded-2xl border border-border bg-card p-3 sm:p-4 shadow-card flex flex-col gap-2.5 sm:gap-3">
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  <Skeleton className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-2.5 w-14" />
+                    <Skeleton className="h-2.5 w-20" />
+                  </div>
+                </div>
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="mt-auto h-8 w-full rounded-md" />
+              </li>
+            ))
+          ) : steps.map((s, i) => {
             const isDone = s.done;
             const isActive = !isDone && i === currentStepIndex;
             const isLocked = !isDone && !isActive;

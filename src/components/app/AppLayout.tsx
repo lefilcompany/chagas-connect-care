@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +37,7 @@ export const AppLayout = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [profileName, setProfileName] = useState<string>("");
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [open, setOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
 
@@ -45,8 +47,10 @@ export const AppLayout = () => {
 
   useEffect(() => {
     if (!user) return;
+    setProfileLoaded(false);
     supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle().then(({ data }) => {
-      if (data) setProfileName(data.full_name || user.email || "");
+      setProfileName((data?.full_name as string) || user.email || "");
+      setProfileLoaded(true);
     });
   }, [user]);
 
@@ -98,8 +102,17 @@ export const AppLayout = () => {
         </nav>
         <div className="border-t border-border p-3">
           <div className="px-2 py-2 text-xs">
-            <div className="font-semibold text-brand truncate">{profileName}</div>
-            <div className="text-muted-foreground truncate">{user.email}</div>
+            {profileLoaded ? (
+              <>
+                <div className="font-semibold text-brand truncate">{profileName}</div>
+                <div className="text-muted-foreground truncate">{user.email}</div>
+              </>
+            ) : (
+              <div className="space-y-1.5 py-0.5">
+                <Skeleton className="h-3.5 w-32" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+            )}
           </div>
           <Button variant="ghost" className="w-full justify-start text-foreground/70" onClick={() => setLogoutOpen(true)}>
             <LogOut className="h-4 w-4" /> Sair
