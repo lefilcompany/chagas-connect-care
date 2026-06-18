@@ -5,7 +5,14 @@ import { fetchers, qk } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Copy, Trash2, Pencil, Users } from "lucide-react";
+import { Plus, Copy, Trash2, Pencil, Users, MoreVertical, Eye } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AUDIENCE_LABELS, AudienceType, SegmentDef, SegmentFilters,
   resolveRecipients,
@@ -50,40 +57,80 @@ export default function Segments() {
           Nenhum segmento criado ainda. Clique em <span className="font-medium text-brand">Novo segmento</span> para começar.
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {(segments as SegmentDef[]).map((s) => (
-            <article key={s.id} className="rounded-2xl border border-border bg-card p-5 shadow-card flex flex-col gap-3">
-              <div>
-                <h3 className="font-display text-lg font-bold text-brand truncate">{s.name}</h3>
-                {s.description && <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{s.description}</p>}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {(Array.isArray(s.audience_types) ? s.audience_types : []).map((a) => (
-                  <Badge key={a} variant="secondary">{AUDIENCE_LABELS[a]}</Badge>
-                ))}
-              </div>
-              <SegmentChips filters={s.filters} />
-              <SegmentCount audience_types={s.audience_types} filters={s.filters} />
-              <div className="mt-auto flex items-center gap-2 pt-3 border-t border-border">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => edit(s)}>
-                  <Pencil className="h-4 w-4" /> Editar
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => duplicate(s)} aria-label="Duplicar">
-                  <Copy className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => remove(s.id)} aria-label="Excluir">
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            </article>
-          ))}
+        <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
+          <div className="hidden md:grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_140px_160px_56px] gap-4 px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/30">
+            <div>Nome da segmentação</div>
+            <div>Audiência / Filtros</div>
+            <div>Destinatários</div>
+            <div>Última atualização</div>
+            <div className="text-right">Ações</div>
+          </div>
+          <ul className="divide-y divide-border">
+            {(segments as SegmentDef[]).map((s) => (
+              <li
+                key={s.id}
+                className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_140px_160px_56px] gap-3 md:gap-4 px-5 py-4 items-center hover:bg-muted/30 transition-colors"
+              >
+                <div className="min-w-0">
+                  <button
+                    onClick={() => edit(s)}
+                    className="text-left font-display font-semibold text-brand hover:underline truncate block w-full"
+                  >
+                    {s.name}
+                  </button>
+                  {s.description && (
+                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{s.description}</p>
+                  )}
+                </div>
+                <div className="min-w-0 flex flex-wrap gap-1.5">
+                  {(Array.isArray(s.audience_types) ? s.audience_types : []).map((a) => (
+                    <Badge key={a} variant="secondary" className="text-[10px]">{AUDIENCE_LABELS[a]}</Badge>
+                  ))}
+                  <SegmentFilterSummary filters={s.filters} />
+                </div>
+                <SegmentCount audience_types={s.audience_types} filters={s.filters} />
+                <div className="text-sm text-muted-foreground">
+                  {s.updated_at
+                    ? new Date(s.updated_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+                    : "—"}
+                </div>
+                <div className="flex justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" aria-label="Mais ações">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={() => edit(s)}>
+                        <Eye className="h-4 w-4" /> Ver destinatários
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => edit(s)}>
+                        <Pencil className="h-4 w-4" /> Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => duplicate(s)}>
+                        <Copy className="h-4 w-4" /> Duplicar
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => remove(s.id)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" /> Excluir segmento
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
   );
 }
 
-function SegmentChips({ filters }: { filters: SegmentFilters }) {
+function SegmentFilterSummary({ filters }: { filters: SegmentFilters }) {
   const chips: string[] = [];
   if (filters.stages?.length) chips.push(`Etapas: ${filters.stages.join(", ")}`);
   if (filters.city?.length) chips.push(`Cidade: ${filters.city.join(", ")}`);
@@ -92,12 +139,14 @@ function SegmentChips({ filters }: { filters: SegmentFilters }) {
   if (filters.age_max != null) chips.push(`≤ ${filters.age_max} anos`);
   if (filters.status) chips.push(`Status: ${filters.status}`);
   if (filters.channel) chips.push(`Canal: ${filters.channel}`);
-  
-  if (!chips.length) return <p className="text-xs text-muted-foreground italic">Sem filtros (todos os registros).</p>;
+
+  if (!chips.length) return <span className="text-[11px] text-muted-foreground italic">sem filtros</span>;
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {chips.map((c) => <Badge key={c} variant="outline" className="text-[10px] font-normal">{c}</Badge>)}
-    </div>
+    <>
+      {chips.map((c) => (
+        <Badge key={c} variant="outline" className="text-[10px] font-normal">{c}</Badge>
+      ))}
+    </>
   );
 }
 
@@ -108,7 +157,7 @@ function SegmentCount({ audience_types, filters }: { audience_types: AudienceTyp
     staleTime: 30_000,
   });
   return (
-    <div className="inline-flex items-center gap-1.5 self-start rounded-full bg-muted/50 px-2.5 py-1 text-xs font-medium text-brand">
+    <div className="inline-flex w-fit items-center gap-1.5 self-start rounded-full bg-muted/50 px-2.5 py-1 text-xs font-medium text-brand">
       <Users className="h-3.5 w-3.5" />
       {isLoading ? "..." : `${data.length} destinatário${data.length === 1 ? "" : "s"}`}
     </div>
