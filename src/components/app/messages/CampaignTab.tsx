@@ -21,7 +21,7 @@ import {
   SegmentFilters, TargetingMode, emptyFilters, resolveRecipients,
 } from "@/lib/segments";
 import {
-  extractVariables, renderTemplate, formatMedications, pickVariantBody,
+  extractVariables, renderTemplate, formatMedications, pickVariantBody, getVariableLabel,
   type MessageTemplate,
 } from "@/lib/templates";
 import { createBatch } from "@/lib/whatsapp";
