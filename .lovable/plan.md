@@ -1,71 +1,61 @@
-## Visão geral
+# Cadastro de paciente em etapas
 
-Transformar o conceito de "Modelo de mensagem" em **Objetivo** (ex.: Lembrete de medicação, Lembrete de consulta). Cada objetivo passa a ter **três variantes de corpo** — uma para Paciente, uma para Familiar/Cuidador e uma para Segmento. Quando o usuário escolhe o destinatário no envio, o texto da mensagem troca automaticamente, e a interface mostra claramente qual variante está sendo usada.
+Transformar o diálogo "Novo paciente" em um wizard de 3 etapas, com validação por etapa e novos campos clínicos focados em Doença de Chagas.
 
-## Mudanças no banco
+## Etapas
 
-Migração única que:
+**1. Informações pessoais**
+- Nome completo*, CPF, data de nascimento
+- Telefone*, e-mail
+- Endereço (CEP → rua, cidade, estado — já temos o componente `CepAddressFields`)
 
-1. Adiciona 3 colunas em `message_templates`:
-   - `body_patient` text — corpo enviado quando destinatário = paciente
-   - `body_contact` text — corpo enviado para familiar/cuidador/médico
-   - `body_segment` text — corpo enviado em disparo segmentado
-   - A coluna `body` existente fica como fallback (caso uma variante esteja em branco).
-2. Renomeia a coluna interna: mantém `category` (compatível com pastas), mas **na UI** será chamada "Objetivo".
-3. Apaga todos os modelos existentes (`DELETE FROM message_templates`).
-4. Insere 9 objetivos padrão (`is_default = true`), cada um com as 3 variantes preenchidas:
-   - Lembrete de medicação · Lembrete de consulta · Confirmação de recebimento · Acompanhamento de adesão · Cuidados de rotina · Boas-vindas · Aviso do ambulatório · Alimentação saudável · Orientação de saúde
-   - O antigo "Mensagem para familiar/cuidador" deixa de existir — vira a variante `body_contact` dos demais.
+**2. Informações de saúde**
+- Etapa da doença* (diagnóstico, agudo, crônico) — já existe
+- Forma clínica de Chagas (indeterminada, cardíaca, digestiva, mista)
+- Data do diagnóstico
+- Peso (kg), altura (cm), tipo sanguíneo (A+/A-/B+/B-/AB+/AB-/O+/O-/não sabe)
+- Comorbidades (texto livre)
+- Alergias (texto livre)
+- Medicações em uso (texto livre)
 
-Exemplo (Lembrete de medicação):
-- Paciente: `Olá, {nome_paciente}. Lembrete da sua medicação: {medicacao}. Não esqueça do horário.`
-- Familiar: `Olá, {nome_contato}. Você é responsável pelo cuidado de {nome_paciente}. Lembrete da medicação dele(a): {medicacao}.`
-- Segmento: `Olá, {nome_destinatario}. Este é um lembrete coletivo sobre o uso correto da medicação: {medicacao}.`
+**3. Preferências e observações**
+- Canal preferido* (WhatsApp/SMS)
+- Status (ativo/inativo)
+- Observações gerais
 
-## Mudanças no editor (TemplateEditorDialog)
+## UX
 
-- Título: "Novo objetivo de mensagem" / "Editar objetivo".
-- Campo "Nome do modelo" → "Nome do objetivo".
-- "Categoria" → "Pasta" (já vem das pastas de conteúdo).
-- Etapa 2 ("Mensagem") ganha **3 abas** (Paciente, Familiar/Cuidador, Segmento). Cada aba tem seu próprio textarea + preview do WhatsApp. As variáveis sugeridas continuam funcionando para a aba ativa.
-- Validação: pelo menos a variante "Paciente" precisa estar preenchida; as outras herdam dela se ficarem vazias.
+- Barra de progresso no topo: `Pessoais · Saúde · Preferências` (passo atual destacado, anteriores marcados como concluídos).
+- Botões `Voltar` / `Próximo` no rodapé; última etapa mostra `Cadastrar paciente`.
+- "Próximo" valida apenas os campos da etapa atual (zod por etapa). Erros aparecem inline e o foco vai para o primeiro campo inválido.
+- Estado do formulário preservado ao navegar entre etapas (não reseta ao voltar).
+- Ao fechar o diálogo, o wizard reseta para a etapa 1.
+- Mesmo padrão visual já usado nos diálogos atuais (sem mudanças de design system).
 
-## Mudanças no envio (UseTemplateDialog)
+## Mudanças técnicas
 
-- Título: "Usar objetivo: {nome}".
-- Ao escolher o destinatário no passo 1, a variante correspondente é selecionada automaticamente:
-  - `patient` → `body_patient`
-  - `contact` → `body_contact`
-  - `segment` → `body_segment`
-- Acima do preview (passos 2 e 3) aparece um **badge visível** indicando a variante ativa, ex.: `Variante: Familiar/Cuidador`. O usuário pode trocar a variante manualmente via um seletor compacto ao lado do badge se quiser sobrescrever.
-- Variáveis detectadas e auto-preenchidas passam a vir da variante ativa.
+**Banco** (migration):
+- Adicionar colunas em `public.patients`:
+  - `clinical_form text` (valores: `indeterminada` | `cardiaca` | `digestiva` | `mista` | vazio)
+  - `diagnosis_date date`
+  - `weight_kg numeric(5,2)`
+  - `height_cm numeric(5,2)`
+  - `blood_type text`
+  - `comorbidities text` default `''`
+  - `allergies text` default `''`
+  - `current_medications text` default `''`
+- Todas opcionais (NULL ou default vazio) para não quebrar registros existentes.
+- Sem mudança em RLS/policies (herdam as atuais da tabela).
 
-## Mudanças no disparo segmentado / batches
+**Frontend** (`src/pages/app/Patients.tsx`):
+- Extrair o conteúdo do `Dialog` de cadastro em um novo componente `NewPatientWizard` (`src/components/app/patients/NewPatientWizard.tsx`) para isolar a lógica de etapas e manter `Patients.tsx` legível.
+- Schema zod dividido: `personalSchema`, `healthSchema`, `prefsSchema` + `fullSchema` combinado para o submit final.
+- Estado único `form` com todos os campos; `step` controla a UI.
+- `onCreate` envia o objeto completo para `supabase.from('patients').insert(...)` com os novos campos.
+- Mesma invalidação de queries (`patients`, `dashboard`) e toast de sucesso.
 
-- `CampaignTab` e `createBatch` (em `src/lib/whatsapp.ts`) escolhem `body_segment` por padrão quando há template; cai para `body_patient` ou `body` se faltar.
-- `process-message-batch` (edge function) **não muda** — o `body` final já é renderizado no cliente antes de inserir as mensagens.
-
-## Mudanças textuais na UI (renomeação)
-
-| Onde aparece "Modelo" hoje | Vira |
-|---|---|
-| Aba "Modelos" da página Mensagens | "Objetivos" |
-| Botão "Novo modelo" | "Novo objetivo" |
-| "Usar modelo" | "Usar objetivo" |
-| Resumo do envio: "Modelo:" | "Objetivo:" |
-| Toasts "Modelo criado/atualizado" | "Objetivo criado/atualizado" |
-| Cards de template | Mantêm visual, troca o rótulo |
-
-Arquivos tocados na renomeação: `TemplatesTab.tsx`, `TemplateCard.tsx`, `TemplateEditorDialog.tsx`, `UseTemplateDialog.tsx`, `CampaignTab.tsx`, `Messages.tsx`.
-
-## Detalhes técnicos
-
-- Tipo `MessageTemplate` em `src/lib/templates.ts` ganha `body_patient`, `body_contact`, `body_segment` (todos opcionais para compatibilidade).
-- Novo helper `pickVariant(template, mode): string` que devolve a variante certa com fallback em cadeia: variante pedida → `body_patient` → `body`.
-- `queueAndSendFromTemplate` recebe um parâmetro `mode` e usa `pickVariant` para escolher o corpo. `extractVariables` roda sobre a variante escolhida.
-- Sem mudança na edge function, sem mudança nas políticas RLS, sem mudança no schema das outras tabelas.
+**Detalhes de paciente** (`src/pages/app/PatientDetail.tsx`): fora de escopo nesta tarefa — os novos campos ficam disponíveis no banco mas a exibição/edição em "detalhes" pode ser feita em uma etapa seguinte se você quiser.
 
 ## Fora de escopo
-
-- Não mexe na biblioteca de conteúdos (`content_library`).
-- Não muda o fluxo da Meta (template aprovado continua sendo um único nome/idioma — variantes só valem para `template_kind = "internal"`; para `meta` as 3 abas ficam desabilitadas e só `body_patient` é usado).
+- Edição dos novos campos via tela de detalhes do paciente.
+- Migrar o cadastro de contatos (familiar/cuidador/médico) para wizard — segue como está.
