@@ -53,8 +53,40 @@ export default function Segments() {
         </Button>
       </header>
 
-      {segments.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center text-muted-foreground">
+      {isLoading ? (
+        <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
+          <div className="hidden md:grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_140px_160px_56px] gap-4 px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/30">
+            <div>Nome da segmentação</div>
+            <div>Audiência / Filtros</div>
+            <div>Destinatários</div>
+            <div>Última atualização</div>
+            <div className="text-right">Ações</div>
+          </div>
+          <ul className="divide-y divide-border">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <li
+                key={i}
+                className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_140px_160px_56px] gap-3 md:gap-4 px-5 py-4 items-center"
+              >
+                <div className="min-w-0 space-y-2">
+                  <Skeleton className="h-5 w-3/4" />
+                  <Skeleton className="h-3.5 w-1/2" />
+                </div>
+                <div className="min-w-0 flex flex-wrap gap-1.5">
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-5 w-12" />
+                </div>
+                <Skeleton className="h-6 w-24 rounded-full" />
+                <Skeleton className="h-4 w-28" />
+                <div className="flex justify-end">
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : segments.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center text-muted-1text-muted-foreground">
           Nenhum segmento criado ainda. Clique em <span className="font-medium text-brand">Novo segmento</span> para começar.
         </div>
       ) : (
