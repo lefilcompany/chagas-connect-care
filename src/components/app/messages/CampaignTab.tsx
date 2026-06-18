@@ -21,7 +21,7 @@ import {
   SegmentFilters, TargetingMode, emptyFilters, resolveRecipients,
 } from "@/lib/segments";
 import {
-  extractVariables, renderTemplate, formatMedications, pickVariantBody,
+  extractVariables, renderTemplate, formatMedications, pickVariantBody, getVariableLabel,
   type MessageTemplate,
 } from "@/lib/templates";
 import { createBatch } from "@/lib/whatsapp";
@@ -559,7 +559,7 @@ export default function CampaignTab({
               <div className="grid gap-2 sm:grid-cols-2">
                 {manualVars.map((v) => (
                   <div key={v} className="space-y-1">
-                    <Label className="font-mono text-xs">{`{${v}}`}</Label>
+                    <Label className="text-xs font-medium">{getVariableLabel(v)}</Label>
                     <VariableInput
                       varKey={v}
                       value={vars[v] ?? ""}

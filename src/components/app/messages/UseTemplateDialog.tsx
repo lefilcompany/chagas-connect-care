@@ -18,7 +18,7 @@ import {
   ChevronLeft, ChevronRight, Send, AlertTriangle, Users, User as UserIcon,
 } from "lucide-react";
 import {
-  extractVariables, renderTemplate, autofillVariables, pickVariantBody,
+  extractVariables, renderTemplate, autofillVariables, pickVariantBody, getVariableLabel,
   VARIANT_LABEL, type MessageTemplate, type TemplateVariant,
 } from "@/lib/templates";
 import { WhatsAppPreview } from "./WhatsAppPreview";
@@ -366,7 +366,7 @@ export function UseTemplateDialog({
               ) : (
                 detectedVars.map((v) => (
                   <div key={v} className="space-y-1.5">
-                    <Label className="font-mono text-xs">{`{${v}}`}</Label>
+                    <Label className="text-xs font-medium">{getVariableLabel(v)}</Label>
                     <VariableInput
                       varKey={v}
                       value={vars[v] ?? ""}
