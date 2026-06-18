@@ -546,13 +546,20 @@ export type Database = {
       patients: {
         Row: {
           address: string
+          allergies: string
           birth_date: string | null
+          blood_type: string | null
           channel_pref: Database["public"]["Enums"]["message_channel"]
           city: string
+          clinical_form: string | null
+          comorbidities: string
           cpf: string
           created_at: string
+          current_medications: string
+          diagnosis_date: string | null
           email: string
           full_name: string
+          height_cm: number | null
           id: string
           institution: string
           notes: string | null
@@ -562,16 +569,24 @@ export type Database = {
           state: string
           status: string
           updated_at: string
+          weight_kg: number | null
         }
         Insert: {
           address?: string
+          allergies?: string
           birth_date?: string | null
+          blood_type?: string | null
           channel_pref?: Database["public"]["Enums"]["message_channel"]
           city?: string
+          clinical_form?: string | null
+          comorbidities?: string
           cpf?: string
           created_at?: string
+          current_medications?: string
+          diagnosis_date?: string | null
           email?: string
           full_name: string
+          height_cm?: number | null
           id?: string
           institution?: string
           notes?: string | null
@@ -581,16 +596,24 @@ export type Database = {
           state?: string
           status?: string
           updated_at?: string
+          weight_kg?: number | null
         }
         Update: {
           address?: string
+          allergies?: string
           birth_date?: string | null
+          blood_type?: string | null
           channel_pref?: Database["public"]["Enums"]["message_channel"]
           city?: string
+          clinical_form?: string | null
+          comorbidities?: string
           cpf?: string
           created_at?: string
+          current_medications?: string
+          diagnosis_date?: string | null
           email?: string
           full_name?: string
+          height_cm?: number | null
           id?: string
           institution?: string
           notes?: string | null
@@ -600,6 +623,7 @@ export type Database = {
           state?: string
           status?: string
           updated_at?: string
+          weight_kg?: number | null
         }
         Relationships: []
       }
