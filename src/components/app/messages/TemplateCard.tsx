@@ -41,7 +41,7 @@ export function TemplateCard({
   return (
     <article className="flex h-full flex-col rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="font-display text-base font-bold text-brand line-clamp-1">{template.name}</h3>
+        <h3 className="font-display text-base font-bold text-brand break-words">{template.name}</h3>
         {isDefault && (
           <Badge variant="outline" className="shrink-0 text-[10px] border-primary/40 text-primary">
             <Lock className="mr-0.5 h-3 w-3" /> Padrão
