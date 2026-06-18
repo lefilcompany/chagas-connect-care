@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CepAddressFields } from "@/components/app/CepAddressFields";
+import { NewPatientWizard } from "@/components/app/patients/NewPatientWizard";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
@@ -297,59 +298,10 @@ export default function Patients() {
           <h1 className="font-display text-3xl font-bold text-brand">Pacientes</h1>
           <p className="text-muted-foreground mt-1">Pacientes, famílias e cuidadores acompanhados pela sua equipe.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button variant="hero"><Plus className="h-4 w-4" /> Novo paciente</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Cadastrar paciente</DialogTitle></DialogHeader>
-            <form onSubmit={onCreate} className="space-y-4">
-              <div className="space-y-2"><Label>Nome completo *</Label><Input name="full_name" placeholder="Ex: Maria da Silva" required /></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Telefone *</Label><Input name="phone" type="tel" placeholder="(81) 99999-9999" required maxLength={15} onInput={(e) => { e.currentTarget.value = formatPhone(e.currentTarget.value); }} /></div>
-                <div className="space-y-2"><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Data de nascimento</Label><Input name="birth_date" type="date" /></div>
-                <div className="space-y-2"><Label>CPF</Label><Input name="cpf" placeholder="000.000.000-00" maxLength={14} /></div>
-              </div>
-              <CepAddressFields />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-2"><Label>Etapa</Label>
-                  <Select name="stage" defaultValue="diagnostico">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="diagnostico">Diagnóstico</SelectItem>
-                      <SelectItem value="agudo">Agudo</SelectItem>
-                      <SelectItem value="cronico">Crônico</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2"><Label>Canal preferido</Label>
-                  <Select name="channel_pref" defaultValue="whatsapp">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                      <SelectItem value="sms">SMS</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2"><Label>Status</Label>
-                  <Select name="status" defaultValue="ativo">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ativo">Ativo</SelectItem>
-                      <SelectItem value="inativo">Inativo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="space-y-2"><Label>Observações</Label><Input name="notes" placeholder="Ex: Alergia a penicilina" /></div>
-              <Button type="submit" variant="hero" className="w-full">Cadastrar</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button variant="hero" onClick={() => setOpen(true)}>
+          <Plus className="h-4 w-4" /> Novo paciente
+        </Button>
+        <NewPatientWizard open={open} onOpenChange={setOpen} />
       </header>
 
       <div className="flex flex-wrap items-center gap-3">
