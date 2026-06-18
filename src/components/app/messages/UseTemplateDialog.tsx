@@ -18,7 +18,7 @@ import {
   ChevronLeft, ChevronRight, Send, AlertTriangle, Users, User as UserIcon,
 } from "lucide-react";
 import {
-  extractVariables, renderTemplate, autofillVariables, pickVariantBody,
+  extractVariables, renderTemplate, autofillVariables, pickVariantBody, getVariableLabel,
   VARIANT_LABEL, type MessageTemplate, type TemplateVariant,
 } from "@/lib/templates";
 import { WhatsAppPreview } from "./WhatsAppPreview";
