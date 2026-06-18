@@ -17,6 +17,7 @@ import {
   Phone, ArrowRight, Trash2, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { z } from "zod";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Patient = {
   id: string; full_name: string; stage: string; phone: string;
@@ -69,6 +70,7 @@ export default function Patients() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: items = [] } = useQuery({ queryKey: qk.patients, queryFn: fetchers.patients as () => Promise<Patient[]> });
+  const { isLoading: patientsLoading } = useQuery({ queryKey: qk.patients, queryFn: fetchers.patients as () => Promise<Patient[]> });
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"table" | "cards">("table");
@@ -383,7 +385,20 @@ export default function Patients() {
         </div>}
       </div>
 
-      {filtered.length === 0 ? (
+      {patientsLoading && items.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-card shadow-card p-4 space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="h-9 w-9 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
+              <Skeleton className="h-8 w-40 rounded-xl" />
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card p-12 text-center text-muted-foreground shadow-card">
           Nenhum paciente encontrado.
         </div>
