@@ -77,8 +77,9 @@ export default function CampaignTab({
 
   // Realtime: refresh medication-derived state whenever medications change anywhere.
   useEffect(() => {
+    if (!institution) return;
     const channel = supabase
-      .channel("campaign-medications-realtime")
+      .channel(`${institution}:campaign-medications-realtime`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "medications" },
@@ -91,7 +92,7 @@ export default function CampaignTab({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [qc]);
+  }, [qc, institution]);
 
   // Apply preselected template (when navigated from "Usar modelo > Segmento")
   useEffect(() => {
