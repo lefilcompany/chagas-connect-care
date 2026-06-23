@@ -6,6 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AuthPage from "./pages/Auth.tsx";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import TermsOfUse from "./pages/legal/TermsOfUse";
+import DataDeletion from "./pages/legal/DataDeletion";
 import { AuthProvider } from "@/lib/auth";
 import { AppLayout } from "@/components/app/AppLayout";
 import Dashboard from "./pages/app/Dashboard";
@@ -45,6 +48,9 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+            <Route path="/termos-de-uso" element={<TermsOfUse />} />
+            <Route path="/exclusao-de-dados" element={<DataDeletion />} />
             <Route path="/app" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="pacientes" element={<Patients />} />
