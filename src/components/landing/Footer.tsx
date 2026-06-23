@@ -3,6 +3,10 @@ import { useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
+const handleLegalClick = () => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
 export const Footer = () => (
   <footer className="border-t border-border bg-card">
     <div className="container py-14">
