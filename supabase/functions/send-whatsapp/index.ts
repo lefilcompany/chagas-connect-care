@@ -10,7 +10,12 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
-const META_API = `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+const RAW_WHATSAPP_GRAPH_VERSION = Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? "v25.0";
+const WHATSAPP_GRAPH_VERSION = /^v\d+\.\d+$/.test(RAW_WHATSAPP_GRAPH_VERSION)
+  ? RAW_WHATSAPP_GRAPH_VERSION
+  : "v25.0";
+
+const META_API = `https://graph.facebook.com/${WHATSAPP_GRAPH_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
