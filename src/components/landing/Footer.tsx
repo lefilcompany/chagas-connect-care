@@ -2,6 +2,10 @@ import { Heart, Instagram, Linkedin, Twitter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
+const handleLegalClick = () => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
 export const Footer = () => (
   <footer className="border-t border-border bg-card">
     <div className="container py-14">
@@ -29,9 +33,9 @@ export const Footer = () => (
           <div>
             <h4 className="mb-3 font-display text-sm font-bold text-brand">Legal</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link to="/politica-de-privacidade" className="hover:text-brand">Política de Privacidade</Link></li>
-              <li><Link to="/termos-de-uso" className="hover:text-brand">Termos de Uso</Link></li>
-              <li><Link to="/exclusao-de-dados" className="hover:text-brand">Exclusão de Dados</Link></li>
+              <li><Link to="/politica-de-privacidade" onClick={handleLegalClick} className="hover:text-brand">Política de Privacidade</Link></li>
+              <li><Link to="/termos-de-uso" onClick={handleLegalClick} className="hover:text-brand">Termos de Uso</Link></li>
+              <li><Link to="/exclusao-de-dados" onClick={handleLegalClick} className="hover:text-brand">Exclusão de Dados</Link></li>
             </ul>
           </div>
         </div>
