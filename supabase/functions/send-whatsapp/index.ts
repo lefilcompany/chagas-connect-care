@@ -606,6 +606,155 @@ Deno.serve(async (req) => {
       },
     };
     }
+
+    // ---- Carousel (Phase 7) -------------------------------------------
+    // Carousel templates carry per-card definitions on
+    // message_templates.meta_carousel_cards. Runtime values come from
+    // messages.template_variables.__carousel:
+    //   [{ card_index, header_media_asset_id?, body_params?: string[],
+    //      buttons?: Array<{ index, sub_type, payload?, url_param?, copy_code? }> }]
+    const carouselDefsRaw = (tplRow as any).meta_carousel_cards;
+    const carouselDefs: any[] = Array.isArray(carouselDefsRaw) ? carouselDefsRaw : [];
+    if (carouselDefs.length > 0) {
+      const carouselInputsRaw = ((msg as any).template_variables as Record<string, unknown> | null)?.__carousel;
+      const carouselInputs: any[] = Array.isArray(carouselInputsRaw) ? carouselInputsRaw : [];
+      if (carouselInputs.length !== carouselDefs.length) {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: `Carrossel exige ${carouselDefs.length} cards, recebido ${carouselInputs.length}`,
+        }).eq("id", msg.id);
+        return json(200, {
+          ok: false,
+          error_code: "CAROUSEL_CARD_COUNT_MISMATCH",
+          error: `Este carrossel exige exatamente ${carouselDefs.length} cards.`,
+        });
+      }
+
+      const allowEnv = (Deno.env.get("WHATSAPP_URL_ALLOWLIST") ?? "").trim();
+      const allowAll = allowEnv === "" || allowEnv === "*";
+      const allowList = allowAll ? [] : allowEnv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+      const failCarousel = async (code: string, errorMsg: string) => {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: errorMsg,
+        }).eq("id", msg.id);
+        return json(200, { ok: false, error_code: code, error: errorMsg });
+      };
+
+      const cards: Record<string, unknown>[] = [];
+      for (let i = 0; i < carouselDefs.length; i++) {
+        const def = carouselDefs[i] ?? {};
+        const input = carouselInputs[i] ?? {};
+        const cardComponents: Record<string, unknown>[] = [];
+
+        // Header (image/video required at runtime via media_asset_id)
+        const headerFormat: string | null = (def.header?.format ?? def.header_format ?? null)
+          ? String(def.header?.format ?? def.header_format).toLowerCase()
+          : null;
+        if (headerFormat === "image" || headerFormat === "video") {
+          const assetId = input.header_media_asset_id as string | null;
+          if (!assetId) {
+            return await failCarousel("MEDIA_NOT_UPLOADED", `Card ${i + 1}: mídia do cabeçalho ausente.`);
+          }
+          const { data: asset } = await admin
+            .from("whatsapp_media_assets")
+            .select("meta_media_id, status")
+            .eq("id", assetId)
+            .maybeSingle();
+          const mediaId = (asset as any)?.meta_media_id as string | null;
+          if (!mediaId || (asset as any)?.status !== "uploaded") {
+            return await failCarousel("MEDIA_NOT_UPLOADED", `Card ${i + 1}: mídia ainda não enviada à Meta.`);
+          }
+          cardComponents.push({
+            type: "header",
+            parameters: [{ type: headerFormat, [headerFormat]: { id: mediaId } }],
+          });
+        }
+
+        // Body parameters (positional)
+        const bodyParams = Array.isArray(input.body_params) ? (input.body_params as unknown[]) : [];
+        const bodyOrder = Array.isArray(def.body?.parameter_order)
+          ? (def.body.parameter_order as string[])
+          : null;
+        const expectedBody = bodyOrder ? bodyOrder.length : bodyParams.length;
+        if (bodyParams.length !== expectedBody) {
+          return await failCarousel(
+            "TEMPLATE_PARAMETER_COUNT_MISMATCH",
+            `Card ${i + 1}: esperado ${expectedBody} variáveis, recebido ${bodyParams.length}.`,
+          );
+        }
+        if (bodyParams.length > 0) {
+          cardComponents.push({
+            type: "body",
+            parameters: bodyParams.map((v) => ({ type: "text", text: String(v ?? "") })),
+          });
+        }
+
+        // Buttons per card (same shape used by Phase 4)
+        const btnDefs: any[] = Array.isArray(def.buttons) ? def.buttons : [];
+        const btnInputs: any[] = Array.isArray(input.buttons) ? input.buttons : [];
+        for (const inp of btnInputs) {
+          if (typeof inp?.index !== "number" || inp.index < 0 || inp.index >= btnDefs.length) {
+            return await failCarousel("BUTTON_INDEX_OUT_OF_RANGE",
+              `Card ${i + 1}: botão índice ${inp?.index} não existe.`);
+          }
+          const bd = btnDefs[inp.index];
+          const btype = String(bd?.type ?? "").toUpperCase();
+          if (btype === "QUICK_REPLY") {
+            if (inp.sub_type !== "quick_reply" || !inp.payload || inp.payload.length === 0 || inp.payload.length > 256) {
+              return await failCarousel("TEMPLATE_PARAMETER_MISSING",
+                `Card ${i + 1}: payload do botão inválido.`);
+            }
+            cardComponents.push({
+              type: "button", sub_type: "quick_reply", index: String(inp.index),
+              parameters: [{ type: "payload", payload: inp.payload }],
+            });
+          } else if (btype === "URL") {
+            if (inp.sub_type !== "url" || !inp.url_param) {
+              return await failCarousel("TEMPLATE_PARAMETER_MISSING",
+                `Card ${i + 1}: parâmetro de URL ausente.`);
+            }
+            let parsed: URL | null = null;
+            try { parsed = new URL(String(bd.url ?? "").replace("{{1}}", inp.url_param)); } catch { parsed = null; }
+            if (!parsed || parsed.protocol !== "https:") {
+              return await failCarousel("URL_DOMAIN_NOT_ALLOWED",
+                `Card ${i + 1}: URL inválida ou sem HTTPS.`);
+            }
+            if (!allowAll) {
+              const host = parsed.hostname.toLowerCase();
+              const okHost = allowList.some((d) => host === d || host.endsWith("." + d));
+              if (!okHost) {
+                return await failCarousel("URL_DOMAIN_NOT_ALLOWED",
+                  `Card ${i + 1}: domínio "${host}" fora da allowlist.`);
+              }
+            }
+            cardComponents.push({
+              type: "button", sub_type: "url", index: String(inp.index),
+              parameters: [{ type: "text", text: inp.url_param }],
+            });
+          }
+          // PHONE_NUMBER / static buttons → no runtime component
+        }
+
+        cards.push({ card_index: i, components: cardComponents });
+      }
+
+      // Compose the final template payload: keep any pre-existing components
+      // (top-level body / header) and append the carousel component last.
+      const baseTpl = (metaPayload as any).template ?? {
+        name: tplRow.meta_template_name,
+        language: { code: tplRow.meta_language || "pt_BR" },
+      };
+      const baseComps: Record<string, unknown>[] = Array.isArray((baseTpl as any).components)
+        ? [...(baseTpl as any).components] : [];
+      baseComps.push({ type: "carousel", cards });
+      metaPayload = {
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: { ...baseTpl, components: baseComps },
+      };
+    }
   }
 
   // ---- Interactive messages (Phase 6) -----------------------------------
