@@ -851,6 +851,57 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_channels: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          display_phone_number: string | null
+          id: string
+          institution: string
+          last_synced_at: string | null
+          last_webhook_at: string | null
+          mode: string
+          notes: string | null
+          phone_number_id: string | null
+          quality_rating: string | null
+          status: string
+          updated_at: string
+          waba_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          display_phone_number?: string | null
+          id?: string
+          institution: string
+          last_synced_at?: string | null
+          last_webhook_at?: string | null
+          mode?: string
+          notes?: string | null
+          phone_number_id?: string | null
+          quality_rating?: string | null
+          status?: string
+          updated_at?: string
+          waba_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          display_phone_number?: string | null
+          id?: string
+          institution?: string
+          last_synced_at?: string | null
+          last_webhook_at?: string | null
+          mode?: string
+          notes?: string | null
+          phone_number_id?: string | null
+          quality_rating?: string | null
+          status?: string
+          updated_at?: string
+          waba_id?: string | null
+        }
+        Relationships: []
+      }
       whatsapp_conversations: {
         Row: {
           contact_id: string | null

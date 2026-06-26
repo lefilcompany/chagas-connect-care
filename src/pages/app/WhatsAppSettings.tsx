@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Info, Settings } from "lucide-react";
+import { Info, Settings, RefreshCw, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
 import { WhatsAppPreview } from "@/components/app/messages/WhatsAppPreview";
 import { APP_DISPLAY_NAME, DEFAULT_POWERED_BY_TEXT } from "@/config/application";
 
@@ -189,9 +189,9 @@ export default function WhatsAppSettings() {
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="overview">Visão geral</TabsTrigger>
           <TabsTrigger value="identity">Identidade e assinatura</TabsTrigger>
-          <TabsTrigger value="templates" disabled>Templates Meta</TabsTrigger>
-          <TabsTrigger value="channel" disabled>Canal</TabsTrigger>
-          <TabsTrigger value="diagnostics" disabled>Diagnóstico</TabsTrigger>
+          <TabsTrigger value="templates">Templates Meta</TabsTrigger>
+          <TabsTrigger value="channel">Canal</TabsTrigger>
+          <TabsTrigger value="diagnostics">Diagnóstico</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -387,6 +387,18 @@ export default function WhatsAppSettings() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="templates">
+          <TemplatesMetaTab institution={institution} isAdmin={isAdmin} />
+        </TabsContent>
+
+        <TabsContent value="channel">
+          <ChannelTab institution={institution} />
+        </TabsContent>
+
+        <TabsContent value="diagnostics">
+          <DiagnosticsTab isAdmin={isAdmin} />
+        </TabsContent>
       </Tabs>
 
       {dirty && isAdmin && (
@@ -403,5 +415,200 @@ export default function WhatsAppSettings() {
         </div>
       )}
     </div>
+  );
+}
+
+// =========================================================
+// Templates Meta tab — list + sync trigger
+// =========================================================
+function TemplatesMetaTab({ institution, isAdmin }: { institution: string; isAdmin: boolean }) {
+  const qc = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["whatsappTemplates", institution],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("message_templates")
+        .select("id,name,meta_template_name,meta_language,meta_status,meta_category,meta_footer_text,meta_has_local_differences,meta_last_synced_at")
+        .eq("template_kind", "meta")
+        .order("meta_last_synced_at", { ascending: false, nullsFirst: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!institution,
+  });
+
+  async function onSync() {
+    if (!isAdmin) return;
+    setSyncing(true);
+    const { data: res, error } = await supabase.functions.invoke("sync-whatsapp-templates", { body: {} });
+    setSyncing(false);
+    if (error || !(res as any)?.ok) {
+      toast.error((error?.message ?? (res as any)?.error) || "Falha ao sincronizar templates");
+      return;
+    }
+    toast.success(`Sincronizados: ${(res as any).updated} | Não mapeados: ${(res as any).unmapped}`);
+    qc.invalidateQueries({ queryKey: ["whatsappTemplates", institution] });
+    refetch();
+  }
+
+  return (
+    <Card className="space-y-4 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">Templates aprovados na Meta</p>
+          <p className="text-xs text-muted-foreground">
+            Sincronize para trazer status, categoria, rodapé oficial e divergências locais.
+          </p>
+        </div>
+        <Button size="sm" onClick={onSync} disabled={!isAdmin || syncing}>
+          <RefreshCw className={"h-4 w-4 " + (syncing ? "animate-spin" : "")} />
+          {syncing ? "Sincronizando…" : "Sincronizar agora"}
+        </Button>
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-32 w-full" />
+      ) : !data || data.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhum template Meta encontrado ainda.</p>
+      ) : (
+        <div className="divide-y divide-border rounded-md border border-border">
+          {(data as any[]).map((t) => (
+            <div key={t.id} className="flex flex-wrap items-center gap-3 p-3 text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{t.meta_template_name ?? t.name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {t.meta_language ?? "—"} · {t.meta_category ?? "—"}
+                  {t.meta_footer_text ? ` · rodapé: "${t.meta_footer_text}"` : ""}
+                </p>
+              </div>
+              <span className={
+                "rounded-full px-2 py-0.5 text-xs " +
+                (t.meta_status === "approved"
+                  ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
+                  : t.meta_status === "rejected"
+                    ? "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200"
+                    : "bg-muted text-muted-foreground")
+              }>
+                {t.meta_status ?? "—"}
+              </span>
+              {t.meta_has_local_differences && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                  Divergente
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// =========================================================
+// Channel tab
+// =========================================================
+function ChannelTab({ institution }: { institution: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["whatsappChannels", institution],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("whatsapp_channels" as any)
+        .select("*")
+        .eq("institution", institution);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!institution,
+  });
+
+  if (isLoading) return <Skeleton className="h-32 w-full" />;
+  const channels = (data as any[]) ?? [];
+
+  return (
+    <div className="space-y-4">
+      <Card className="space-y-3 p-5">
+        <p className="text-sm font-medium">Canal compartilhado</p>
+        {channels.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nenhum canal cadastrado para esta instituição.
+          </p>
+        ) : (
+          channels.map((c) => (
+            <div key={c.id} className="rounded-md border border-border p-3 text-sm">
+              <p className="font-medium">{c.display_name ?? c.display_phone_number ?? "Sem nome"}</p>
+              <p className="text-xs text-muted-foreground">
+                Modo: {c.mode} · Status: {c.status}
+                {c.last_webhook_at ? ` · Último webhook: ${new Date(c.last_webhook_at).toLocaleString()}` : ""}
+              </p>
+              {c.notes && <p className="mt-1 text-xs text-muted-foreground">{c.notes}</p>}
+            </div>
+          ))
+        )}
+      </Card>
+      <Card className="space-y-2 p-5 opacity-70">
+        <p className="text-sm font-medium">Canal dedicado</p>
+        <p className="text-xs text-muted-foreground">
+          Canal dedicado por instituição ainda não está disponível. O armazenamento seguro de credenciais
+          será habilitado em uma evolução futura.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+// =========================================================
+// Diagnostics tab
+// =========================================================
+function DiagnosticsTab({ isAdmin }: { isAdmin: boolean }) {
+  const [running, setRunning] = useState(false);
+  const [checks, setChecks] = useState<Array<{ id: string; label: string; state: string; detail?: string }>>([]);
+
+  async function onRun() {
+    setRunning(true);
+    const { data, error } = await supabase.functions.invoke("whatsapp-diagnostics", { body: {} });
+    setRunning(false);
+    if (error || !(data as any)?.ok) {
+      toast.error(error?.message ?? "Falha ao executar diagnóstico");
+      return;
+    }
+    setChecks((data as any).checks ?? []);
+  }
+
+  return (
+    <Card className="space-y-4 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">Diagnóstico da integração</p>
+          <p className="text-xs text-muted-foreground">
+            Mostra apenas o estado de cada item — nunca exibe valores sensíveis.
+          </p>
+        </div>
+        <Button size="sm" onClick={onRun} disabled={!isAdmin || running}>
+          <RefreshCw className={"h-4 w-4 " + (running ? "animate-spin" : "")} />
+          {running ? "Executando…" : "Executar diagnóstico"}
+        </Button>
+      </div>
+      {checks.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Clique em "Executar diagnóstico" para começar.</p>
+      ) : (
+        <ul className="divide-y divide-border rounded-md border border-border">
+          {checks.map((c) => (
+            <li key={c.id} className="flex items-center gap-3 p-3 text-sm">
+              {c.state === "configurado" ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              ) : c.state === "nao_configurado" ? (
+                <XCircle className="h-4 w-4 text-red-600" />
+              ) : (
+                <HelpCircle className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className="flex-1">{c.label}</span>
+              <span className="text-xs text-muted-foreground">
+                {c.state}{c.detail ? ` · ${c.detail}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
