@@ -114,7 +114,7 @@ export function TemplateEditorDialog({
       .select("*")
       .eq("institution", institution)
       .maybeSingle()
-      .then(({ data }) => setBrandingSettings((data as InstitutionWhatsAppSettings | null) ?? null));
+      .then(({ data }) => setBrandingSettings(((data as unknown) as InstitutionWhatsAppSettings | null) ?? null));
   }, [institution]);
 
   useEffect(() => {
