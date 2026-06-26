@@ -67,6 +67,22 @@ export function friendlyWhatsAppError(payload: any): string {
   if (code === "FEATURE_DISABLED")
     return "Este recurso ainda não está habilitado para a sua instituição.";
 
+  // Phase 6 — interactive messages (button/list/cta_url)
+  if (code === "INTERACTIVE_INVALID_TYPE")
+    return payload?.error ?? "Tipo de mensagem interativa não suportado.";
+  if (code === "INTERACTIVE_BODY_REQUIRED")
+    return payload?.error ?? "Mensagem interativa precisa de um corpo de texto válido.";
+  if (code === "INTERACTIVE_FOOTER_INVALID")
+    return payload?.error ?? "Rodapé da mensagem interativa inválido (máx. 60 caracteres).";
+  if (code === "INTERACTIVE_HEADER_INVALID")
+    return payload?.error ?? "Cabeçalho da mensagem interativa inválido.";
+  if (code === "INTERACTIVE_BUTTONS_INVALID")
+    return payload?.error ?? "Lista de botões inválida (1–3 botões, título até 20 caracteres).";
+  if (code === "INTERACTIVE_LIST_INVALID")
+    return payload?.error ?? "Lista de opções inválida (até 10 linhas no total).";
+  if (code === "INTERACTIVE_CTA_INVALID")
+    return payload?.error ?? "Botão CTA inválido. Use HTTPS e texto até 20 caracteres.";
+
   if (code === "MISSING_TOKEN") return "Token do WhatsApp não configurado. Avise o administrador.";
   if (code === "MISSING_PHONE_ID") return "Phone Number ID do WhatsApp não configurado.";
   if (code === "INVALID_RECIPIENT") return payload?.error ?? "Número do destinatário inválido.";
