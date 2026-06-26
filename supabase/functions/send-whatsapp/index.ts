@@ -206,12 +206,29 @@ Deno.serve(async (req) => {
     };
     if (msg.contact_id) idPayload.contact_id = msg.contact_id;
     else idPayload.patient_id = msg.patient_id;
-    const { data: existing } = await admin
+    const phoneVariants = brPhoneVariants(to);
+    const { data: existingList } = await admin
       .from("whatsapp_identities")
-      .select("id, opt_in_status")
+      .select("id, opt_in_status, phone_e164")
       .eq("institution", institution)
-      .eq("phone_e164", to)
-      .maybeSingle();
+      .in("phone_e164", phoneVariants);
+    let existing: any = (existingList ?? [])[0] ?? null;
+    if (existingList && existingList.length > 1) {
+      // Prefer the identity that already has an OPEN service window
+      const ids = existingList.map((e: any) => e.id);
+      const { data: convs } = await admin
+        .from("whatsapp_conversations")
+        .select("identity_id, service_window_expires_at")
+        .in("identity_id", ids);
+      const open = (convs ?? []).find(
+        (c: any) =>
+          c.service_window_expires_at &&
+          new Date(c.service_window_expires_at).getTime() > Date.now(),
+      );
+      if (open) {
+        existing = existingList.find((e: any) => e.id === open.identity_id) ?? existing;
+      }
+    }
     if (existing) {
       identityId = (existing as any).id;
       optInStatus = (existing as any).opt_in_status ?? "pending";
