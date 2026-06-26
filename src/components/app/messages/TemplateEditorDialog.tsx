@@ -30,6 +30,10 @@ import {
   AudienceType, SegmentFilters, TargetingMode, emptyFilters,
 } from "@/lib/segments";
 import { useFolders } from "@/hooks/useFolders";
+import { useAuth as _u } from "@/lib/auth";
+import type { InstitutionWhatsAppSettings } from "@/lib/branding";
+import { computeFooterCompatibility } from "@/lib/branding";
+void _u;
 
 type Form = {
   name: string;
@@ -43,6 +47,8 @@ type Form = {
   meta_language: string;
   meta_category: string;
   meta_status: MetaStatus;
+  meta_footer_source: "none" | "institution_default" | "custom" | "meta_synced";
+  meta_footer_text: string;
   targeting_mode: TargetingMode;
   audience_types: AudienceType[];
   filters: SegmentFilters;
@@ -60,12 +66,14 @@ const emptyForm = (): Form => ({
   meta_language: "pt_BR",
   meta_category: "UTILITY",
   meta_status: "not_submitted",
+  meta_footer_source: "institution_default",
+  meta_footer_text: "",
   targeting_mode: "all",
   audience_types: ["paciente"],
   filters: emptyFilters(),
 });
 
-const STEPS = ["Básico", "Mensagem", "Segmentação", "Salvar"] as const;
+const STEPS = ["Básico", "Mensagem", "Rodapé", "Segmentação", "Salvar"] as const;
 
 export function TemplateEditorDialog({
   open,
@@ -90,6 +98,7 @@ export function TemplateEditorDialog({
   const [saving, setSaving] = useState(false);
   const [institution, setInstitution] = useState("");
   const [activeVariant, setActiveVariant] = useState<TemplateVariant>("patient");
+  const [brandingSettings, setBrandingSettings] = useState<InstitutionWhatsAppSettings | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -97,6 +106,16 @@ export function TemplateEditorDialog({
         .then(({ data }) => setInstitution(data?.institution ?? ""));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!institution) return;
+    supabase
+      .from("institution_whatsapp_settings" as any)
+      .select("*")
+      .eq("institution", institution)
+      .maybeSingle()
+      .then(({ data }) => setBrandingSettings(((data as unknown) as InstitutionWhatsAppSettings | null) ?? null));
+  }, [institution]);
 
   useEffect(() => {
     if (!open) return;
@@ -114,6 +133,8 @@ export function TemplateEditorDialog({
         meta_language: editing.meta_language ?? "pt_BR",
         meta_category: editing.meta_category ?? "UTILITY",
         meta_status: editing.meta_status,
+        meta_footer_source: (editing.meta_footer_source as Form["meta_footer_source"]) ?? "institution_default",
+        meta_footer_text: editing.meta_footer_text ?? "",
         targeting_mode: editing.targeting_mode ?? "all",
         audience_types: (editing.audience_types as AudienceType[]) ?? ["paciente"],
         filters: (editing.filters as SegmentFilters) ?? emptyFilters(),
@@ -179,6 +200,13 @@ export function TemplateEditorDialog({
       meta_language: form.meta_language,
       meta_category: form.template_kind === "meta" ? form.meta_category : null,
       meta_status: form.template_kind === "meta" ? form.meta_status : "not_submitted",
+      meta_footer_source: form.meta_footer_source,
+      meta_footer_text:
+        form.meta_footer_source === "none"
+          ? null
+          : form.meta_footer_source === "institution_default"
+            ? brandingSettings?.default_template_footer_text ?? null
+            : form.meta_footer_text.trim() || null,
       channel: "whatsapp",
       targeting_mode: form.targeting_mode,
       audience_types: form.audience_types,
@@ -405,6 +433,14 @@ export function TemplateEditorDialog({
         )}
 
         {step === 2 && (
+          <FooterStep
+            form={form}
+            setForm={setForm}
+            branding={brandingSettings}
+          />
+        )}
+
+        {step === 3 && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Opcional: defina um público padrão sugerido sempre que este modelo for usado em envio segmentado.
@@ -440,7 +476,7 @@ export function TemplateEditorDialog({
           </div>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-2 text-sm">
@@ -457,6 +493,16 @@ export function TemplateEditorDialog({
                   <li>• Familiar/Cuidador: {form.body_contact.trim() ? "✓" : "herda do paciente"}</li>
                   <li>• Segmento: {form.body_segment.trim() ? "✓" : "herda do paciente"}</li>
                 </ul>
+                <p className="text-xs">
+                  <span className="text-muted-foreground">Rodapé:</span>{" "}
+                  {form.meta_footer_source === "none"
+                    ? "Sem rodapé"
+                    : form.meta_footer_source === "institution_default"
+                      ? `Padrão da instituição (${brandingSettings?.default_template_footer_text ?? "não configurado"})`
+                      : form.meta_footer_source === "meta_synced"
+                        ? `Sincronizado da Meta (${form.meta_footer_text || "—"})`
+                        : `Personalizado (${form.meta_footer_text || "—"})`}
+                </p>
                 {variables.length > 0 && (
                   <p>
                     <span className="text-muted-foreground">Variáveis:</span>{" "}
@@ -466,7 +512,19 @@ export function TemplateEditorDialog({
                   </p>
                 )}
               </div>
-              <WhatsAppPreview body={form.body_patient} recipientName={form.name || "Paciente"} />
+              <WhatsAppPreview
+                body={form.body_patient}
+                recipientName={form.name || "Paciente"}
+                messageType={form.template_kind === "meta" ? "template" : "text"}
+                templateStatus={form.template_kind === "meta" ? META_STATUS_LABEL[form.meta_status] : undefined}
+                footer={
+                  form.meta_footer_source === "none"
+                    ? null
+                    : form.meta_footer_source === "institution_default"
+                      ? brandingSettings?.default_template_footer_text ?? null
+                      : form.meta_footer_text || null
+                }
+              />
             </div>
           </div>
         )}
@@ -555,5 +613,100 @@ function KindOption({
       <div className="font-semibold text-sm text-brand">{title}</div>
       <p className="mt-1 text-xs text-muted-foreground">{desc}</p>
     </button>
+  );
+}
+
+function FooterStep({
+  form,
+  setForm,
+  branding,
+}: {
+  form: Form;
+  setForm: (f: Form) => void;
+  branding: InstitutionWhatsAppSettings | null;
+}) {
+  const institutionDefault = (branding?.default_template_footer_text ?? "").trim();
+  const compat = computeFooterCompatibility(
+    form.meta_footer_source === "custom" || form.meta_footer_source === "meta_synced"
+      ? form.meta_footer_text
+      : form.meta_footer_source === "institution_default"
+        ? institutionDefault
+        : "",
+    branding,
+  );
+  const options = [
+    { v: "none", label: "Sem rodapé", desc: "Nada é exibido abaixo da mensagem." },
+    {
+      v: "institution_default",
+      label: "Padrão da instituição",
+      desc: institutionDefault
+        ? `"${institutionDefault}" — definido em Configurações > WhatsApp.`
+        : "Configure o padrão na aba Identidade e assinatura.",
+    },
+    { v: "custom", label: "Personalizado", desc: "Você escreve um rodapé específico (até 60 caracteres)." },
+    {
+      v: "meta_synced",
+      label: "Sincronizado da Meta",
+      desc: "Use o rodapé exatamente como foi aprovado na Meta. Edite criando uma nova versão.",
+    },
+  ] as const;
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        O rodapé aparece em texto menor abaixo da mensagem. Para Templates Meta ele faz parte
+        da definição aprovada e não pode ser alterado em runtime.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((opt) => (
+          <button
+            key={opt.v}
+            type="button"
+            onClick={() => setForm({ ...form, meta_footer_source: opt.v })}
+            className={`text-left rounded-lg border-2 p-3 transition-colors ${
+              form.meta_footer_source === opt.v
+                ? "border-primary bg-primary/5"
+                : "border-border bg-card hover:bg-muted/50"
+            }`}
+          >
+            <div className="font-semibold text-sm text-brand">{opt.label}</div>
+            <p className="mt-1 text-xs text-muted-foreground">{opt.desc}</p>
+          </button>
+        ))}
+      </div>
+
+      {(form.meta_footer_source === "custom" || form.meta_footer_source === "meta_synced") && (
+        <div className="space-y-1.5">
+          <Label>Texto do rodapé</Label>
+          <Input
+            value={form.meta_footer_text}
+            maxLength={60}
+            onChange={(e) => setForm({ ...form, meta_footer_text: e.target.value })}
+            placeholder="Ex: Mensagem oficial do Hospital Central"
+          />
+          <p className="text-right text-[11px] text-muted-foreground">
+            {form.meta_footer_text.length}/60
+          </p>
+        </div>
+      )}
+
+      {form.template_kind === "meta" && (
+        <div
+          className={`rounded-lg border p-3 text-xs ${
+            compat === "differs_from_institution_default"
+              ? "border-amber-500/40 bg-amber-500/5 text-amber-900 dark:text-amber-200"
+              : "border-border bg-muted/30 text-muted-foreground"
+          }`}
+        >
+          {compat === "matches_institution_default" &&
+            "✓ Rodapé idêntico ao padrão configurado para a instituição."}
+          {compat === "differs_from_institution_default" &&
+            "⚠ Este rodapé difere do padrão da instituição. Para conciliá-los, será necessário criar uma nova versão na Meta."}
+          {compat === "no_local_footer" &&
+            "Nenhum rodapé local. O envio usará o padrão da instituição quando aplicável."}
+          {compat === "no_institution_default" &&
+            "Sem padrão institucional configurado — configure em Configurações > WhatsApp."}
+        </div>
+      )}
+    </div>
   );
 }

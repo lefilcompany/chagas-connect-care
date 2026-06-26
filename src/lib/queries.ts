@@ -18,6 +18,13 @@ export const qk = {
   segments: ["segments"] as const,
   templates: ["message-templates"] as const,
   batches: ["message-batches"] as const,
+  institutionWhatsAppSettings: (institution: string) =>
+    ["institutionWhatsAppSettings", institution] as const,
+  whatsappChannels: (institution: string) =>
+    ["whatsappChannels", institution] as const,
+  whatsappTemplates: (institution: string) =>
+    ["whatsappTemplates", institution] as const,
+  whatsappDiagnostics: ["whatsappDiagnostics"] as const,
 };
 
 export const fetchers = {
