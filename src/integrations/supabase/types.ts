@@ -964,6 +964,108 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_otp_codes: {
+        Row: {
+          attempts: number
+          code_hash: string
+          code_length: number
+          contact_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          identity_id: string | null
+          institution: string
+          issued_at: string
+          max_attempts: number
+          message_id: string | null
+          otp_type: string
+          patient_id: string | null
+          purpose: string
+          status: string
+          template_id: string | null
+          updated_at: string
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          code_length?: number
+          contact_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          identity_id?: string | null
+          institution: string
+          issued_at?: string
+          max_attempts?: number
+          message_id?: string | null
+          otp_type?: string
+          patient_id?: string | null
+          purpose?: string
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          code_length?: number
+          contact_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          identity_id?: string | null
+          institution?: string
+          issued_at?: string
+          max_attempts?: number
+          message_id?: string | null
+          otp_type?: string
+          patient_id?: string | null
+          purpose?: string
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_otp_codes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_otp_codes_identity_id_fkey"
+            columns: ["identity_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_identities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_otp_codes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_otp_codes_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_otp_codes_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_unmatched_events: {
         Row: {
           created_at: string

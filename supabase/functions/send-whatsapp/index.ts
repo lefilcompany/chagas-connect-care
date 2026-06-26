@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
   if (!WHATSAPP_TEST_MODE && (msg as any).template_id) {
     const { data: tpl } = await admin
       .from("message_templates")
-      .select("template_kind, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text, meta_buttons")
+      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text, meta_buttons, meta_authentication_config")
       .eq("id", (msg as any).template_id)
       .maybeSingle();
     tplRow = tpl;
@@ -298,6 +298,76 @@ Deno.serve(async (req) => {
 
   if (willSendTemplate && tplRow) {
     const vars = ((msg as any).template_variables ?? {}) as Record<string, string>;
+    // ---- AUTHENTICATION / OTP (Phase 5) ----------------------------------
+    // Authentication templates have a strict shape:
+    //   body parameter: the OTP code (single {{1}})
+    //   button: OTP button (copy_code or one_tap), parameter = the same code
+    // We generate the code server-side, persist a hash for later verification
+    // by the webhook, then inject the code into the payload components.
+    const isAuth =
+      (tplRow as any).meta_category === "AUTHENTICATION" ||
+      !!(tplRow as any).meta_authentication_config;
+    if (isAuth) {
+      const cfg = ((tplRow as any).meta_authentication_config ?? {}) as {
+        otp_type?: "copy_code" | "one_tap";
+        code_length?: number;
+        ttl_minutes?: number;
+      };
+      const codeLen = Math.min(Math.max(Number(cfg.code_length ?? 6), 4), 8);
+      const ttlMin = Math.min(Math.max(Number(cfg.ttl_minutes ?? 10), 1), 60);
+      const otpType: "copy_code" | "one_tap" = cfg.otp_type === "one_tap" ? "one_tap" : "copy_code";
+      // Numeric code with cryptographic randomness, zero-padded to code_length.
+      const rnd = new Uint32Array(1);
+      crypto.getRandomValues(rnd);
+      const max = 10 ** codeLen;
+      const code = String(rnd[0] % max).padStart(codeLen, "0");
+      const codeHashBuf = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(`${institution}:${code}`),
+      );
+      const codeHash = Array.from(new Uint8Array(codeHashBuf))
+        .map((b) => b.toString(16).padStart(2, "0")).join("");
+      const expiresAt = new Date(Date.now() + ttlMin * 60 * 1000).toISOString();
+      await admin.from("whatsapp_otp_codes").insert({
+        institution,
+        identity_id: identityId,
+        patient_id: msg.patient_id ?? null,
+        contact_id: msg.contact_id ?? null,
+        message_id: msg.id,
+        template_id: (msg as any).template_id,
+        purpose: "authentication",
+        code_hash: codeHash,
+        code_length: codeLen,
+        otp_type: otpType,
+        status: "pending",
+        expires_at: expiresAt,
+      } as any);
+
+      const components: Record<string, unknown>[] = [
+        { type: "body", parameters: [{ type: "text", text: code }] },
+        {
+          type: "button",
+          sub_type: otpType === "one_tap" ? "url" : "copy_code",
+          index: "0",
+          parameters: [{ type: "text", text: code }],
+        },
+      ];
+
+      metaPayload = {
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: {
+          name: tplRow.meta_template_name,
+          language: { code: tplRow.meta_language || "pt_BR" },
+          components,
+        },
+      };
+      sendKind = "template";
+      usedTemplateName = tplRow.meta_template_name;
+      usedTemplateLanguage = tplRow.meta_language || "pt_BR";
+      // Skip the generic template build path below.
+    } else {
     const order = Array.isArray(tplRow.meta_parameter_order)
       ? (tplRow.meta_parameter_order as string[])
       : [];
@@ -535,6 +605,7 @@ Deno.serve(async (req) => {
         ...(components.length ? { components } : {}),
       },
     };
+    }
   }
 
   // Call Meta Cloud API
