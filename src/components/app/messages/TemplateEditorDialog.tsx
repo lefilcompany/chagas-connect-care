@@ -30,6 +30,10 @@ import {
   AudienceType, SegmentFilters, TargetingMode, emptyFilters,
 } from "@/lib/segments";
 import { useFolders } from "@/hooks/useFolders";
+import { useAuth as _u } from "@/lib/auth";
+import type { InstitutionWhatsAppSettings } from "@/lib/branding";
+import { computeFooterCompatibility } from "@/lib/branding";
+void _u;
 
 type Form = {
   name: string;
@@ -43,6 +47,8 @@ type Form = {
   meta_language: string;
   meta_category: string;
   meta_status: MetaStatus;
+  meta_footer_source: "none" | "institution_default" | "custom" | "meta_synced";
+  meta_footer_text: string;
   targeting_mode: TargetingMode;
   audience_types: AudienceType[];
   filters: SegmentFilters;
@@ -60,12 +66,14 @@ const emptyForm = (): Form => ({
   meta_language: "pt_BR",
   meta_category: "UTILITY",
   meta_status: "not_submitted",
+  meta_footer_source: "institution_default",
+  meta_footer_text: "",
   targeting_mode: "all",
   audience_types: ["paciente"],
   filters: emptyFilters(),
 });
 
-const STEPS = ["Básico", "Mensagem", "Segmentação", "Salvar"] as const;
+const STEPS = ["Básico", "Mensagem", "Rodapé", "Segmentação", "Salvar"] as const;
 
 export function TemplateEditorDialog({
   open,
@@ -90,6 +98,7 @@ export function TemplateEditorDialog({
   const [saving, setSaving] = useState(false);
   const [institution, setInstitution] = useState("");
   const [activeVariant, setActiveVariant] = useState<TemplateVariant>("patient");
+  const [brandingSettings, setBrandingSettings] = useState<InstitutionWhatsAppSettings | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -97,6 +106,16 @@ export function TemplateEditorDialog({
         .then(({ data }) => setInstitution(data?.institution ?? ""));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!institution) return;
+    supabase
+      .from("institution_whatsapp_settings" as any)
+      .select("*")
+      .eq("institution", institution)
+      .maybeSingle()
+      .then(({ data }) => setBrandingSettings((data as InstitutionWhatsAppSettings | null) ?? null));
+  }, [institution]);
 
   useEffect(() => {
     if (!open) return;
@@ -114,6 +133,8 @@ export function TemplateEditorDialog({
         meta_language: editing.meta_language ?? "pt_BR",
         meta_category: editing.meta_category ?? "UTILITY",
         meta_status: editing.meta_status,
+        meta_footer_source: (editing.meta_footer_source as Form["meta_footer_source"]) ?? "institution_default",
+        meta_footer_text: editing.meta_footer_text ?? "",
         targeting_mode: editing.targeting_mode ?? "all",
         audience_types: (editing.audience_types as AudienceType[]) ?? ["paciente"],
         filters: (editing.filters as SegmentFilters) ?? emptyFilters(),
