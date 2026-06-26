@@ -1,197 +1,118 @@
-# Evolução 2 — WhatsApp Cloud API (Chagas Connect Care)
+# Identidade Institucional, Assinatura e Rodapé WhatsApp — Plano de Execução
 
-Plano modular e incremental. Cada fase é independente, testável e pode ser publicada isoladamente sem quebrar o que já funciona (envio, janela 24h, identidade, opt-in, idempotência, sync básico).
+Evolução incremental do Chagas Connect Care para permitir que cada instituição configure como sua marca aparece nas mensagens (texto livre, interativa e Template Meta), respeitando as regras reais da Meta Cloud API e preservando toda a arquitetura atual (RLS, multi-instituição, webhooks, templates, campanhas).
 
-## Princípios
-
-- Nada do fluxo atual é removido. Tudo novo entra atrás de feature flags por instituição (colunas booleanas em `profiles`/`institutions` ou tabela `feature_flags`).
-- Definição oficial da Meta é a fonte da verdade. A UI deriva campos de `meta_definition`, nunca inventa componentes.
-- Toda chamada à Graph API acontece em Edge Function. Frontend nunca vê `WHATSAPP_TOKEN`, `WHATSAPP_APP_SECRET` ou `SERVICE_ROLE_KEY`.
-- Builders puros e tipados em `_shared/` para evitar `if/else` espalhados em `send-whatsapp`.
+A execução é dividida em fases pequenas e seguras. Cada fase termina em estado verde (build ok, fluxos antigos intactos) antes da próxima.
 
 ---
 
-## Fase 1 — Fundação compartilhada (sem mudança de comportamento)
+## Fase 0 — Auditoria e fundação não-sensível
 
-**Objetivo:** extrair builders + tipos sem alterar o que sai pela Meta hoje.
+- Ler integralmente os arquivos listados no item 1 do brief + migrations existentes para mapear o que já existe (`message_templates.meta_footer_text`, `meta_definition`, `whatsapp_identities`, `whatsapp_conversations`, `institution`, papéis via `has_role`, etc.) e evitar duplicações.
+- Criar `src/config/application.ts` exportando `APP_DISPLAY_NAME` e `DEFAULT_POWERED_BY_TEXT`.
+- Substituir literais de marca incoerentes no frontend (sem tocar em nome jurídico nem nome aprovado do número WhatsApp).
+- Definir no backend o uso de `Deno.env.get("APPLICATION_DISPLAY_NAME") ?? "Chagas Digital Care"` (sem `VITE_`, sem secret).
 
-Novos arquivos:
-- `supabase/functions/_shared/whatsapp-types.ts` — `WhatsAppHeaderType`, `WhatsAppButtonType`, `WhatsAppMessageKind`, `MetaComponent`, `MetaButton`, `MetaTemplateDefinition`, `BuiltPayload`.
-- `supabase/functions/_shared/whatsapp-payload-builder.ts` — `buildTextPayload`, `buildTemplatePayload`, `buildInteractivePayload`, `buildMediaPayload`, `validateTemplateDefinition`, `validateRuntimeParameters`.
-- `supabase/functions/_shared/whatsapp-errors.ts` — códigos estruturados reutilizáveis.
+## Fase 1 — Banco: configurações por instituição + auditoria de envio
 
-Refatorar `send-whatsapp/index.ts` para chamar os builders. Sem mudança funcional. Build + deno check + smoke test com um template de texto existente.
+Migration única, incremental:
 
-## Fase 2 — Modelo de dados Meta-first
+1. `institution_whatsapp_settings` com os campos do item 3, `unique(institution)`, check constraint para `signature_mode in ('none','institution_name','powered_by','custom')`, trigger `updated_at`, GRANTs (`authenticated`, `service_role`), RLS:
+   - SELECT: usuário cuja `profiles.institution = institution` **ou** `has_role(auth.uid(),'admin')`.
+   - INSERT/UPDATE: somente `has_role(auth.uid(),'admin')` E mesma instituição; preencher `updated_by = auth.uid()` via trigger.
+2. `ALTER TABLE messages ADD COLUMN IF NOT EXISTS resolved_footer_text text, footer_delivery_mode text, rendered_body text, branding_settings_snapshot jsonb` + check para `footer_delivery_mode in ('none','body_signature','interactive_footer','meta_template_footer')`.
+3. `ALTER TABLE message_templates` adicionando o que ainda faltar: `meta_footer_source`, `meta_has_local_differences`, `meta_version`, `meta_parent_template_id` (FK self), `last_synced_at` (manter os existentes).
+4. Backfill: inserir uma linha em `institution_whatsapp_settings` para cada `institution` distinta encontrada em `profiles`/`patients`, com `signature_mode='powered_by'`, `signature_enabled=true`, flags de aplicação `true`.
 
-Migration incremental em `message_templates` (todas as colunas nullable, defaults seguros):
+## Fase 2 — Helper compartilhado de branding (Edge)
 
-```
-meta_template_id text
-meta_template_name text
-meta_language text
-meta_category text                 -- UTILITY | MARKETING | AUTHENTICATION
-meta_status text
-meta_definition jsonb
-meta_header_type text              -- none | text | image | video | document
-meta_header_text text
-meta_header_parameter_order jsonb
-meta_body_parameter_order jsonb
-meta_footer_text text
-meta_buttons jsonb
-meta_carousel_cards jsonb
-meta_authentication_config jsonb
-meta_rejection_reason text
-meta_last_synced_at timestamptz
-```
+- Criar `supabase/functions/_shared/institution-branding.ts` com:
+  - `resolveInstitutionBranding(supabase, institution)` → carrega settings com cache por execução.
+  - `resolveSignatureText(settings)` → aplica regra `none|institution_name|powered_by|custom` + fallback de `brand_name`/`application_display_name`.
+  - `appendSignatureToFreeText(body, signature)` → idempotente (normaliza espaços, evita duplicar quando o corpo já termina com a assinatura, formata `\n\n_{assinatura}_`).
+  - `resolveInteractiveFooter(settings, explicit?)` → respeita limite de 60 chars, retorna `null` quando desativado.
+  - `resolveDefaultTemplateFooter(settings)` → texto padrão para criação de novos templates.
+- Snapshot helper para gravar `branding_settings_snapshot` apenas com campos não sensíveis.
 
-Nova tabela `whatsapp_media_assets` (institution-scoped, RLS via `get_user_institution`, GRANTs corretos, service_role inclusive):
+## Fase 3 — `send-whatsapp`: aplicar branding
 
-```
-id, institution, created_by,
-storage_path, meta_media_id,
-media_type, mime_type, filename, size_bytes, sha256,
-status (pending|uploaded|expired|failed),
-expires_at, created_at, updated_at
-```
+- Após resolver instituição e antes do envio:
+  - **type:text**: se `append_signature_to_text` e assinatura ativa → `rendered_body = appendSignature(body, sig)`; payload usa `rendered_body`; gravar `resolved_footer_text=sig`, `footer_delivery_mode='body_signature'`.
+  - **interactive**: aplicar `resolveInteractiveFooter`; só usa `footer.text` nativo; gravar `footer_delivery_mode='interactive_footer'`.
+  - **template**: nunca tocar no body; ler `meta_footer_text` do template; se settings exigem footer e `meta_footer_text` divergir → retornar erro estruturado `META_TEMPLATE_FOOTER_MISMATCH` (configurável: bloquear por padrão para categorias clínicas, permitir com confirmação em outras via flag do request); gravar `resolved_footer_text=meta_footer_text`, `footer_delivery_mode='meta_template_footer'`.
+  - **authentication**: nunca adicionar assinatura; `footer_delivery_mode='none'` (ou `meta_template_footer` quando aprovado).
+- Preservar `body` original; `rendered_body` é o texto realmente enviado.
+- Atualizar `friendlyWhatsAppError` em `src/lib/whatsapp.ts` para o novo código.
 
-Bucket privado `whatsapp-media` (não público — dados clínicos). Política de expiração via coluna + função `cleanup_expired_media()`.
+## Fase 4 — Sincronização Meta completa
 
-Ampliar `messages` (ou tabela `message_inbound_payloads` separada para PHI mínimo):
+- Em `sync-whatsapp-templates`:
+  - Buscar `?fields=name,language,status,category,quality_score,rejected_reason,components` na Graph v25.
+  - Extrair componentes: HEADER → `meta_header_type`/`meta_header_text`; BODY (mantém parsing atual); FOOTER → `meta_footer_text`; BUTTONS → `meta_buttons`; CAROUSEL → `meta_carousel_cards`; AUTH → `meta_authentication_config`.
+  - Persistir `meta_definition` completo, `last_synced_at`, `rejection_reason`.
+  - Calcular `meta_has_local_differences` comparando footer/body local x Meta sem sobrescrever silenciosamente.
+  - Templates retornados sem vínculo local ficam disponíveis para "Mapear" (não auto-associar por nome).
 
-```
-message_content_type text
-media_asset_id uuid
-media_mime_type text
-media_filename text
-interaction_type text             -- button_reply | list_reply | reaction | etc.
-interaction_id text
-reaction_emoji text
-location_data jsonb
-```
+## Fase 5 — Tabela `whatsapp_channels` + roteamento de webhook
 
-Atualizar `sync-whatsapp-templates` para popular `meta_definition`, parâmetros, botões, carrossel, header.
+- Migration: criar tabela conforme item 11 (sem colunas de token), `unique(institution, phone_number_id)`, índice em `phone_number_id`, RLS (leitura por instituição/admin; escrita por admin), GRANTs.
+- Backfill: inserir um canal `shared` por instituição usando `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_WABA_ID` (lidos no backfill via script de migration que apenas referencia env vars).
+- `whatsapp-webhook`: ler `value.metadata.phone_number_id` → resolver `whatsapp_channels` → `institution` → buscar identidade por `(institution, wa_id)` em vez de global; atualizar `last_webhook_at`.
+- Identidades existentes ganham backfill de `institution` quando ambíguo é resolvível.
+- Modo `dedicated` documentado como "preparação"; sem armazenar token (Vault fora de escopo aqui — exibir "Canal dedicado ainda não configurado").
 
-## Fase 3 — Headers e mídia segura
+## Fase 6 — Edge Function `create-whatsapp-template`
 
-1. Nova Edge Function `upload-whatsapp-media`:
-   - Valida JWT, instituição, role.
-   - Aceita multipart, valida MIME allowlist (image/jpeg, image/png, video/mp4, application/pdf, …), tamanho por tipo, rejeita executáveis e extensões duplas.
-   - Calcula sha256, grava no bucket privado, faz upload para `/{phone_id}/media`, salva `meta_media_id`, retorna `media_asset_id` (nunca o token).
-2. Builders: `buildHeaderTextParam`, `buildHeaderMediaParam(asset)` respeitando `meta_header_parameter_order`.
-3. `send-whatsapp`: resolve `media_asset_id` → `meta_media_id` no backend, monta `components[].type=header`.
+- Nova função autenticada (JWT + `has_role admin`):
+  - Valida nome, categoria, idioma, componentes, footer (≤60).
+  - Chama `POST /{waba_id}/message_templates`.
+  - Persiste resultado em `message_templates` da instituição com `meta_version`, `meta_parent_template_id` (quando "nova versão"), `meta_footer_source='meta_synced'`, status real retornado.
+  - Para "nova versão" gera nome `{base}_v{n+1}`; nunca marca aprovado sem retorno da Meta.
+- Edge `whatsapp-diagnostics`: leitura apenas; retorna estados `configurado|nao_configurado|desconhecido` para token/app secret/verify token/webhook/WABA subscription/forma de pagamento/últimos eventos. Nunca devolve valores.
 
-## Fase 4 — Botões
+## Fase 7 — Frontend: rota e navegação
 
-Builders e validações para os 4 tipos:
-- `quick_reply` → mapear texto visível → `stable_id` (`CONFIRM_APPOINTMENT`, etc.) persistido em `meta_buttons[].stable_id`. Webhook usa `stable_id` como chave lógica.
-- `url` estática + dinâmica `{{1}}` com allowlist de domínios em `whatsapp_url_allowlist` (config por instituição). Bloquear `javascript:`, schemes não-http(s).
-- `phone_number` — apenas exibir, parâmetros não dinâmicos.
-- `copy_code` — preparar para autenticação.
+- Rota `/app/configuracoes/whatsapp` em `src/App.tsx`.
+- Item "Configurações" (ícone engrenagem) em `AppLayout.tsx`, leitura para todos, edição condicionada a `has_role admin`.
+- Página com header descritivo + card resumo de conexão (status, número, modo, qualidade, último webhook, última sync) + tabs: Visão geral · Identidade e assinatura · Templates Meta · Canal · Diagnóstico. Mobile: tabs roláveis.
 
-Builder ordena parâmetros por índice de botão conforme definição Meta.
+## Fase 8 — Tab "Identidade e assinatura" + preview
 
-## Fase 5 — Templates de autenticação (isolado por flag)
+- Form (coluna esquerda) com `brand_name`, switch `signature_enabled`, radio `signature_mode` (4 opções), textarea `custom_signature_text` (condicional, validado), switches `append_signature_to_text`, `use_native_interactive_footer`, `use_as_template_footer_default`, campo `default_template_footer_text` com contador 60.
+- Avisos contextuais por tipo de mensagem.
+- Coluna direita: `WhatsAppPreview` evoluído aceitando `header|body|footer|buttons|media|recipientName|messageType|footerDeliveryMode|templateStatus|category` + seletor "Texto livre / Interativa / Template Meta" mostrando o comportamento real (assinatura no balão vs footer cinza separado vs footer estático com selo de aprovado).
+- Barra inferior "Alterações não salvas" com Cancelar/Salvar; `aria-live` ao salvar; estados loading/erro/sem permissão/não configurado conforme item 24.
 
-- `buildAuthenticationTemplatePayload(otp, config)` separado.
-- Geração de OTP no backend (`crypto.randomInt`), TTL curto (default 5 min), persistir só `otp_hash` + `expires_at` + `attempt_count` em tabela `whatsapp_otp_challenges`.
-- Limite de tentativas, rate limit por destinatário.
-- Logs nunca incluem o código. Redaction explícito no logger.
-- UI: categoria AUTH mostra apenas campos OTP / expiração / copy_code / autofill / package_name / signature_hash.
-- Proibir uso de template AUTH para conteúdo clínico (validação no backend por categoria).
+## Fase 9 — Tab "Templates Meta" + cards
 
-## Fase 6 — Carrosséis
+- `TemplateCard.tsx`: simplificar badges (Meta aprovado, em análise, objetivo interno, rodapé institucional, rodapé divergente) e mover detalhes para tooltip/menu.
+- `TemplateEditorDialog.tsx`: refator em wizard (Informações → Tipo/categoria → Cabeçalho → Corpo/variáveis → Rodapé → Botões → Segmentação → Revisão). Etapa Rodapé com opções `Sem rodapé | Padrão da instituição | Personalizado | Sincronizado da Meta` + status de compatibilidade. Editar localmente nunca dá impressão de alterar template aprovado; CTA "Criar nova versão na Meta" quando aplicável, com diff visual e confirmação.
+- Lista (tab) com busca, filtros (status, categoria, compatibilidade footer, instituição quando aplicável), tabela responsiva → cards no mobile.
 
-- Builder `buildCarouselPayload(cards, definition)` que valida nº de cards ≤ definição Meta e que cada card tem os mesmos componentes aprovados.
-- UI: editor com add/remove/reorder limitado, preview horizontal.
-- Persistência em `meta_carousel_cards` com `index`, `media_asset_id`, `body_parameter_order`, `buttons[]`.
+## Fase 10 — Tab "Canal" e "Diagnóstico"
 
-## Fase 7 — Mensagens interativas e mídia dentro da janela
+- Canal: leitura do `whatsapp_channels` da instituição; modo compartilhado em destaque; bloco "Canal dedicado" desativado com tooltip explicativo.
+- Diagnóstico: chama `whatsapp-diagnostics`; lista de itens com estado, botão "Executar diagnóstico"; nenhum valor sensível exibido.
 
-- `buildInteractivePayload({ kind: 'button' | 'list', ... })`.
-- Gate obrigatório em `send-whatsapp`: se `kind !== 'template'` → checar `whatsapp_window_open(identity_id)`. Erro estruturado `INTERACTIVE_MESSAGE_REQUIRES_OPEN_WINDOW`.
-- Mídia (image/video/document) dentro da janela usa o mesmo pipeline da Fase 3.
-- UI exibe aviso de privacidade quando anexar arquivo clínico.
+## Fase 11 — Campanhas + custos
 
-## Fase 8 — Webhook ampliado
+- Em `CampaignTab.tsx`: exibir assinatura resolvida, footer oficial do template, alerta de divergência, contagem de destinatários "texto livre" vs "Template Meta", estimativa de mensagens potencialmente tarifáveis (`Gratuito na janela | Pode gerar cobrança | Cobrança esperada | Não foi possível determinar`); bloquear template de outra instituição; preview de exemplo final.
+- Mesma resolução de assinatura aplicada via `whatsapp.ts` ao construir `body` de mensagens livres na campanha (front renderiza preview; backend é fonte da verdade).
 
-Reconhecer e persistir: `text`, `image`, `video`, `audio`, `document`, `sticker`, `location`, `contacts`, `reaction`, `interactive` (button_reply, list_reply), `button`.
+## Fase 12 — Tipos, queries, segurança, testes
 
-Para mídia:
-1. Webhook só registra `media_id` + metadados, marca `status=pending_download`.
-2. Job assíncrono (segunda invocação ou cron) baixa com o token, valida MIME, grava em bucket privado, atualiza `whatsapp_media_assets`.
+- `src/lib/templates.ts` e `src/integrations/supabase/types.ts` (regenerados pós-migration) com novos tipos: `InstitutionWhatsAppSettings`, `WhatsAppChannel`, `SignatureMode`, `FooterDeliveryMode`, `TemplateFooterCompatibility`.
+- `src/lib/queries.ts`: query keys `institutionWhatsAppSettings`, `whatsappChannels`, `whatsappTemplates`, `whatsappDiagnostics` com invalidação cirúrgica.
+- Testes Vitest cobrindo `appendSignatureToFreeText` (idempotência, cada modo, custom vazio, desativado), resolução por instituição, regras de template Meta (mismatch, OTP sem assinatura), webhook por `phone_number_id`, RLS cross-tenant (via supabase-js com dois usuários simulados quando possível).
+- `bun run build` + `deno check` nas funções alteradas.
 
-Idempotência: usar `external_message_id` (já existente) + `interaction_id` para respostas. Manter prioridade monotônica de status já implementada.
+## Critérios de aceitação
 
-## Fase 9 — UI: Editor estruturado
+Todos os checkboxes do item 33 do brief. Nenhuma secret no frontend. RLS por instituição. Build verde. Sem regressão em cadastro, campanhas, envio, webhook, OTP, mídia, botões, carrosséis, produtos.
 
-Reescrever `TemplateEditorDialog` em wizard de 10 etapas (Básico → Categoria → Header → Body+vars → Footer → Botões → Carrossel/Auth → Segmentação → Preview → Validação). Componentes desabilitados/escondidos conforme `meta_definition` sincronizada e feature flags. Edição local nunca muta o template aprovado na Meta — apenas mapeamentos internos (variáveis ↔ campos do paciente, stable_ids dos botões, segmentação).
+## Limitações conhecidas (a comunicar ao final)
 
-## Fase 10 — Preview fiel + cards + tela de teste + Campaign
-
-- `WhatsAppPreview`: renderizar header (text/image/video/document), body com variáveis resolvidas, footer, botões, lista, carrossel horizontal, OTP, loading/erro de mídia. Sempre exibir disclaimer "Pré-visualização local — o conteúdo final é determinado pelo template aprovado".
-- `TemplateCard`: mostrar objetivo, categoria interna + Meta, idioma, status oficial, header type, contagem de variáveis/botões, possui mídia, possui carrossel, última sync. Ações: editar local / sincronizar / testar / duplicar / desativar local / ver definição oficial.
-- Nova página `Testar Template Meta` (admin-only): destinatário marcado como `is_test`, formulário dinâmico por componente, confirmação, mostra resposta crua da Meta, wamid e timeline de status.
-- `CampaignTab`: validação pré-envio (mídia presente, vars completas, URLs válidas, categoria, aprovação, opt-in, janela quando aplicável). Estimativa por categoria sem prometer valor financeiro.
-
-## Fase 11 — Feature flags, segurança, testes, deploy
-
-Flags (tabela `institution_feature_flags` ou colunas em `profiles.institution_settings`):
-`WHATSAPP_MEDIA_ENABLED`, `WHATSAPP_INTERACTIVE_ENABLED`, `WHATSAPP_AUTH_TEMPLATES_ENABLED`, `WHATSAPP_CAROUSEL_ENABLED`. Backend rejeita com erro claro quando desligado; UI esconde.
-
-Testes (Deno test nas funções + Vitest nos builders puros):
-- Texto: 0/1/N variáveis, ordem, var ausente.
-- Header: cada tipo.
-- Botões: 4 tipos + URL dinâmica + domínio bloqueado.
-- Auth: OTP válido, expirado, código não vaza em log (assert sobre logger spy).
-- Carrossel: limites, mídia/params/botões por card.
-- Interativo: ok com janela, bloqueado fora.
-- Webhook: button_reply, list_reply, imagem, documento, evento duplicado, assinatura inválida.
-- Segurança: upload sem JWT, MIME inválido, tamanho excessivo, cross-institution.
-
-`npm run build` e `deno check` em cada função tocada antes de cada deploy. Deploy ordenado: shared → migrations → `upload-whatsapp-media` → `send-whatsapp` → `whatsapp-webhook` → `process-message-batch` → `sync-whatsapp-templates`.
-
----
-
-## Detalhes técnicos
-
-### Builders — assinaturas
-```ts
-buildTemplatePayload(args: {
-  to: string;
-  definition: MetaTemplateDefinition;
-  headerParams?: HeaderParamInput;
-  bodyParams?: Record<string, string>;
-  buttonParams?: ButtonParamInput[];
-  carouselCards?: CarouselCardInput[];
-}): BuiltPayload
-```
-`validateRuntimeParameters` retorna `{ ok, errors[] }` com códigos: `MISSING_BODY_PARAM`, `INVALID_URL_DOMAIN`, `MEDIA_NOT_UPLOADED`, `CAROUSEL_CARD_COUNT_MISMATCH`, `BUTTON_INDEX_OUT_OF_RANGE`, etc.
-
-### Erros estruturados (PT-BR em `src/lib/whatsapp.ts`)
-Acrescentar a `friendlyWhatsAppError`: `INTERACTIVE_MESSAGE_REQUIRES_OPEN_WINDOW`, `MEDIA_UPLOAD_FAILED`, `MEDIA_MIME_NOT_ALLOWED`, `MEDIA_TOO_LARGE`, `URL_DOMAIN_NOT_ALLOWED`, `OTP_EXPIRED`, `OTP_TOO_MANY_ATTEMPTS`, `TEMPLATE_DEFINITION_MISMATCH`, `CAROUSEL_CARD_COUNT_MISMATCH`, `FEATURE_DISABLED`.
-
-### RLS / GRANTs (toda nova tabela)
-`GRANT SELECT, INSERT, UPDATE, DELETE … TO authenticated; GRANT ALL … TO service_role;` Policies por instituição via `get_user_institution(auth.uid())`. Sem `anon`.
-
-### Limites Meta atuais que respeitarei
-Image ≤ 5MB, Video ≤ 16MB, Document ≤ 100MB, Audio ≤ 16MB; janela 24h; carrossel 2–10 cards; OTP ≤ 15 min.
-
----
-
-## Critérios de aceitação (mesma lista do pedido, marcada ao final de cada fase)
-
-Itens 1–18 do pedido viram checklist de Definition of Done por fase. Nenhum recurso será marcado como "Implementado" sem teste real ou payload validado contra a Meta — caso contrário, marcado como "Parcial" com justificativa.
-
-## Riscos e limitações conhecidos
-
-- Carrossel e Authentication template dependem da Graph API version e da aprovação da Meta — se a WABA atual não tiver aprovação, ficarão "Parcial".
-- Estimativa de cobrança não é determinística sem chamada a `/pricing_analytics`; apresentarei faixa, nunca valor exato.
-- Bucket privado depende de a workspace permitir buckets do tipo private (sem bloqueio público é OK).
-- Webhook media download é assíncrono; latência de até alguns segundos é esperada.
-
----
-
-## Pergunta antes de implementar
-
-Quer que eu comece pela **Fase 1 + 2** (fundação shared + migrations Meta-first + media_assets), que destrava tudo o resto sem mudar comportamento visível, e siga as próximas fases nas mensagens seguintes? Ou prefere priorizar uma fase específica (ex.: pular direto para mídia + botões)?
+- Footer de Template Meta é estático: mudanças exigem nova aprovação na Meta (a função `create-whatsapp-template` só envia o pedido).
+- Canal dedicado por instituição fica apenas como arquitetura preparada; sem Vault configurado não armazenaremos token — UI mostra "Canal dedicado ainda não configurado".
+- Forma de pagamento e custos exibidos são qualitativos; valores exatos dependem da conta Meta.
+- Diagnóstico só reporta estados (`configurado|nao_configurado|desconhecido`), nunca valores.
