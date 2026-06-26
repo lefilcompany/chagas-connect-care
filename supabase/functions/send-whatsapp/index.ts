@@ -608,6 +608,164 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ---- Interactive messages (Phase 6) -----------------------------------
+  // Free-form interactive messages (button / list / cta_url) sent inside the
+  // open 24h service window. Carried on messages.template_variables.__interactive.
+  if (!willSendTemplate && !WHATSAPP_TEST_MODE) {
+    const interactive = ((msg as any).template_variables as Record<string, unknown> | null)
+      ?.__interactive as Record<string, unknown> | undefined;
+    if (interactive && typeof interactive === "object") {
+      const failInteractive = async (code: string, errorMsg: string) => {
+        await admin.from("messages").update({
+          status: "failed",
+          failed_at: new Date().toISOString(),
+          last_error: errorMsg,
+        }).eq("id", msg.id);
+        return json(200, { ok: false, error_code: code, error: errorMsg });
+      };
+
+      const itype = String((interactive as any).type ?? "").toLowerCase();
+      const bodyText = String((interactive as any).body ?? msg.body ?? "").trim();
+      const footerText = ((interactive as any).footer ? String((interactive as any).footer) : "").trim();
+      if (!bodyText) return await failInteractive("INTERACTIVE_BODY_REQUIRED", "Mensagem interativa precisa de um corpo de texto.");
+      if (bodyText.length > 1024) return await failInteractive("INTERACTIVE_BODY_REQUIRED", "Corpo da mensagem interativa excede 1024 caracteres.");
+      if (footerText && footerText.length > 60) return await failInteractive("INTERACTIVE_FOOTER_INVALID", "Rodapé da mensagem interativa excede 60 caracteres.");
+
+      // Optional header (text only by default; media header reuses media_asset_id).
+      let headerObj: Record<string, unknown> | null = null;
+      const header = (interactive as any).header as Record<string, unknown> | undefined;
+      if (header && typeof header === "object") {
+        const htype = String(header.type ?? "").toLowerCase();
+        if (htype === "text") {
+          const ht = String(header.text ?? "").trim();
+          if (!ht || ht.length > 60) {
+            return await failInteractive("INTERACTIVE_HEADER_INVALID", "Cabeçalho de texto deve ter até 60 caracteres.");
+          }
+          headerObj = { type: "text", text: ht };
+        } else if (htype === "image" || htype === "video" || htype === "document") {
+          const assetId = (msg as any).media_asset_id as string | null;
+          if (!assetId) return await failInteractive("INTERACTIVE_HEADER_INVALID", "Cabeçalho de mídia exige media_asset_id.");
+          const { data: asset } = await admin
+            .from("whatsapp_media_assets")
+            .select("meta_media_id, status, filename")
+            .eq("id", assetId)
+            .maybeSingle();
+          const mediaId = (asset as any)?.meta_media_id as string | null;
+          if (!mediaId || (asset as any)?.status !== "uploaded") {
+            return await failInteractive("MEDIA_NOT_UPLOADED", "A mídia do cabeçalho ainda não foi enviada para a Meta.");
+          }
+          const mediaObj: Record<string, unknown> = { id: mediaId };
+          if (htype === "document") {
+            const filename = (msg as any).media_filename || (asset as any)?.filename;
+            if (filename) mediaObj.filename = filename;
+          }
+          headerObj = { type: htype, [htype]: mediaObj };
+        } else {
+          return await failInteractive("INTERACTIVE_HEADER_INVALID", `Tipo de cabeçalho não suportado: ${htype}.`);
+        }
+      }
+
+      let action: Record<string, unknown> | null = null;
+
+      if (itype === "button") {
+        const buttons = (interactive as any).buttons;
+        if (!Array.isArray(buttons) || buttons.length < 1 || buttons.length > 3) {
+          return await failInteractive("INTERACTIVE_BUTTONS_INVALID", "Mensagem com botões exige entre 1 e 3 botões.");
+        }
+        const ids = new Set<string>();
+        const built: Record<string, unknown>[] = [];
+        for (const b of buttons) {
+          const id = String((b as any)?.id ?? "").trim();
+          const title = String((b as any)?.title ?? "").trim();
+          if (!id || id.length > 256) return await failInteractive("INTERACTIVE_BUTTONS_INVALID", "Cada botão precisa de um id (até 256 caracteres).");
+          if (!title || title.length > 20) return await failInteractive("INTERACTIVE_BUTTONS_INVALID", "Cada botão precisa de um título com até 20 caracteres.");
+          if (ids.has(id)) return await failInteractive("INTERACTIVE_BUTTONS_INVALID", `Botão com id duplicado: "${id}".`);
+          ids.add(id);
+          built.push({ type: "reply", reply: { id, title } });
+        }
+        action = { buttons: built };
+      } else if (itype === "list") {
+        const buttonText = String((interactive as any).button_text ?? "").trim();
+        if (!buttonText || buttonText.length > 20) {
+          return await failInteractive("INTERACTIVE_LIST_INVALID", "Lista exige texto do botão com até 20 caracteres.");
+        }
+        const sections = (interactive as any).sections;
+        if (!Array.isArray(sections) || sections.length < 1 || sections.length > 10) {
+          return await failInteractive("INTERACTIVE_LIST_INVALID", "Lista exige entre 1 e 10 seções.");
+        }
+        let totalRows = 0;
+        const rowIds = new Set<string>();
+        const builtSections: Record<string, unknown>[] = [];
+        for (const s of sections) {
+          const title = String((s as any)?.title ?? "").trim();
+          const rows = (s as any)?.rows;
+          if (title.length > 24) return await failInteractive("INTERACTIVE_LIST_INVALID", "Título de seção excede 24 caracteres.");
+          if (!Array.isArray(rows) || rows.length === 0) return await failInteractive("INTERACTIVE_LIST_INVALID", "Cada seção precisa de pelo menos uma linha.");
+          const builtRows: Record<string, unknown>[] = [];
+          for (const r of rows) {
+            const rid = String((r as any)?.id ?? "").trim();
+            const rtitle = String((r as any)?.title ?? "").trim();
+            const rdesc = ((r as any)?.description ? String((r as any).description) : "").trim();
+            if (!rid || rid.length > 200) return await failInteractive("INTERACTIVE_LIST_INVALID", "Cada linha precisa de id com até 200 caracteres.");
+            if (!rtitle || rtitle.length > 24) return await failInteractive("INTERACTIVE_LIST_INVALID", "Título de linha deve ter 1–24 caracteres.");
+            if (rdesc.length > 72) return await failInteractive("INTERACTIVE_LIST_INVALID", "Descrição de linha excede 72 caracteres.");
+            if (rowIds.has(rid)) return await failInteractive("INTERACTIVE_LIST_INVALID", `Linha com id duplicado: "${rid}".`);
+            rowIds.add(rid);
+            totalRows++;
+            const row: Record<string, unknown> = { id: rid, title: rtitle };
+            if (rdesc) row.description = rdesc;
+            builtRows.push(row);
+          }
+          const section: Record<string, unknown> = { rows: builtRows };
+          if (title) section.title = title;
+          builtSections.push(section);
+        }
+        if (totalRows > 10) return await failInteractive("INTERACTIVE_LIST_INVALID", "Lista pode ter no máximo 10 linhas no total.");
+        action = { button: buttonText, sections: builtSections };
+      } else if (itype === "cta_url" || itype === "cta") {
+        const display = String((interactive as any).display_text ?? (interactive as any).cta_text ?? "").trim();
+        const url = String((interactive as any).url ?? "").trim();
+        if (!display || display.length > 20) {
+          return await failInteractive("INTERACTIVE_CTA_INVALID", "Botão CTA exige texto com até 20 caracteres.");
+        }
+        let parsed: URL | null = null;
+        try { parsed = new URL(url); } catch { parsed = null; }
+        if (!parsed || parsed.protocol !== "https:") {
+          return await failInteractive("INTERACTIVE_CTA_INVALID", "URL do CTA precisa usar HTTPS.");
+        }
+        const allowEnv = (Deno.env.get("WHATSAPP_URL_ALLOWLIST") ?? "").trim();
+        const allowAll = allowEnv === "" || allowEnv === "*";
+        if (!allowAll) {
+          const allowList = allowEnv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+          const host = parsed.hostname.toLowerCase();
+          const ok = allowList.some((d) => host === d || host.endsWith("." + d));
+          if (!ok) {
+            return await failInteractive("URL_DOMAIN_NOT_ALLOWED", `Domínio "${host}" não está na allowlist (WHATSAPP_URL_ALLOWLIST).`);
+          }
+        }
+        action = { name: "cta_url", parameters: { display_text: display, url } };
+      } else {
+        return await failInteractive("INTERACTIVE_INVALID_TYPE", `Tipo de mensagem interativa não suportado: "${itype}". Use button, list ou cta_url.`);
+      }
+
+      const interactivePayload: Record<string, unknown> = {
+        type: itype === "cta" ? "cta_url" : itype,
+        body: { text: bodyText },
+        action,
+      };
+      if (headerObj) interactivePayload.header = headerObj;
+      if (footerText) interactivePayload.footer = { text: footerText };
+
+      metaPayload = {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: interactivePayload,
+      };
+      sendKind = "text"; // not a template
+    }
+  }
+
   // Call Meta Cloud API
   let metaRes: Response;
   try {
