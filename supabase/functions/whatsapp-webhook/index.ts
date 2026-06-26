@@ -44,29 +44,51 @@ function normalizeBR(p: string): string {
   return digits.startsWith("55") ? digits : "55" + digits;
 }
 
-/** Resolve a WhatsApp identity by exact wa_id then exact E.164 phone. */
+/**
+ * Resolve a WhatsApp identity scoped to a channel/institution when known.
+ * Falls back to global lookup when no channel maps to this phone_number_id.
+ */
 async function findIdentity(
   admin: ReturnType<typeof createClient>,
   wa_id: string,
   phone_e164: string,
+  institution: string | null,
 ) {
+  const cols = "id, institution, patient_id, contact_id";
+  const scope = (q: any) => (institution ? q.eq("institution", institution) : q);
   if (wa_id) {
-    const { data } = await admin
-      .from("whatsapp_identities")
-      .select("id, institution, patient_id, contact_id")
-      .eq("wa_id", wa_id)
-      .maybeSingle();
+    const { data } = await scope(
+      admin.from("whatsapp_identities").select(cols).eq("wa_id", wa_id),
+    ).maybeSingle();
     if (data) return data as any;
   }
   if (phone_e164) {
-    const { data } = await admin
-      .from("whatsapp_identities")
-      .select("id, institution, patient_id, contact_id")
-      .eq("phone_e164", phone_e164)
-      .maybeSingle();
+    const { data } = await scope(
+      admin.from("whatsapp_identities").select(cols).eq("phone_e164", phone_e164),
+    ).maybeSingle();
     if (data) return data as any;
   }
   return null;
+}
+
+/** Resolve the institution that owns a Meta `phone_number_id`. */
+async function resolveChannelInstitution(
+  admin: ReturnType<typeof createClient>,
+  phoneNumberId: string | null,
+): Promise<string | null> {
+  if (!phoneNumberId) return null;
+  const { data } = await admin
+    .from("whatsapp_channels")
+    .select("id, institution")
+    .eq("phone_number_id", phoneNumberId)
+    .maybeSingle();
+  if (!data) return null;
+  // Best-effort: stamp last_webhook_at without blocking the response.
+  admin.from("whatsapp_channels")
+    .update({ last_webhook_at: new Date().toISOString() })
+    .eq("id", (data as any).id)
+    .then(() => {}, () => {});
+  return (data as any).institution ?? null;
 }
 
 const OPT_OUT_KEYWORDS = ["PARAR", "SAIR", "CANCELAR", "NAO QUERO", "NÃO QUERO", "REMOVER", "STOP"];
@@ -207,6 +229,8 @@ Deno.serve(async (req) => {
       const changes: any[] = Array.isArray(entry?.changes) ? entry.changes : [];
       for (const change of changes) {
         const value = change?.value ?? {};
+        const phoneNumberId: string | null = value?.metadata?.phone_number_id ?? null;
+        const channelInstitution = await resolveChannelInstitution(admin, phoneNumberId);
 
         // Status updates
         const statuses: any[] = Array.isArray(value?.statuses) ? value.statuses : [];
@@ -262,7 +286,7 @@ Deno.serve(async (req) => {
           const interactionType: string | null = m?.interactive?.type ?? (m?.button ? "button" : null);
 
           const phone_e164 = normalizeBR(from);
-          const identity = await findIdentity(admin, from, phone_e164);
+          const identity = await findIdentity(admin, from, phone_e164, channelInstitution);
 
           if (!identity) {
             // Triage: register the unmatched event (no clinical content).
