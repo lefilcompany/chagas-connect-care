@@ -23,6 +23,8 @@ import Profile from "./pages/app/Profile";
 import Segments from "./pages/app/Segments";
 import SegmentEditor from "./pages/app/SegmentEditor";
 import WhatsAppSettings from "./pages/app/WhatsAppSettings";
+import Conversas from "./pages/app/Conversas";
+import OnboardingForm from "./pages/public/OnboardingForm";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,11 +54,13 @@ const App = () => (
             <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
             <Route path="/termos-de-uso" element={<TermsOfUse />} />
             <Route path="/exclusao-de-dados" element={<DataDeletion />} />
+            <Route path="/cadastro/:token" element={<OnboardingForm />} />
             <Route path="/app" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="pacientes" element={<Patients />} />
               <Route path="pacientes/:id" element={<PatientDetail />} />
               <Route path="mensagens" element={<Messages />} />
+              <Route path="conversas" element={<Conversas />} />
               <Route path="conteudos" element={<Content />} />
               <Route path="conteudos/campanha" element={<Campaign />} />
               <Route path="segmentos" element={<Segments />} />
