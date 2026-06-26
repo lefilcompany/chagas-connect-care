@@ -1,5 +1,13 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import {
+  resolveInstitutionBranding,
+  resolveSignatureText,
+  appendSignatureToFreeText,
+  resolveInteractiveFooter,
+  brandingSnapshot,
+  type InstitutionWhatsAppSettings,
+} from "../_shared/institution-branding.ts";
 
 const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
 const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
