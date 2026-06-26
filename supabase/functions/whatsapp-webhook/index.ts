@@ -351,6 +351,7 @@ Deno.serve(async (req) => {
                 wa_id: from,
                 phone_e164,
                 event_type: "inbound",
+                payload: m,
               } as any);
               continue;
             }
@@ -371,6 +372,7 @@ Deno.serve(async (req) => {
                 wa_id: from,
                 phone_e164,
                 event_type: "inbound",
+                payload: m,
               } as any);
               continue;
             }
