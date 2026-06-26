@@ -200,6 +200,13 @@ export function TemplateEditorDialog({
       meta_language: form.meta_language,
       meta_category: form.template_kind === "meta" ? form.meta_category : null,
       meta_status: form.template_kind === "meta" ? form.meta_status : "not_submitted",
+      meta_footer_source: form.meta_footer_source,
+      meta_footer_text:
+        form.meta_footer_source === "none"
+          ? null
+          : form.meta_footer_source === "institution_default"
+            ? brandingSettings?.default_template_footer_text ?? null
+            : form.meta_footer_text.trim() || null,
       channel: "whatsapp",
       targeting_mode: form.targeting_mode,
       audience_types: form.audience_types,
