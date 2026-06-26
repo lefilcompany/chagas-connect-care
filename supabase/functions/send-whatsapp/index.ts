@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
   // Fetch the message with admin client for full field access
   const { data: msg, error: msgErr } = await admin
     .from("messages")
-    .select("id, patient_id, contact_id, channel, body, status, template_id, template_variables, send_attempts")
+    .select("id, patient_id, contact_id, channel, body, status, template_id, template_variables, send_attempts, media_asset_id, media_filename")
     .eq("id", body.message_id)
     .maybeSingle();
 
@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
   if (!WHATSAPP_TEST_MODE && (msg as any).template_id) {
     const { data: tpl } = await admin
       .from("message_templates")
-      .select("template_kind, meta_template_name, meta_language, meta_status, meta_parameter_order")
+      .select("template_kind, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text")
       .eq("id", (msg as any).template_id)
       .maybeSingle();
     tplRow = tpl;
@@ -332,6 +332,57 @@ Deno.serve(async (req) => {
     sendKind = "template";
     usedTemplateName = tplRow.meta_template_name;
     usedTemplateLanguage = tplRow.meta_language || "pt_BR";
+
+    // Build optional header component when template declares a header type.
+    const headerType: string | null = (tplRow as any).meta_header_type ?? null;
+    let headerComponent: Record<string, unknown> | null = null;
+    if (headerType === "text" && (tplRow as any).meta_header_text) {
+      // header text variables (when present) are passed via template_variables.__header
+      const headerText = ((msg as any).template_variables?.__header_text as string | undefined) ?? null;
+      if (headerText) {
+        headerComponent = {
+          type: "header",
+          parameters: [{ type: "text", text: headerText }],
+        };
+      }
+    } else if (
+      headerType === "image" || headerType === "video" || headerType === "document"
+    ) {
+      const assetId = (msg as any).media_asset_id as string | null;
+      if (assetId) {
+        const { data: asset } = await admin
+          .from("whatsapp_media_assets")
+          .select("meta_media_id, status, filename, mime_type")
+          .eq("id", assetId)
+          .maybeSingle();
+        const mediaId = (asset as any)?.meta_media_id as string | null;
+        if (!mediaId || (asset as any)?.status !== "uploaded") {
+          await admin.from("messages").update({
+            status: "failed", failed_at: new Date().toISOString(),
+            last_error: "Mídia do cabeçalho não está disponível na Meta",
+          }).eq("id", msg.id);
+          return json(200, {
+            ok: false,
+            error_code: "MEDIA_NOT_UPLOADED",
+            error: "A mídia do cabeçalho ainda não foi enviada para a Meta.",
+          });
+        }
+        const mediaObj: Record<string, unknown> = { id: mediaId };
+        if (headerType === "document") {
+          const filename = (msg as any).media_filename || (asset as any)?.filename;
+          if (filename) mediaObj.filename = filename;
+        }
+        headerComponent = {
+          type: "header",
+          parameters: [{ type: headerType, [headerType]: mediaObj }],
+        };
+      }
+    }
+
+    const components: Record<string, unknown>[] = [];
+    if (headerComponent) components.push(headerComponent);
+    if (params.length) components.push({ type: "body", parameters: params });
+
     metaPayload = {
       messaging_product: "whatsapp",
       to,
@@ -339,9 +390,7 @@ Deno.serve(async (req) => {
       template: {
         name: tplRow.meta_template_name,
         language: { code: tplRow.meta_language || "pt_BR" },
-        ...(params.length
-          ? { components: [{ type: "body", parameters: params }] }
-          : {}),
+        ...(components.length ? { components } : {}),
       },
     };
   }
