@@ -94,21 +94,7 @@ export default function CampaignTab({
       );
   }, [institution]);
 
-  // Cross-tenant safety: a template from a different institution must not be sent.
-  const crossTenantBlocked = useMemo(() => {
-    if (!institution || !selectedTemplate) return false;
-    const ti = (selectedTemplate as any).institution as string | null | undefined;
-    return !!ti && ti !== institution;
-  }, [institution, selectedTemplate]);
-
   const signatureText = useMemo(() => resolveSignatureText(branding), [branding]);
-  const footerCompat = useMemo(
-    () =>
-      selectedTemplate?.template_kind === "meta"
-        ? computeFooterCompatibility(selectedTemplate.meta_footer_text ?? null, branding)
-        : null,
-    [selectedTemplate, branding],
-  );
 
   // Realtime: refresh medication-derived state whenever medications change anywhere.
   useEffect(() => {
