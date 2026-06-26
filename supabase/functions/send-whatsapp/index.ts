@@ -42,6 +42,24 @@ function normalizeBRPhone(input: string): string | null {
 }
 
 /**
+ * Returns BR phone E.164 variants with and without the mobile "9" prefix
+ * so identity/conversation lookups are resilient to numbers stored in either
+ * form (patients sometimes registered with "9", but inbound from Meta arrives
+ * without it for legacy lines, or vice-versa).
+ */
+function brPhoneVariants(p: string): string[] {
+  if (!p) return [];
+  const set = new Set<string>([p]);
+  if (p.startsWith("55") && p.length >= 12) {
+    const ddd = p.slice(2, 4);
+    const local = p.slice(4);
+    if (local.length === 9 && local.startsWith("9")) set.add(`55${ddd}${local.slice(1)}`);
+    else if (local.length === 8) set.add(`55${ddd}9${local}`);
+  }
+  return [...set];
+}
+
+/**
  * Validates required env + recipient phone. Never returns the token itself.
  * Returns { ok: true, to } on success or { ok: false, code, error } on failure.
  */
@@ -188,12 +206,29 @@ Deno.serve(async (req) => {
     };
     if (msg.contact_id) idPayload.contact_id = msg.contact_id;
     else idPayload.patient_id = msg.patient_id;
-    const { data: existing } = await admin
+    const phoneVariants = brPhoneVariants(to);
+    const { data: existingList } = await admin
       .from("whatsapp_identities")
-      .select("id, opt_in_status")
+      .select("id, opt_in_status, phone_e164")
       .eq("institution", institution)
-      .eq("phone_e164", to)
-      .maybeSingle();
+      .in("phone_e164", phoneVariants);
+    let existing: any = (existingList ?? [])[0] ?? null;
+    if (existingList && existingList.length > 1) {
+      // Prefer the identity that already has an OPEN service window
+      const ids = existingList.map((e: any) => e.id);
+      const { data: convs } = await admin
+        .from("whatsapp_conversations")
+        .select("identity_id, service_window_expires_at")
+        .in("identity_id", ids);
+      const open = (convs ?? []).find(
+        (c: any) =>
+          c.service_window_expires_at &&
+          new Date(c.service_window_expires_at).getTime() > Date.now(),
+      );
+      if (open) {
+        existing = existingList.find((e: any) => e.id === open.identity_id) ?? existing;
+      }
+    }
     if (existing) {
       identityId = (existing as any).id;
       optInStatus = (existing as any).opt_in_status ?? "pending";
@@ -250,13 +285,24 @@ Deno.serve(async (req) => {
   if (!willSendTemplate && !WHATSAPP_TEST_MODE) {
     let windowOpen = false;
     if (identityId) {
-      const { data: conv } = await admin
+      // Look across every identity that shares a phone variant (BR mobile "9"
+      // duplication) so we don't falsely close the window.
+      const { data: sibs } = await admin
+        .from("whatsapp_identities")
+        .select("id")
+        .eq("institution", institution)
+        .in("phone_e164", brPhoneVariants(to));
+      const ids = (sibs ?? []).map((s: any) => s.id);
+      if (!ids.includes(identityId)) ids.push(identityId);
+      const { data: convs } = await admin
         .from("whatsapp_conversations")
         .select("service_window_expires_at")
-        .eq("identity_id", identityId)
-        .maybeSingle();
-      const exp = (conv as any)?.service_window_expires_at as string | null | undefined;
-      windowOpen = !!(exp && new Date(exp).getTime() > Date.now());
+        .in("identity_id", ids);
+      windowOpen = (convs ?? []).some(
+        (c: any) =>
+          c.service_window_expires_at &&
+          new Date(c.service_window_expires_at).getTime() > Date.now(),
+      );
     }
     if (!windowOpen) {
       await admin.from("messages").update({
