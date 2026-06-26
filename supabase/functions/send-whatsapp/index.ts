@@ -42,6 +42,24 @@ function normalizeBRPhone(input: string): string | null {
 }
 
 /**
+ * Returns BR phone E.164 variants with and without the mobile "9" prefix
+ * so identity/conversation lookups are resilient to numbers stored in either
+ * form (patients sometimes registered with "9", but inbound from Meta arrives
+ * without it for legacy lines, or vice-versa).
+ */
+function brPhoneVariants(p: string): string[] {
+  if (!p) return [];
+  const set = new Set<string>([p]);
+  if (p.startsWith("55") && p.length >= 12) {
+    const ddd = p.slice(2, 4);
+    const local = p.slice(4);
+    if (local.length === 9 && local.startsWith("9")) set.add(`55${ddd}${local.slice(1)}`);
+    else if (local.length === 8) set.add(`55${ddd}9${local}`);
+  }
+  return [...set];
+}
+
+/**
  * Validates required env + recipient phone. Never returns the token itself.
  * Returns { ok: true, to } on success or { ok: false, code, error } on failure.
  */
