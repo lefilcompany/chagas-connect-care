@@ -1,0 +1,59 @@
+// Centralized structured error codes for WhatsApp flows.
+// Both edge functions and the frontend (src/lib/whatsapp.ts) map these codes.
+
+export const WhatsAppErrorCode = {
+  // Identity / consent
+  IDENTITY_NOT_FOUND: "IDENTITY_NOT_FOUND",
+  WHATSAPP_OPT_IN_REQUIRED: "WHATSAPP_OPT_IN_REQUIRED",
+  WHATSAPP_OPT_OUT_ACTIVE: "WHATSAPP_OPT_OUT_ACTIVE",
+  PURPOSE_NOT_AUTHORIZED: "PURPOSE_NOT_AUTHORIZED",
+  // Window
+  SERVICE_WINDOW_CLOSED: "SERVICE_WINDOW_CLOSED",
+  INTERACTIVE_MESSAGE_REQUIRES_OPEN_WINDOW: "INTERACTIVE_MESSAGE_REQUIRES_OPEN_WINDOW",
+  // Template
+  TEMPLATE_NOT_APPROVED: "TEMPLATE_NOT_APPROVED",
+  TEMPLATE_NAME_MISSING: "TEMPLATE_NAME_MISSING",
+  TEMPLATE_DEFINITION_MISMATCH: "TEMPLATE_DEFINITION_MISMATCH",
+  TEMPLATE_PARAMETER_ORDER_MISSING: "TEMPLATE_PARAMETER_ORDER_MISSING",
+  TEMPLATE_PARAMETER_MISSING: "TEMPLATE_PARAMETER_MISSING",
+  TEMPLATE_PARAMETER_COUNT_MISMATCH: "TEMPLATE_PARAMETER_COUNT_MISMATCH",
+  // Buttons / URL
+  URL_DOMAIN_NOT_ALLOWED: "URL_DOMAIN_NOT_ALLOWED",
+  BUTTON_INDEX_OUT_OF_RANGE: "BUTTON_INDEX_OUT_OF_RANGE",
+  // Media
+  MEDIA_NOT_UPLOADED: "MEDIA_NOT_UPLOADED",
+  MEDIA_UPLOAD_FAILED: "MEDIA_UPLOAD_FAILED",
+  MEDIA_MIME_NOT_ALLOWED: "MEDIA_MIME_NOT_ALLOWED",
+  MEDIA_TOO_LARGE: "MEDIA_TOO_LARGE",
+  // Carousel
+  CAROUSEL_CARD_COUNT_MISMATCH: "CAROUSEL_CARD_COUNT_MISMATCH",
+  // OTP
+  OTP_EXPIRED: "OTP_EXPIRED",
+  OTP_TOO_MANY_ATTEMPTS: "OTP_TOO_MANY_ATTEMPTS",
+  // Feature flags
+  FEATURE_DISABLED: "FEATURE_DISABLED",
+  // Config
+  MISSING_TOKEN: "MISSING_TOKEN",
+  MISSING_PHONE_ID: "MISSING_PHONE_ID",
+  INVALID_RECIPIENT: "INVALID_RECIPIENT",
+  // Meta API passthrough
+  META_API_ERROR: "META_API_ERROR",
+} as const;
+
+export type WhatsAppErrorCodeValue =
+  (typeof WhatsAppErrorCode)[keyof typeof WhatsAppErrorCode];
+
+export interface WhatsAppStructuredError {
+  ok: false;
+  error_code: WhatsAppErrorCodeValue;
+  error: string;
+  details?: Record<string, unknown>;
+}
+
+export function structuredError(
+  code: WhatsAppErrorCodeValue,
+  message: string,
+  details?: Record<string, unknown>,
+): WhatsAppStructuredError {
+  return { ok: false, error_code: code, error: message, details };
+}

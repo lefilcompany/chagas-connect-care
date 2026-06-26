@@ -393,9 +393,20 @@ export type Database = {
           is_active: boolean
           is_default: boolean
           last_synced_at: string | null
+          meta_authentication_config: Json | null
+          meta_body_parameter_order: Json | null
+          meta_buttons: Json | null
+          meta_carousel_cards: Json | null
           meta_category: string | null
+          meta_definition: Json | null
+          meta_footer_text: string | null
+          meta_header_parameter_order: Json | null
+          meta_header_text: string | null
+          meta_header_type: string | null
           meta_language: string
+          meta_last_synced_at: string | null
           meta_parameter_order: Json
+          meta_rejection_reason: string | null
           meta_status: string
           meta_template_id: string | null
           meta_template_name: string | null
@@ -424,9 +435,20 @@ export type Database = {
           is_active?: boolean
           is_default?: boolean
           last_synced_at?: string | null
+          meta_authentication_config?: Json | null
+          meta_body_parameter_order?: Json | null
+          meta_buttons?: Json | null
+          meta_carousel_cards?: Json | null
           meta_category?: string | null
+          meta_definition?: Json | null
+          meta_footer_text?: string | null
+          meta_header_parameter_order?: Json | null
+          meta_header_text?: string | null
+          meta_header_type?: string | null
           meta_language?: string
+          meta_last_synced_at?: string | null
           meta_parameter_order?: Json
+          meta_rejection_reason?: string | null
           meta_status?: string
           meta_template_id?: string | null
           meta_template_name?: string | null
@@ -455,9 +477,20 @@ export type Database = {
           is_active?: boolean
           is_default?: boolean
           last_synced_at?: string | null
+          meta_authentication_config?: Json | null
+          meta_body_parameter_order?: Json | null
+          meta_buttons?: Json | null
+          meta_carousel_cards?: Json | null
           meta_category?: string | null
+          meta_definition?: Json | null
+          meta_footer_text?: string | null
+          meta_header_parameter_order?: Json | null
+          meta_header_text?: string | null
+          meta_header_type?: string | null
           meta_language?: string
+          meta_last_synced_at?: string | null
           meta_parameter_order?: Json
+          meta_rejection_reason?: string | null
           meta_status?: string
           meta_template_id?: string | null
           meta_template_name?: string | null
@@ -488,11 +521,17 @@ export type Database = {
           interaction_title: string | null
           interaction_type: string | null
           last_error: string | null
+          location_data: Json | null
+          media_asset_id: string | null
+          media_filename: string | null
+          media_mime_type: string | null
+          message_content_type: string | null
           message_type: string | null
           patient_id: string
           provider: string | null
           queued_at: string | null
           raw_message_type: string | null
+          reaction_emoji: string | null
           read_at: string | null
           scheduled_for: string | null
           send_attempts: number
@@ -518,11 +557,17 @@ export type Database = {
           interaction_title?: string | null
           interaction_type?: string | null
           last_error?: string | null
+          location_data?: Json | null
+          media_asset_id?: string | null
+          media_filename?: string | null
+          media_mime_type?: string | null
+          message_content_type?: string | null
           message_type?: string | null
           patient_id: string
           provider?: string | null
           queued_at?: string | null
           raw_message_type?: string | null
+          reaction_emoji?: string | null
           read_at?: string | null
           scheduled_for?: string | null
           send_attempts?: number
@@ -548,11 +593,17 @@ export type Database = {
           interaction_title?: string | null
           interaction_type?: string | null
           last_error?: string | null
+          location_data?: Json | null
+          media_asset_id?: string | null
+          media_filename?: string | null
+          media_mime_type?: string | null
+          message_content_type?: string | null
           message_type?: string | null
           patient_id?: string
           provider?: string | null
           queued_at?: string | null
           raw_message_type?: string | null
+          reaction_emoji?: string | null
           read_at?: string | null
           scheduled_for?: string | null
           send_attempts?: number
@@ -856,6 +907,63 @@ export type Database = {
           },
         ]
       }
+      whatsapp_media_assets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          direction: string
+          expires_at: string | null
+          filename: string | null
+          id: string
+          institution: string
+          media_type: string
+          meta_media_id: string | null
+          mime_type: string
+          sha256: string | null
+          size_bytes: number | null
+          status: string
+          storage_bucket: string | null
+          storage_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          expires_at?: string | null
+          filename?: string | null
+          id?: string
+          institution: string
+          media_type: string
+          meta_media_id?: string | null
+          mime_type: string
+          sha256?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_bucket?: string | null
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          expires_at?: string | null
+          filename?: string | null
+          id?: string
+          institution?: string
+          media_type?: string
+          meta_media_id?: string | null
+          mime_type?: string
+          sha256?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_bucket?: string | null
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       whatsapp_unmatched_events: {
         Row: {
           created_at: string
@@ -923,6 +1031,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      mark_expired_whatsapp_media: { Args: never; Returns: number }
       whatsapp_window_open: { Args: { _identity_id: string }; Returns: boolean }
     }
     Enums: {
