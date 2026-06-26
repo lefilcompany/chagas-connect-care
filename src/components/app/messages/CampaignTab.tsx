@@ -315,7 +315,10 @@ export default function CampaignTab({
   };
 
   const stepValid = (i: number): boolean => {
-    if (i === 0) return !!selectedTemplate || freeBody.trim().length >= 3;
+    if (i === 0) {
+      if (crossTenantBlocked) return false;
+      return !!selectedTemplate || freeBody.trim().length >= 3;
+    }
     if (i === 1) return previewAud.length > 0 && finalRecipients.length > 0;
     if (i === 2) {
       if (renderedBody.trim().length < 3) return false;
