@@ -292,12 +292,39 @@ Deno.serve(async (req) => {
           if (!from) continue;
 
           const rawType: string = m?.type ?? "text";
-          const text: string =
+          // Extract a human-readable body across all WhatsApp message types so
+          // the inbox never shows just "[mensagem sem texto]".
+          const mediaCaption: string | undefined =
+            m?.image?.caption ?? m?.video?.caption ?? m?.document?.caption;
+          const mediaFilename: string | undefined = m?.document?.filename;
+          let text: string =
             m?.text?.body ??
             m?.button?.text ??
             m?.interactive?.button_reply?.title ??
             m?.interactive?.list_reply?.title ??
+            mediaCaption ??
             "";
+          if (!text) {
+            switch (rawType) {
+              case "image": text = "🖼️ Imagem recebida"; break;
+              case "video": text = "🎥 Vídeo recebido"; break;
+              case "audio": text = "🎤 Áudio recebido"; break;
+              case "voice": text = "🎤 Mensagem de voz"; break;
+              case "document": text = `📎 Documento${mediaFilename ? `: ${mediaFilename}` : ""}`; break;
+              case "sticker": text = "💟 Figurinha"; break;
+              case "location": {
+                const lat = m?.location?.latitude;
+                const lng = m?.location?.longitude;
+                const name = m?.location?.name;
+                text = `📍 Localização${name ? `: ${name}` : lat && lng ? ` (${lat}, ${lng})` : ""}`;
+                break;
+              }
+              case "contacts": text = "👤 Contato compartilhado"; break;
+              case "reaction": text = `❤️ Reagiu: ${m?.reaction?.emoji ?? ""}`.trim(); break;
+              case "order": text = "🛒 Pedido recebido"; break;
+              default: text = `[${rawType}]`;
+            }
+          }
           const interactionId: string | null =
             m?.button?.payload ??
             m?.interactive?.button_reply?.id ??
