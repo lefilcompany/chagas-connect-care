@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
   if (!WHATSAPP_TEST_MODE && (msg as any).template_id) {
     const { data: tpl } = await admin
       .from("message_templates")
-      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text, meta_buttons, meta_authentication_config")
+      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text, meta_footer_text, meta_buttons, meta_authentication_config")
       .eq("id", (msg as any).template_id)
       .maybeSingle();
     tplRow = tpl;
