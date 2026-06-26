@@ -44,21 +44,50 @@ function normalizeBR(p: string): string {
   return digits.startsWith("55") ? digits : "55" + digits;
 }
 
-async function findPatientByPhone(admin: ReturnType<typeof createClient>, phone: string) {
-  const normalized = normalizeBR(phone);
-  if (!normalized) return null;
-  const candidates = new Set<string>([normalized]);
-  if (normalized.startsWith("55")) candidates.add(normalized.slice(2));
-
-  for (const cand of candidates) {
+/** Resolve a WhatsApp identity by exact wa_id then exact E.164 phone. */
+async function findIdentity(
+  admin: ReturnType<typeof createClient>,
+  wa_id: string,
+  phone_e164: string,
+) {
+  if (wa_id) {
     const { data } = await admin
-      .from("patients")
-      .select("id")
-      .ilike("phone", `%${cand.slice(-8)}%`)
-      .limit(1);
-    if (data && data.length > 0) return data[0].id as string;
+      .from("whatsapp_identities")
+      .select("id, institution, patient_id, contact_id")
+      .eq("wa_id", wa_id)
+      .maybeSingle();
+    if (data) return data as any;
+  }
+  if (phone_e164) {
+    const { data } = await admin
+      .from("whatsapp_identities")
+      .select("id, institution, patient_id, contact_id")
+      .eq("phone_e164", phone_e164)
+      .maybeSingle();
+    if (data) return data as any;
   }
   return null;
+}
+
+const OPT_OUT_KEYWORDS = ["PARAR", "SAIR", "CANCELAR", "NAO QUERO", "NÃO QUERO", "REMOVER", "STOP"];
+function isOptOutText(t: string): boolean {
+  const norm = (t ?? "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return OPT_OUT_KEYWORDS.some((k) => norm === k.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+}
+
+// queued < sent < delivered < read; failed never overwrites a later success.
+const STATUS_RANK: Record<string, number> = {
+  queued: 0, sent: 1, delivered: 2, read: 3,
+};
+function shouldApplyStatus(current: string | null | undefined, next: string): boolean {
+  if (next === "failed") {
+    // Only apply failed if we haven't already reached sent or beyond.
+    const cur = STATUS_RANK[current ?? "queued"] ?? 0;
+    return cur <= 0;
+  }
+  const cur = STATUS_RANK[current ?? "queued"] ?? -1;
+  const nxt = STATUS_RANK[next] ?? -1;
+  return nxt > cur;
 }
 
 Deno.serve(async (req) => {
@@ -117,50 +146,133 @@ Deno.serve(async (req) => {
           const status: string | undefined = st?.status;
           if (!extId || !status) continue;
 
-          const patch: Record<string, unknown> = {};
-          if (status === "delivered") {
-            patch.status = "delivered";
-            patch.delivered_at = new Date().toISOString();
-          } else if (status === "read") {
-            patch.status = "read";
-            patch.read_at = new Date().toISOString();
-          } else if (status === "failed") {
-            patch.status = "failed";
+          // Look up current state to enforce monotonic status priority.
+          const { data: cur } = await admin
+            .from("messages")
+            .select("id, status")
+            .eq("external_message_id", extId)
+            .maybeSingle();
+          if (!cur) continue;
+          if (!shouldApplyStatus((cur as any).status, status)) continue;
+
+          const patch: Record<string, unknown> = { status };
+          if (status === "delivered") patch.delivered_at = new Date().toISOString();
+          else if (status === "read") patch.read_at = new Date().toISOString();
+          else if (status === "failed") {
             patch.failed_at = new Date().toISOString();
             patch.last_error =
               st?.errors?.[0]?.title ?? st?.errors?.[0]?.message ?? "Falha na entrega";
-          } else if (status === "sent") {
-            patch.status = "sent";
           }
-          if (Object.keys(patch).length > 0) {
-            await admin.from("messages").update(patch).eq("external_message_id", extId);
-          }
+          await admin.from("messages").update(patch).eq("id", (cur as any).id);
         }
 
         // Inbound messages
         const messages: any[] = Array.isArray(value?.messages) ? value.messages : [];
         for (const m of messages) {
           const from: string = m?.from ?? "";
-          const text: string = m?.text?.body ?? m?.button?.text ?? "";
           const extId: string | undefined = m?.id;
           if (!from) continue;
 
-          const patientId = await findPatientByPhone(admin, from);
-          if (!patientId) {
-            console.log("whatsapp-webhook: inbound from unknown phone", from);
+          const rawType: string = m?.type ?? "text";
+          const text: string =
+            m?.text?.body ??
+            m?.button?.text ??
+            m?.interactive?.button_reply?.title ??
+            m?.interactive?.list_reply?.title ??
+            "";
+          const interactionId: string | null =
+            m?.button?.payload ??
+            m?.interactive?.button_reply?.id ??
+            m?.interactive?.list_reply?.id ??
+            null;
+          const interactionTitle: string | null =
+            m?.interactive?.button_reply?.title ??
+            m?.interactive?.list_reply?.title ??
+            m?.button?.text ??
+            null;
+          const interactionType: string | null = m?.interactive?.type ?? (m?.button ? "button" : null);
+
+          const phone_e164 = normalizeBR(from);
+          const identity = await findIdentity(admin, from, phone_e164);
+
+          if (!identity) {
+            // Triage: register the unmatched event (no clinical content).
+            await admin.from("whatsapp_unmatched_events").insert({
+              external_message_id: extId ?? null,
+              wa_id: from,
+              phone_e164,
+              event_type: "inbound",
+            } as any);
             continue;
           }
 
+          // Idempotency: skip if we already stored this inbound id.
+          if (extId) {
+            const { data: existing } = await admin
+              .from("messages")
+              .select("id")
+              .eq("external_message_id", extId)
+              .eq("direction", "inbound")
+              .maybeSingle();
+            if (existing) continue;
+          }
+
+          // Resolve patient_id: use the identity's patient_id or, for contact
+          // identities, fall back to the contact's owning patient.
+          let patientId: string | null = identity.patient_id ?? null;
+          if (!patientId && identity.contact_id) {
+            const { data: c } = await admin
+              .from("contacts").select("patient_id").eq("id", identity.contact_id).maybeSingle();
+            patientId = (c as any)?.patient_id ?? null;
+          }
+          if (!patientId) continue;
+
+          const nowIso = new Date().toISOString();
+
           await admin.from("messages").insert({
             patient_id: patientId,
+            contact_id: identity.contact_id ?? null,
             channel: "whatsapp",
             direction: "inbound",
             body: text || "[mensagem sem texto]",
             status: "received",
             external_message_id: extId ?? null,
             provider: "meta_whatsapp_cloud",
-            sent_at: new Date().toISOString(),
-          });
+            sent_at: nowIso,
+            interaction_type: interactionType,
+            interaction_id: interactionId,
+            interaction_title: interactionTitle,
+            raw_message_type: rawType,
+          } as any);
+
+          // Open/renew service window (24h).
+          const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+          await admin.from("whatsapp_conversations").upsert({
+            identity_id: identity.id,
+            institution: identity.institution,
+            patient_id: patientId,
+            contact_id: identity.contact_id ?? null,
+            last_inbound_at: nowIso,
+            last_message_at: nowIso,
+            service_window_expires_at: expiry,
+            status: "active",
+          } as any, { onConflict: "identity_id" });
+
+          // Opt-out keywords → revoke and cancel queued outbound to this identity.
+          if (text && isOptOutText(text)) {
+            await admin
+              .from("whatsapp_identities")
+              .update({ opt_in_status: "opted_out", opt_out_at: nowIso, is_active: false })
+              .eq("id", identity.id);
+            // Cancel queued messages addressed to this patient/contact.
+            const q = admin.from("messages").update({
+              status: "failed",
+              failed_at: nowIso,
+              last_error: "Cancelado por opt-out do destinatário",
+            }).eq("status", "queued");
+            if (identity.contact_id) await q.eq("contact_id", identity.contact_id);
+            else await q.eq("patient_id", patientId).is("contact_id", null);
+          }
         }
       }
     }
