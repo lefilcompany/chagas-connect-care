@@ -286,17 +286,43 @@ Deno.serve(async (req) => {
           const interactionType: string | null = m?.interactive?.type ?? (m?.button ? "button" : null);
 
           const phone_e164 = normalizeBR(from);
-          const identity = await findIdentity(admin, from, phone_e164, channelInstitution);
+          let identity = await findIdentity(admin, from, phone_e164, channelInstitution);
 
+          // Unknown sender: create a lightweight identity (no patient/contact link)
+          // so the inbox can show the conversation and the team can invite the
+          // contact to register through a public form. Requires we know the
+          // institution that owns the receiving WhatsApp channel.
           if (!identity) {
-            // Triage: register the unmatched event (no clinical content).
-            await admin.from("whatsapp_unmatched_events").insert({
-              external_message_id: extId ?? null,
-              wa_id: from,
-              phone_e164,
-              event_type: "inbound",
-            } as any);
-            continue;
+            if (!channelInstitution) {
+              await admin.from("whatsapp_unmatched_events").insert({
+                external_message_id: extId ?? null,
+                wa_id: from,
+                phone_e164,
+                event_type: "inbound",
+              } as any);
+              continue;
+            }
+            const { data: created } = await admin
+              .from("whatsapp_identities")
+              .insert({
+                institution: channelInstitution,
+                phone_e164,
+                wa_id: from,
+                recipient_type: "unknown",
+                opt_in_status: "pending",
+              } as any)
+              .select("id, institution, patient_id, contact_id")
+              .maybeSingle();
+            if (!created) {
+              await admin.from("whatsapp_unmatched_events").insert({
+                external_message_id: extId ?? null,
+                wa_id: from,
+                phone_e164,
+                event_type: "inbound",
+              } as any);
+              continue;
+            }
+            identity = created as any;
           }
 
           // Idempotency: skip if we already stored this inbound id.
@@ -310,20 +336,20 @@ Deno.serve(async (req) => {
             if (existing) continue;
           }
 
-          // Resolve patient_id: use the identity's patient_id or, for contact
-          // identities, fall back to the contact's owning patient.
+          // Resolve patient_id when available; unknown identities keep it null.
           let patientId: string | null = identity.patient_id ?? null;
           if (!patientId && identity.contact_id) {
             const { data: c } = await admin
               .from("contacts").select("patient_id").eq("id", identity.contact_id).maybeSingle();
             patientId = (c as any)?.patient_id ?? null;
           }
-          if (!patientId) continue;
 
           const nowIso = new Date().toISOString();
 
           await admin.from("messages").insert({
             patient_id: patientId,
+            identity_id: identity.id,
+            institution: identity.institution,
             contact_id: identity.contact_id ?? null,
             channel: "whatsapp",
             direction: "inbound",
@@ -352,7 +378,7 @@ Deno.serve(async (req) => {
           } as any, { onConflict: "identity_id" });
 
           // OTP verification attempt (Phase 5). Runs on every inbound text.
-          if (text) {
+          if (text && patientId) {
             try {
               await tryVerifyOtp(admin, identity, text);
             } catch (e) {
@@ -366,14 +392,15 @@ Deno.serve(async (req) => {
               .from("whatsapp_identities")
               .update({ opt_in_status: "opted_out", opt_out_at: nowIso, is_active: false })
               .eq("id", identity.id);
-            // Cancel queued messages addressed to this patient/contact.
-            const q = admin.from("messages").update({
-              status: "failed",
-              failed_at: nowIso,
-              last_error: "Cancelado por opt-out do destinatário",
-            }).eq("status", "queued");
-            if (identity.contact_id) await q.eq("contact_id", identity.contact_id);
-            else await q.eq("patient_id", patientId).is("contact_id", null);
+            if (patientId) {
+              const q = admin.from("messages").update({
+                status: "failed",
+                failed_at: nowIso,
+                last_error: "Cancelado por opt-out do destinatário",
+              }).eq("status", "queued");
+              if (identity.contact_id) await q.eq("contact_id", identity.contact_id);
+              else await q.eq("patient_id", patientId).is("contact_id", null);
+            }
           }
         }
       }
