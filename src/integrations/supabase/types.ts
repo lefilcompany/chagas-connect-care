@@ -98,6 +98,10 @@ export type Database = {
       contacts: {
         Row: {
           address: string
+          authorization_scope: string[]
+          authorization_status: string
+          authorized_at: string | null
+          authorized_by: string | null
           birth_date: string | null
           channel_pref: Database["public"]["Enums"]["message_channel"]
           city: string
@@ -110,11 +114,16 @@ export type Database = {
           phone: string
           receives_reminders: boolean
           relation: string
+          revoked_at: string | null
           state: string
           status: string
         }
         Insert: {
           address?: string
+          authorization_scope?: string[]
+          authorization_status?: string
+          authorized_at?: string | null
+          authorized_by?: string | null
           birth_date?: string | null
           channel_pref?: Database["public"]["Enums"]["message_channel"]
           city?: string
@@ -127,11 +136,16 @@ export type Database = {
           phone?: string
           receives_reminders?: boolean
           relation?: string
+          revoked_at?: string | null
           state?: string
           status?: string
         }
         Update: {
           address?: string
+          authorization_scope?: string[]
+          authorization_status?: string
+          authorized_at?: string | null
+          authorized_by?: string | null
           birth_date?: string | null
           channel_pref?: Database["public"]["Enums"]["message_channel"]
           city?: string
@@ -144,6 +158,7 @@ export type Database = {
           phone?: string
           receives_reminders?: boolean
           relation?: string
+          revoked_at?: string | null
           state?: string
           status?: string
         }
@@ -377,12 +392,15 @@ export type Database = {
           institution: string
           is_active: boolean
           is_default: boolean
+          last_synced_at: string | null
           meta_category: string | null
           meta_language: string
+          meta_parameter_order: Json
           meta_status: string
           meta_template_id: string | null
           meta_template_name: string | null
           name: string
+          rejection_reason: string | null
           segment_id: string | null
           targeting_mode: string
           template_kind: string
@@ -405,12 +423,15 @@ export type Database = {
           institution?: string
           is_active?: boolean
           is_default?: boolean
+          last_synced_at?: string | null
           meta_category?: string | null
           meta_language?: string
+          meta_parameter_order?: Json
           meta_status?: string
           meta_template_id?: string | null
           meta_template_name?: string | null
           name: string
+          rejection_reason?: string | null
           segment_id?: string | null
           targeting_mode?: string
           template_kind?: string
@@ -433,12 +454,15 @@ export type Database = {
           institution?: string
           is_active?: boolean
           is_default?: boolean
+          last_synced_at?: string | null
           meta_category?: string | null
           meta_language?: string
+          meta_parameter_order?: Json
           meta_status?: string
           meta_template_id?: string | null
           meta_template_name?: string | null
           name?: string
+          rejection_reason?: string | null
           segment_id?: string | null
           targeting_mode?: string
           template_kind?: string
@@ -460,11 +484,15 @@ export type Database = {
           external_message_id: string | null
           failed_at: string | null
           id: string
+          interaction_id: string | null
+          interaction_title: string | null
+          interaction_type: string | null
           last_error: string | null
           message_type: string | null
           patient_id: string
           provider: string | null
           queued_at: string | null
+          raw_message_type: string | null
           read_at: string | null
           scheduled_for: string | null
           send_attempts: number
@@ -486,11 +514,15 @@ export type Database = {
           external_message_id?: string | null
           failed_at?: string | null
           id?: string
+          interaction_id?: string | null
+          interaction_title?: string | null
+          interaction_type?: string | null
           last_error?: string | null
           message_type?: string | null
           patient_id: string
           provider?: string | null
           queued_at?: string | null
+          raw_message_type?: string | null
           read_at?: string | null
           scheduled_for?: string | null
           send_attempts?: number
@@ -512,11 +544,15 @@ export type Database = {
           external_message_id?: string | null
           failed_at?: string | null
           id?: string
+          interaction_id?: string | null
+          interaction_title?: string | null
+          interaction_type?: string | null
           last_error?: string | null
           message_type?: string | null
           patient_id?: string
           provider?: string | null
           queued_at?: string | null
+          raw_message_type?: string | null
           read_at?: string | null
           scheduled_for?: string | null
           send_attempts?: number
@@ -678,6 +714,198 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_conversations: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          id: string
+          identity_id: string
+          institution: string
+          last_inbound_at: string | null
+          last_message_at: string | null
+          last_outbound_at: string | null
+          patient_id: string | null
+          service_window_expires_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          identity_id: string
+          institution: string
+          last_inbound_at?: string | null
+          last_message_at?: string | null
+          last_outbound_at?: string | null
+          patient_id?: string | null
+          service_window_expires_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          identity_id?: string
+          institution?: string
+          last_inbound_at?: string | null
+          last_message_at?: string | null
+          last_outbound_at?: string | null
+          patient_id?: string | null
+          service_window_expires_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_identity_id_fkey"
+            columns: ["identity_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_identities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_identities: {
+        Row: {
+          allowed_purposes: string[]
+          contact_id: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          institution: string
+          is_active: boolean
+          opt_in_at: string | null
+          opt_in_notice_version: string | null
+          opt_in_source: string | null
+          opt_in_status: string
+          opt_out_at: string | null
+          patient_id: string | null
+          phone_e164: string
+          recipient_type: string
+          updated_at: string
+          wa_id: string | null
+        }
+        Insert: {
+          allowed_purposes?: string[]
+          contact_id?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          institution: string
+          is_active?: boolean
+          opt_in_at?: string | null
+          opt_in_notice_version?: string | null
+          opt_in_source?: string | null
+          opt_in_status?: string
+          opt_out_at?: string | null
+          patient_id?: string | null
+          phone_e164: string
+          recipient_type?: string
+          updated_at?: string
+          wa_id?: string | null
+        }
+        Update: {
+          allowed_purposes?: string[]
+          contact_id?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          institution?: string
+          is_active?: boolean
+          opt_in_at?: string | null
+          opt_in_notice_version?: string | null
+          opt_in_source?: string | null
+          opt_in_status?: string
+          opt_out_at?: string | null
+          patient_id?: string | null
+          phone_e164?: string
+          recipient_type?: string
+          updated_at?: string
+          wa_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_identities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_identities_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_unmatched_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          external_message_id: string | null
+          id: string
+          institution: string | null
+          linked_identity_id: string | null
+          phone_e164: string | null
+          received_at: string
+          status: string
+          updated_at: string
+          wa_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type?: string
+          external_message_id?: string | null
+          id?: string
+          institution?: string | null
+          linked_identity_id?: string | null
+          phone_e164?: string | null
+          received_at?: string
+          status?: string
+          updated_at?: string
+          wa_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          external_message_id?: string | null
+          id?: string
+          institution?: string | null
+          linked_identity_id?: string | null
+          phone_e164?: string | null
+          received_at?: string
+          status?: string
+          updated_at?: string
+          wa_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_unmatched_events_linked_identity_id_fkey"
+            columns: ["linked_identity_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_identities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -695,6 +923,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      whatsapp_window_open: { Args: { _identity_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "equipe"

@@ -21,6 +21,27 @@ export function friendlyWhatsAppError(payload: any): string {
     ? " (modo de teste: confirme que o destinatário está autorizado em Testes de API da Meta)."
     : "";
 
+  if (code === "SERVICE_WINDOW_CLOSED")
+    return "Janela de atendimento de 24h encerrada. Use um Template Meta aprovado para reiniciar a conversa.";
+  if (code === "WHATSAPP_OPT_IN_REQUIRED")
+    return "Este destinatário ainda não autorizou mensagens por WhatsApp.";
+  if (code === "WHATSAPP_OPT_OUT_ACTIVE")
+    return "Este destinatário pediu para não receber mensagens (opt-out).";
+  if (code === "PURPOSE_NOT_AUTHORIZED")
+    return "Este contato não possui autorização para este tipo de informação.";
+  if (code === "TEMPLATE_NOT_APPROVED")
+    return "O template está pausado, rejeitado ou desativado na Meta.";
+  if (code === "TEMPLATE_NAME_MISSING")
+    return "O template não tem nome configurado na integração Meta.";
+  if (code === "TEMPLATE_PARAMETER_ORDER_MISSING")
+    return "Defina a ordem das variáveis do template Meta antes de enviar.";
+  if (code === "TEMPLATE_PARAMETER_MISSING")
+    return payload?.error ?? "Uma variável obrigatória do template não foi preenchida.";
+  if (code === "TEMPLATE_PARAMETER_COUNT_MISMATCH")
+    return "A quantidade de variáveis não corresponde ao template aprovado na Meta.";
+  if (code === "IDENTITY_NOT_FOUND")
+    return "O destinatário ainda não está vinculado a um número de WhatsApp válido.";
+
   if (code === "MISSING_TOKEN") return "Token do WhatsApp não configurado. Avise o administrador.";
   if (code === "MISSING_PHONE_ID") return "Phone Number ID do WhatsApp não configurado.";
   if (code === "INVALID_RECIPIENT") return payload?.error ?? "Número do destinatário inválido.";
@@ -43,6 +64,29 @@ export function friendlyWhatsAppError(payload: any): string {
   }
 
   return payload?.error ?? "Falha no envio";
+}
+
+// ----- Service window helpers (used by UI) ------------------------------
+
+export type WindowStatus =
+  | { state: "open"; expiresAt: Date; remainingMinutes: number }
+  | { state: "closed"; expiresAt: Date }
+  | { state: "never" };
+
+export function getWindowStatus(expiresAt: string | null | undefined): WindowStatus {
+  if (!expiresAt) return { state: "never" };
+  const exp = new Date(expiresAt);
+  const diffMs = exp.getTime() - Date.now();
+  if (diffMs <= 0) return { state: "closed", expiresAt: exp };
+  return { state: "open", expiresAt: exp, remainingMinutes: Math.round(diffMs / 60000) };
+}
+
+export function formatWindowLabel(status: WindowStatus): string {
+  if (status.state === "never") return "Nenhuma conversa iniciada — use um Template Meta";
+  if (status.state === "closed") return "Janela encerrada — use um Template Meta";
+  const h = Math.floor(status.remainingMinutes / 60);
+  const m = status.remainingMinutes % 60;
+  return `Janela de atendimento aberta — ${h}h${m > 0 ? ` ${m}m` : ""} restantes`;
 }
 
 export type QueueAndSendInput = {

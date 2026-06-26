@@ -86,6 +86,8 @@ Deno.serve(async (req) => {
 
   let ok = 0;
   let failed = 0;
+  let skipped = 0;
+  const errorCodeCounts: Record<string, number> = {};
   let lastError: string | null = null;
   let idx = 0;
 
@@ -108,6 +110,17 @@ Deno.serve(async (req) => {
           ok++;
         } else {
           failed++;
+          const code = (data as any)?.error_code;
+          if (code) errorCodeCounts[code] = (errorCodeCounts[code] ?? 0) + 1;
+          if (
+            code === "SERVICE_WINDOW_CLOSED" ||
+            code === "WHATSAPP_OPT_OUT_ACTIVE" ||
+            code === "PURPOSE_NOT_AUTHORIZED" ||
+            code === "TEMPLATE_NOT_APPROVED" ||
+            code === "TEMPLATE_NAME_MISSING"
+          ) {
+            skipped++;
+          }
           lastError = data?.error ?? `HTTP ${res.status}`;
         }
       } catch (e) {
@@ -133,5 +146,11 @@ Deno.serve(async (req) => {
     })
     .eq("id", batch.id);
 
-  return json(200, { ok: failed === 0, ok_count: ok, failed_count: failed });
+  return json(200, {
+    ok: failed === 0,
+    ok_count: ok,
+    failed_count: failed,
+    skipped_count: skipped,
+    error_codes: errorCodeCounts,
+  });
 });
