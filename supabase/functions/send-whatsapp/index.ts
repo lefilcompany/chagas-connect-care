@@ -606,6 +606,155 @@ Deno.serve(async (req) => {
       },
     };
     }
+
+    // ---- Carousel (Phase 7) -------------------------------------------
+    // Carousel templates carry per-card definitions on
+    // message_templates.meta_carousel_cards. Runtime values come from
+    // messages.template_variables.__carousel:
+    //   [{ card_index, header_media_asset_id?, body_params?: string[],
+    //      buttons?: Array<{ index, sub_type, payload?, url_param?, copy_code? }> }]
+    const carouselDefsRaw = (tplRow as any).meta_carousel_cards;
+    const carouselDefs: any[] = Array.isArray(carouselDefsRaw) ? carouselDefsRaw : [];
+    if (carouselDefs.length > 0) {
+      const carouselInputsRaw = ((msg as any).template_variables as Record<string, unknown> | null)?.__carousel;
+      const carouselInputs: any[] = Array.isArray(carouselInputsRaw) ? carouselInputsRaw : [];
+      if (carouselInputs.length !== carouselDefs.length) {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: `Carrossel exige ${carouselDefs.length} cards, recebido ${carouselInputs.length}`,
+        }).eq("id", msg.id);
+        return json(200, {
+          ok: false,
+          error_code: "CAROUSEL_CARD_COUNT_MISMATCH",
+          error: `Este carrossel exige exatamente ${carouselDefs.length} cards.`,
+        });
+      }
+
+      const allowEnv = (Deno.env.get("WHATSAPP_URL_ALLOWLIST") ?? "").trim();
+      const allowAll = allowEnv === "" || allowEnv === "*";
+      const allowList = allowAll ? [] : allowEnv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+      const failCarousel = async (code: string, errorMsg: string) => {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: errorMsg,
+        }).eq("id", msg.id);
+        return json(200, { ok: false, error_code: code, error: errorMsg });
+      };
+
+      const cards: Record<string, unknown>[] = [];
+      for (let i = 0; i < carouselDefs.length; i++) {
+        const def = carouselDefs[i] ?? {};
+        const input = carouselInputs[i] ?? {};
+        const cardComponents: Record<string, unknown>[] = [];
+
+        // Header (image/video required at runtime via media_asset_id)
+        const headerFormat: string | null = (def.header?.format ?? def.header_format ?? null)
+          ? String(def.header?.format ?? def.header_format).toLowerCase()
+          : null;
+        if (headerFormat === "image" || headerFormat === "video") {
+          const assetId = input.header_media_asset_id as string | null;
+          if (!assetId) {
+            return await failCarousel("MEDIA_NOT_UPLOADED", `Card ${i + 1}: mídia do cabeçalho ausente.`);
+          }
+          const { data: asset } = await admin
+            .from("whatsapp_media_assets")
+            .select("meta_media_id, status")
+            .eq("id", assetId)
+            .maybeSingle();
+          const mediaId = (asset as any)?.meta_media_id as string | null;
+          if (!mediaId || (asset as any)?.status !== "uploaded") {
+            return await failCarousel("MEDIA_NOT_UPLOADED", `Card ${i + 1}: mídia ainda não enviada à Meta.`);
+          }
+          cardComponents.push({
+            type: "header",
+            parameters: [{ type: headerFormat, [headerFormat]: { id: mediaId } }],
+          });
+        }
+
+        // Body parameters (positional)
+        const bodyParams = Array.isArray(input.body_params) ? (input.body_params as unknown[]) : [];
+        const bodyOrder = Array.isArray(def.body?.parameter_order)
+          ? (def.body.parameter_order as string[])
+          : null;
+        const expectedBody = bodyOrder ? bodyOrder.length : bodyParams.length;
+        if (bodyParams.length !== expectedBody) {
+          return await failCarousel(
+            "TEMPLATE_PARAMETER_COUNT_MISMATCH",
+            `Card ${i + 1}: esperado ${expectedBody} variáveis, recebido ${bodyParams.length}.`,
+          );
+        }
+        if (bodyParams.length > 0) {
+          cardComponents.push({
+            type: "body",
+            parameters: bodyParams.map((v) => ({ type: "text", text: String(v ?? "") })),
+          });
+        }
+
+        // Buttons per card (same shape used by Phase 4)
+        const btnDefs: any[] = Array.isArray(def.buttons) ? def.buttons : [];
+        const btnInputs: any[] = Array.isArray(input.buttons) ? input.buttons : [];
+        for (const inp of btnInputs) {
+          if (typeof inp?.index !== "number" || inp.index < 0 || inp.index >= btnDefs.length) {
+            return await failCarousel("BUTTON_INDEX_OUT_OF_RANGE",
+              `Card ${i + 1}: botão índice ${inp?.index} não existe.`);
+          }
+          const bd = btnDefs[inp.index];
+          const btype = String(bd?.type ?? "").toUpperCase();
+          if (btype === "QUICK_REPLY") {
+            if (inp.sub_type !== "quick_reply" || !inp.payload || inp.payload.length === 0 || inp.payload.length > 256) {
+              return await failCarousel("TEMPLATE_PARAMETER_MISSING",
+                `Card ${i + 1}: payload do botão inválido.`);
+            }
+            cardComponents.push({
+              type: "button", sub_type: "quick_reply", index: String(inp.index),
+              parameters: [{ type: "payload", payload: inp.payload }],
+            });
+          } else if (btype === "URL") {
+            if (inp.sub_type !== "url" || !inp.url_param) {
+              return await failCarousel("TEMPLATE_PARAMETER_MISSING",
+                `Card ${i + 1}: parâmetro de URL ausente.`);
+            }
+            let parsed: URL | null = null;
+            try { parsed = new URL(String(bd.url ?? "").replace("{{1}}", inp.url_param)); } catch { parsed = null; }
+            if (!parsed || parsed.protocol !== "https:") {
+              return await failCarousel("URL_DOMAIN_NOT_ALLOWED",
+                `Card ${i + 1}: URL inválida ou sem HTTPS.`);
+            }
+            if (!allowAll) {
+              const host = parsed.hostname.toLowerCase();
+              const okHost = allowList.some((d) => host === d || host.endsWith("." + d));
+              if (!okHost) {
+                return await failCarousel("URL_DOMAIN_NOT_ALLOWED",
+                  `Card ${i + 1}: domínio "${host}" fora da allowlist.`);
+              }
+            }
+            cardComponents.push({
+              type: "button", sub_type: "url", index: String(inp.index),
+              parameters: [{ type: "text", text: inp.url_param }],
+            });
+          }
+          // PHONE_NUMBER / static buttons → no runtime component
+        }
+
+        cards.push({ card_index: i, components: cardComponents });
+      }
+
+      // Compose the final template payload: keep any pre-existing components
+      // (top-level body / header) and append the carousel component last.
+      const baseTpl = (metaPayload as any).template ?? {
+        name: tplRow.meta_template_name,
+        language: { code: tplRow.meta_language || "pt_BR" },
+      };
+      const baseComps: Record<string, unknown>[] = Array.isArray((baseTpl as any).components)
+        ? [...(baseTpl as any).components] : [];
+      baseComps.push({ type: "carousel", cards });
+      metaPayload = {
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: { ...baseTpl, components: baseComps },
+      };
+    }
   }
 
   // ---- Interactive messages (Phase 6) -----------------------------------
@@ -744,6 +893,56 @@ Deno.serve(async (req) => {
           }
         }
         action = { name: "cta_url", parameters: { display_text: display, url } };
+      } else if (itype === "product") {
+        // Single Product Message (SPM). Requires Meta catalog id (env or
+        // passed in payload) and a product retailer id.
+        const catalogId = String((interactive as any).catalog_id ?? Deno.env.get("WHATSAPP_CATALOG_ID") ?? "").trim();
+        const productId = String((interactive as any).product_retailer_id ?? "").trim();
+        if (!catalogId) return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "catalog_id obrigatório (defina WHATSAPP_CATALOG_ID ou envie no payload).");
+        if (!productId) return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "product_retailer_id obrigatório.");
+        // SPM does not accept header.
+        if (headerObj) return await failInteractive("INTERACTIVE_HEADER_INVALID", "Single Product Message não aceita cabeçalho.");
+        action = { catalog_id: catalogId, product_retailer_id: productId };
+      } else if (itype === "product_list") {
+        // Multi-Product Message (MPM). Header text + sections of products.
+        const catalogId = String((interactive as any).catalog_id ?? Deno.env.get("WHATSAPP_CATALOG_ID") ?? "").trim();
+        if (!catalogId) return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "catalog_id obrigatório (defina WHATSAPP_CATALOG_ID ou envie no payload).");
+        if (!headerObj || (headerObj as any).type !== "text") {
+          return await failInteractive("INTERACTIVE_HEADER_INVALID", "Lista de produtos exige cabeçalho de texto.");
+        }
+        const sections = (interactive as any).sections;
+        if (!Array.isArray(sections) || sections.length < 1 || sections.length > 10) {
+          return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "Lista de produtos exige 1–10 seções.");
+        }
+        let totalProducts = 0;
+        const builtSections: Record<string, unknown>[] = [];
+        const seen = new Set<string>();
+        for (const s of sections) {
+          const title = String((s as any)?.title ?? "").trim();
+          const items = (s as any)?.product_items;
+          if (sections.length > 1 && (!title || title.length > 24)) {
+            return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "Cada seção precisa de título com até 24 caracteres quando há mais de uma seção.");
+          }
+          if (!Array.isArray(items) || items.length === 0) {
+            return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "Cada seção precisa de pelo menos um produto.");
+          }
+          const builtItems: Record<string, unknown>[] = [];
+          for (const it of items) {
+            const pid = String((it as any)?.product_retailer_id ?? "").trim();
+            if (!pid) return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "product_retailer_id é obrigatório em cada item.");
+            if (seen.has(pid)) return await failInteractive("INTERACTIVE_PRODUCT_INVALID", `Produto duplicado: "${pid}".`);
+            seen.add(pid);
+            totalProducts++;
+            builtItems.push({ product_retailer_id: pid });
+          }
+          const section: Record<string, unknown> = { product_items: builtItems };
+          if (title) section.title = title;
+          builtSections.push(section);
+        }
+        if (totalProducts < 1 || totalProducts > 30) {
+          return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "Lista aceita entre 1 e 30 produtos no total.");
+        }
+        action = { catalog_id: catalogId, sections: builtSections };
       } else {
         return await failInteractive("INTERACTIVE_INVALID_TYPE", `Tipo de mensagem interativa não suportado: "${itype}". Use button, list ou cta_url.`);
       }
@@ -753,7 +952,8 @@ Deno.serve(async (req) => {
         body: { text: bodyText },
         action,
       };
-      if (headerObj) interactivePayload.header = headerObj;
+      // SPM forbids header — we already validated that above.
+      if (headerObj && itype !== "product") interactivePayload.header = headerObj;
       if (footerText) interactivePayload.footer = { text: footerText };
 
       metaPayload = {

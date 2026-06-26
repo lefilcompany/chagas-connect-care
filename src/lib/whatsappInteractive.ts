@@ -42,10 +42,31 @@ export type InteractiveCtaUrlMessage = {
   url: string;
 };
 
+/** Single Product Message (SPM) — requires open 24h window. */
+export type InteractiveProductMessage = {
+  type: "product";
+  body: string;
+  footer?: string;
+  catalog_id?: string; // falls back to WHATSAPP_CATALOG_ID
+  product_retailer_id: string;
+};
+
+/** Multi-Product Message (MPM) — requires open 24h window + text header. */
+export type InteractiveProductListMessage = {
+  type: "product_list";
+  header: { type: "text"; text: string };
+  body: string;
+  footer?: string;
+  catalog_id?: string;
+  sections: { title?: string; product_items: { product_retailer_id: string }[] }[];
+};
+
 export type InteractiveMessage =
   | InteractiveButtonMessage
   | InteractiveListMessage
-  | InteractiveCtaUrlMessage;
+  | InteractiveCtaUrlMessage
+  | InteractiveProductMessage
+  | InteractiveProductListMessage;
 
 /** Returns the first validation error, or null when the payload is valid. */
 export function validateInteractive(msg: InteractiveMessage): string | null {
@@ -53,8 +74,9 @@ export function validateInteractive(msg: InteractiveMessage): string | null {
   if (!body) return "O corpo da mensagem é obrigatório.";
   if (body.length > 1024) return "O corpo da mensagem excede 1024 caracteres.";
   if (msg.footer && msg.footer.length > 60) return "Rodapé excede 60 caracteres.";
-  if (msg.header?.type === "text") {
-    const t = msg.header.text.trim();
+  const header = "header" in msg ? msg.header : undefined;
+  if (header?.type === "text") {
+    const t = header.text.trim();
     if (!t || t.length > 60) return "Cabeçalho de texto deve ter 1–60 caracteres.";
   }
 
@@ -110,6 +132,34 @@ export function validateInteractive(msg: InteractiveMessage): string | null {
     return null;
   }
 
+  if (msg.type === "product") {
+    if (!(msg.product_retailer_id ?? "").trim()) return "Informe o product_retailer_id.";
+    return null;
+  }
+
+  if (msg.type === "product_list") {
+    const ht = (msg.header?.text ?? "").trim();
+    if (!ht || ht.length > 60) return "Cabeçalho de texto deve ter 1–60 caracteres.";
+    if (!msg.sections.length || msg.sections.length > 10) return "Lista de produtos exige 1–10 seções.";
+    let total = 0;
+    const seen = new Set<string>();
+    for (const s of msg.sections) {
+      if (msg.sections.length > 1 && (!s.title || s.title.length > 24)) {
+        return "Com mais de uma seção, cada uma precisa de título (≤ 24).";
+      }
+      if (!s.product_items?.length) return "Cada seção precisa de pelo menos um produto.";
+      for (const it of s.product_items) {
+        const pid = (it.product_retailer_id ?? "").trim();
+        if (!pid) return "product_retailer_id é obrigatório em cada item.";
+        if (seen.has(pid)) return `Produto duplicado: "${pid}".`;
+        seen.add(pid);
+        total++;
+      }
+    }
+    if (total < 1 || total > 30) return "Lista aceita entre 1 e 30 produtos no total.";
+    return null;
+  }
+
   return "Tipo de mensagem interativa não suportado.";
 }
 
@@ -119,11 +169,24 @@ export function toEdgePayload(msg: InteractiveMessage): Record<string, unknown> 
     type: msg.type,
     body: msg.body,
     ...(msg.footer ? { footer: msg.footer } : {}),
-    ...(msg.header ? { header: msg.header } : {}),
+    ...("header" in msg && msg.header ? { header: msg.header } : {}),
   };
   if (msg.type === "button") return { ...base, buttons: msg.buttons };
   if (msg.type === "list") return { ...base, button_text: msg.button_text, sections: msg.sections };
-  return { ...base, display_text: msg.display_text, url: msg.url };
+  if (msg.type === "cta_url") return { ...base, display_text: msg.display_text, url: msg.url };
+  if (msg.type === "product") {
+    return {
+      ...base,
+      ...(msg.catalog_id ? { catalog_id: msg.catalog_id } : {}),
+      product_retailer_id: msg.product_retailer_id,
+    };
+  }
+  // product_list
+  return {
+    ...base,
+    ...(msg.catalog_id ? { catalog_id: msg.catalog_id } : {}),
+    sections: msg.sections,
+  };
 }
 
 /**

@@ -83,6 +83,10 @@ export function friendlyWhatsAppError(payload: any): string {
   if (code === "INTERACTIVE_CTA_INVALID")
     return payload?.error ?? "Botão CTA inválido. Use HTTPS e texto até 20 caracteres.";
 
+  // Phase 7 — carousel & product messages
+  if (code === "INTERACTIVE_PRODUCT_INVALID")
+    return payload?.error ?? "Mensagem de produto inválida. Verifique catalog_id e produtos.";
+
   if (code === "MISSING_TOKEN") return "Token do WhatsApp não configurado. Avise o administrador.";
   if (code === "MISSING_PHONE_ID") return "Phone Number ID do WhatsApp não configurado.";
   if (code === "INVALID_RECIPIENT") return payload?.error ?? "Número do destinatário inválido.";
