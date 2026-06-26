@@ -73,7 +73,7 @@ export default function WhatsAppSettings() {
         .eq("institution", institution)
         .maybeSingle();
       if (error) throw error;
-      return (data as Settings | null) ?? null;
+      return (data as unknown as Settings | null) ?? null;
     },
     enabled: !!institution,
   });
