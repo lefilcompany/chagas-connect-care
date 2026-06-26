@@ -353,9 +353,11 @@ export default function WhatsAppSettings() {
                 <div>
                   <p className="text-sm font-medium">Pré-visualização</p>
                   <p className="text-xs text-muted-foreground">
-                    Como ficará uma mensagem livre com a configuração atual.
+                    Como cada tipo de mensagem aparecerá com a configuração atual.
                   </p>
                 </div>
+                <div>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">Texto livre</p>
                 <WhatsAppPreview
                   recipientName="João"
                   body={
@@ -366,21 +368,39 @@ export default function WhatsAppSettings() {
                   }
                   highlightVars={false}
                 />
-                <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-                  <p className="mb-1 font-medium text-foreground">Mensagem interativa</p>
-                  <p>
-                    O rodapé{" "}
-                    {form.use_native_interactive_footer && signaturePreview
-                      ? `"${signaturePreview}"`
-                      : "não será incluído"}{" "}
-                    aparecerá em texto menor, separado do corpo.
-                  </p>
                 </div>
-                <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-                  <p className="mb-1 font-medium text-foreground">Template Meta</p>
-                  <p>
-                    O rodapé é parte da definição aprovada na Meta. Para alterar, será necessário
-                    criar uma nova versão e aguardar nova aprovação.
+                <div>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">Interativa (botões)</p>
+                  <WhatsAppPreview
+                    recipientName="João"
+                    messageType="interactive"
+                    body={"Como podemos ajudar você hoje?"}
+                    footer={
+                      form.use_native_interactive_footer && form.signature_enabled && signaturePreview
+                        ? signaturePreview.slice(0, 60)
+                        : null
+                    }
+                    buttons={[
+                      { type: "quick_reply", text: "Falar com a equipe" },
+                      { type: "quick_reply", text: "Confirmar consulta" },
+                    ]}
+                    highlightVars={false}
+                  />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">
+                    Template Meta (rodapé estático aprovado)
+                  </p>
+                  <WhatsAppPreview
+                    recipientName="João"
+                    messageType="template"
+                    templateStatus="Aprovado"
+                    body={"Olá, João. Confirmamos sua consulta para 03/07 às 10h."}
+                    footer={(form.default_template_footer_text ?? "").trim() || null}
+                    highlightVars={false}
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    O rodapé do template não pode ser alterado em runtime — exige uma nova versão aprovada pela Meta.
                   </p>
                 </div>
               </Card>
