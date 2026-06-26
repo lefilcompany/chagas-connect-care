@@ -75,6 +75,75 @@ function isOptOutText(t: string): boolean {
   return OPT_OUT_KEYWORDS.some((k) => norm === k.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 }
 
+/** Extract a likely OTP code from inbound text: contiguous digits 4–8 long. */
+function extractOtpCandidate(text: string): string | null {
+  if (!text) return null;
+  const digitsOnly = text.replace(/\D/g, "");
+  if (digitsOnly.length >= 4 && digitsOnly.length <= 8) return digitsOnly;
+  const m = text.match(/\b(\d{4,8})\b/);
+  return m ? m[1] : null;
+}
+
+async function hashOtp(institution: string, code: string): Promise<string> {
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${institution}:${code}`),
+  );
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Tries to verify an inbound text as an OTP code for the given identity.
+ * Updates the matching pending whatsapp_otp_codes row to "verified" / "failed".
+ */
+async function tryVerifyOtp(
+  admin: ReturnType<typeof createClient>,
+  identity: { id: string; institution: string },
+  text: string,
+): Promise<void> {
+  const candidate = extractOtpCandidate(text);
+  if (!candidate) return;
+  const nowIso = new Date().toISOString();
+
+  const { data: pendings } = await admin
+    .from("whatsapp_otp_codes")
+    .select("id, code_hash, code_length, attempts, max_attempts, expires_at, status")
+    .eq("identity_id", identity.id)
+    .eq("status", "pending")
+    .order("issued_at", { ascending: false })
+    .limit(5);
+  const rows = Array.isArray(pendings) ? (pendings as any[]) : [];
+  for (const row of rows) {
+    if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) {
+      await admin.from("whatsapp_otp_codes")
+        .update({ status: "expired", updated_at: nowIso })
+        .eq("id", row.id);
+      continue;
+    }
+    if ((row.attempts ?? 0) >= (row.max_attempts ?? 5)) {
+      await admin.from("whatsapp_otp_codes")
+        .update({ status: "failed", updated_at: nowIso })
+        .eq("id", row.id);
+      continue;
+    }
+    const trimmed = candidate.slice(-Number(row.code_length ?? 6));
+    const hash = await hashOtp(identity.institution, trimmed);
+    if (hash === row.code_hash) {
+      await admin.from("whatsapp_otp_codes").update({
+        status: "verified",
+        verified_at: nowIso,
+        attempts: (row.attempts ?? 0) + 1,
+        updated_at: nowIso,
+      }).eq("id", row.id);
+      return;
+    }
+    await admin.from("whatsapp_otp_codes").update({
+      attempts: (row.attempts ?? 0) + 1,
+      updated_at: nowIso,
+    }).eq("id", row.id);
+  }
+}
+
 // queued < sent < delivered < read; failed never overwrites a later success.
 const STATUS_RANK: Record<string, number> = {
   queued: 0, sent: 1, delivered: 2, read: 3,
@@ -257,6 +326,15 @@ Deno.serve(async (req) => {
             service_window_expires_at: expiry,
             status: "active",
           } as any, { onConflict: "identity_id" });
+
+          // OTP verification attempt (Phase 5). Runs on every inbound text.
+          if (text) {
+            try {
+              await tryVerifyOtp(admin, identity, text);
+            } catch (e) {
+              console.error("otp verification error:", e);
+            }
+          }
 
           // Opt-out keywords → revoke and cancel queued outbound to this identity.
           if (text && isOptOutText(text)) {
