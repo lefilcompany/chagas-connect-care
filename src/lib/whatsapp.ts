@@ -135,7 +135,9 @@ export function formatWindowLabel(status: WindowStatus): string {
 }
 
 export type QueueAndSendInput = {
-  patient_id: string;
+  patient_id?: string | null;
+  identity_id?: string | null;
+  institution?: string | null;
   contact_id?: string | null;
   body: string;
   channel?: "whatsapp" | "sms";
@@ -166,7 +168,9 @@ export async function queueAndSend(input: QueueAndSendInput): Promise<QueueAndSe
   const { data: inserted, error: insertError } = await supabase
     .from("messages")
     .insert({
-      patient_id: input.patient_id,
+      patient_id: input.patient_id ?? null,
+      identity_id: input.identity_id ?? null,
+      institution: input.institution ?? null,
       contact_id: input.contact_id ?? null,
       channel,
       body: input.body,
