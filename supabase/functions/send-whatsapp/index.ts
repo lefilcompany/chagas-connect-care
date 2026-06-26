@@ -277,12 +277,39 @@ Deno.serve(async (req) => {
     .update({ send_attempts: ((msg as any).send_attempts ?? 0) + 1 })
     .eq("id", msg.id);
 
-  // Build payload: prefer Meta template when message references an approved one
+  // Resolve institution branding (signature / footer policy) once per send.
+  let branding: InstitutionWhatsAppSettings | null = null;
+  try {
+    branding = await resolveInstitutionBranding(admin, institution);
+  } catch (_e) {
+    branding = null;
+  }
+  const signatureText = resolveSignatureText(branding);
+
+  // Audit fields populated as we build the payload.
+  let renderedBody: string | null = null;
+  let resolvedFooterText: string | null = null;
+  let footerDeliveryMode: "none" | "body_signature" | "interactive_footer" | "meta_template_footer" = "none";
+
+  // For plain text, optionally append the institution signature inside the bubble.
+  const baseText = msg.body ?? "";
+  if (
+    branding?.append_signature_to_text &&
+    signatureText &&
+    !willSendTemplate &&
+    !WHATSAPP_TEST_MODE
+  ) {
+    renderedBody = appendSignatureToFreeText(baseText, signatureText);
+    resolvedFooterText = signatureText;
+    footerDeliveryMode = "body_signature";
+  } else {
+    renderedBody = baseText;
+  }
   let metaPayload: Record<string, unknown> = {
     messaging_product: "whatsapp",
     to,
     type: "text",
-    text: { body: msg.body, preview_url: false },
+    text: { body: renderedBody, preview_url: false },
   };
   let sendKind: "text" | "template" = "text";
   let usedTemplateName: string | null = null;
