@@ -133,6 +133,19 @@ export default function CampaignTab({
     () => activeTemplates.find((t) => t.id === templateId) ?? null,
     [activeTemplates, templateId],
   );
+  // Cross-tenant safety: a template from a different institution must not be sent.
+  const crossTenantBlocked = useMemo(() => {
+    if (!institution || !selectedTemplate) return false;
+    const ti = (selectedTemplate as any).institution as string | null | undefined;
+    return !!ti && ti !== institution;
+  }, [institution, selectedTemplate]);
+  const footerCompat = useMemo(
+    () =>
+      selectedTemplate?.template_kind === "meta"
+        ? computeFooterCompatibility(selectedTemplate.meta_footer_text ?? null, branding)
+        : null,
+    [selectedTemplate, branding],
+  );
   // Em disparos segmentados usamos sempre a variante "Segmento" do objetivo.
   const segmentBody = useMemo(
     () => (selectedTemplate ? pickVariantBody(selectedTemplate, "segment") : ""),
