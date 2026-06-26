@@ -593,6 +593,8 @@ export type Database = {
           failed_at: string | null
           footer_delivery_mode: string | null
           id: string
+          identity_id: string | null
+          institution: string | null
           interaction_id: string | null
           interaction_title: string | null
           interaction_type: string | null
@@ -603,7 +605,7 @@ export type Database = {
           media_mime_type: string | null
           message_content_type: string | null
           message_type: string | null
-          patient_id: string
+          patient_id: string | null
           provider: string | null
           queued_at: string | null
           raw_message_type: string | null
@@ -633,6 +635,8 @@ export type Database = {
           failed_at?: string | null
           footer_delivery_mode?: string | null
           id?: string
+          identity_id?: string | null
+          institution?: string | null
           interaction_id?: string | null
           interaction_title?: string | null
           interaction_type?: string | null
@@ -643,7 +647,7 @@ export type Database = {
           media_mime_type?: string | null
           message_content_type?: string | null
           message_type?: string | null
-          patient_id: string
+          patient_id?: string | null
           provider?: string | null
           queued_at?: string | null
           raw_message_type?: string | null
@@ -673,6 +677,8 @@ export type Database = {
           failed_at?: string | null
           footer_delivery_mode?: string | null
           id?: string
+          identity_id?: string | null
+          institution?: string | null
           interaction_id?: string | null
           interaction_title?: string | null
           interaction_type?: string | null
@@ -683,7 +689,7 @@ export type Database = {
           media_mime_type?: string | null
           message_content_type?: string | null
           message_type?: string | null
-          patient_id?: string
+          patient_id?: string | null
           provider?: string | null
           queued_at?: string | null
           raw_message_type?: string | null
@@ -708,7 +714,73 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "messages_identity_id_fkey"
+            columns: ["identity_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_identities"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "messages_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_invites: {
+        Row: {
+          completed_at: string | null
+          completed_payload: Json | null
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          institution: string
+          intended_role: string
+          patient_id: string | null
+          phone: string | null
+          status: string
+          token: string
+          updated_at: string
+          wa_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_payload?: Json | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          institution: string
+          intended_role: string
+          patient_id?: string | null
+          phone?: string | null
+          status?: string
+          token?: string
+          updated_at?: string
+          wa_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          completed_payload?: Json | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          institution?: string
+          intended_role?: string
+          patient_id?: string | null
+          phone?: string | null
+          status?: string
+          token?: string
+          updated_at?: string
+          wa_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_invites_patient_id_fkey"
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"
@@ -826,6 +898,42 @@ export type Database = {
           institution?: string
           professional_registry?: string
           role_label?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      quick_replies: {
+        Row: {
+          body: string
+          category: string
+          created_at: string
+          created_by: string | null
+          id: string
+          institution: string
+          is_active: boolean
+          label: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          institution: string
+          is_active?: boolean
+          label: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          institution?: string
+          is_active?: boolean
+          label?: string
           updated_at?: string
         }
         Relationships: []

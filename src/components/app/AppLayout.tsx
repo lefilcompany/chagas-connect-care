@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchAllAppRoutes, prefetchRoute } from "@/lib/queries";
 import {
   Heart, LayoutDashboard, Users, MessageCircle, BookOpen, BarChart3,
-  UserCircle, LogOut, Menu, X, Target, Settings,
+  UserCircle, LogOut, Menu, X, Target, Settings, Inbox,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ const nav = [
   { to: "/app", end: true, label: "Painel", icon: LayoutDashboard },
   { to: "/app/pacientes", label: "Pacientes", icon: Users },
   { to: "/app/mensagens", label: "Mensagens", icon: MessageCircle },
+  { to: "/app/conversas", label: "Conversas", icon: Inbox },
   { to: "/app/conteudos", label: "Conteúdos", icon: BookOpen },
   { to: "/app/segmentos", label: "Segmentos", icon: Target },
   { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
