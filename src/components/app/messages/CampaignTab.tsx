@@ -553,6 +553,34 @@ export default function CampaignTab({
 
       {step === 2 && (
         <div className="space-y-4">
+          {crossTenantBlocked && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                Este objetivo pertence a outra instituição e não pode ser disparado por você.
+                Duplique-o em sua instituição antes de continuar.
+              </span>
+            </div>
+          )}
+          {!selectedTemplate && signatureText && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs space-y-1">
+              <p className="font-medium text-emerald-900 dark:text-emerald-200">
+                Assinatura institucional será adicionada automaticamente
+              </p>
+              <pre className="whitespace-pre-wrap font-mono text-[11px] text-emerald-900/80 dark:text-emerald-200/80">
+                {appendSignatureToFreeText(renderedBody, signatureText).slice(-200)}
+              </pre>
+            </div>
+          )}
+          {selectedTemplate?.template_kind === "meta" && footerCompat === "differs_from_institution_default" && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                O rodapé deste Template Meta difere do padrão da instituição. O envio usará o rodapé
+                aprovado na Meta — para alterar, crie uma nova versão.
+              </span>
+            </div>
+          )}
           {usesMedication && patientsWithoutMeds.length > 0 && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
