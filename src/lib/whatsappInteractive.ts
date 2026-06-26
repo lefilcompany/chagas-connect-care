@@ -74,8 +74,9 @@ export function validateInteractive(msg: InteractiveMessage): string | null {
   if (!body) return "O corpo da mensagem é obrigatório.";
   if (body.length > 1024) return "O corpo da mensagem excede 1024 caracteres.";
   if (msg.footer && msg.footer.length > 60) return "Rodapé excede 60 caracteres.";
-  if (msg.header?.type === "text") {
-    const t = msg.header.text.trim();
+  const header = "header" in msg ? msg.header : undefined;
+  if (header?.type === "text") {
+    const t = header.text.trim();
     if (!t || t.length > 60) return "Cabeçalho de texto deve ter 1–60 caracteres.";
   }
 
