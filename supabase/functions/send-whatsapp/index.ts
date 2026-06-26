@@ -989,7 +989,13 @@ Deno.serve(async (req) => {
       };
       // SPM forbids header — we already validated that above.
       if (headerObj && itype !== "product") interactivePayload.header = headerObj;
-      if (footerText) interactivePayload.footer = { text: footerText };
+      // Resolve footer: explicit override > institution policy.
+      const finalFooter = resolveInteractiveFooter(branding, footerText || null);
+      if (finalFooter) {
+        interactivePayload.footer = { text: finalFooter };
+        resolvedFooterText = finalFooter;
+        footerDeliveryMode = "interactive_footer";
+      }
 
       metaPayload = {
         messaging_product: "whatsapp",
@@ -999,6 +1005,26 @@ Deno.serve(async (req) => {
       };
       sendKind = "text"; // not a template
     }
+  }
+
+  // For Meta templates the footer is static and lives on the approved
+  // definition. We only record it for audit; never inject at runtime.
+  if (willSendTemplate && tplRow) {
+    const isAuth =
+      (tplRow as any).meta_category === "AUTHENTICATION" ||
+      !!(tplRow as any).meta_authentication_config;
+    const tplFooter = ((tplRow as any).meta_footer_text ?? "") as string;
+    if (!isAuth && tplFooter) {
+      resolvedFooterText = tplFooter;
+      footerDeliveryMode = "meta_template_footer";
+    } else if (isAuth) {
+      footerDeliveryMode = tplFooter ? "meta_template_footer" : "none";
+      resolvedFooterText = tplFooter || null;
+    } else {
+      footerDeliveryMode = "none";
+    }
+    // Templates carry their own approved body — never override with signature.
+    renderedBody = null;
   }
 
   // Call Meta Cloud API
