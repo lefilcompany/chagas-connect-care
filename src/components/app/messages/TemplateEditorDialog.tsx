@@ -433,6 +433,14 @@ export function TemplateEditorDialog({
         )}
 
         {step === 2 && (
+          <FooterStep
+            form={form}
+            setForm={setForm}
+            branding={brandingSettings}
+          />
+        )}
+
+        {step === 3 && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Opcional: defina um público padrão sugerido sempre que este modelo for usado em envio segmentado.
@@ -468,7 +476,7 @@ export function TemplateEditorDialog({
           </div>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-2 text-sm">
@@ -485,6 +493,16 @@ export function TemplateEditorDialog({
                   <li>• Familiar/Cuidador: {form.body_contact.trim() ? "✓" : "herda do paciente"}</li>
                   <li>• Segmento: {form.body_segment.trim() ? "✓" : "herda do paciente"}</li>
                 </ul>
+                <p className="text-xs">
+                  <span className="text-muted-foreground">Rodapé:</span>{" "}
+                  {form.meta_footer_source === "none"
+                    ? "Sem rodapé"
+                    : form.meta_footer_source === "institution_default"
+                      ? `Padrão da instituição (${brandingSettings?.default_template_footer_text ?? "não configurado"})`
+                      : form.meta_footer_source === "meta_synced"
+                        ? `Sincronizado da Meta (${form.meta_footer_text || "—"})`
+                        : `Personalizado (${form.meta_footer_text || "—"})`}
+                </p>
                 {variables.length > 0 && (
                   <p>
                     <span className="text-muted-foreground">Variáveis:</span>{" "}
@@ -494,7 +512,19 @@ export function TemplateEditorDialog({
                   </p>
                 )}
               </div>
-              <WhatsAppPreview body={form.body_patient} recipientName={form.name || "Paciente"} />
+              <WhatsAppPreview
+                body={form.body_patient}
+                recipientName={form.name || "Paciente"}
+                messageType={form.template_kind === "meta" ? "template" : "text"}
+                templateStatus={form.template_kind === "meta" ? META_STATUS_LABEL[form.meta_status] : undefined}
+                footer={
+                  form.meta_footer_source === "none"
+                    ? null
+                    : form.meta_footer_source === "institution_default"
+                      ? brandingSettings?.default_template_footer_text ?? null
+                      : form.meta_footer_text || null
+                }
+              />
             </div>
           </div>
         )}
