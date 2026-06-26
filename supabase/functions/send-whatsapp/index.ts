@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
   // Fetch the message with admin client for full field access
   const { data: msg, error: msgErr } = await admin
     .from("messages")
-    .select("id, patient_id, contact_id, channel, body, status, template_id, template_variables, send_attempts, media_asset_id, media_filename")
+    .select("id, patient_id, contact_id, identity_id, institution, channel, body, status, template_id, template_variables, send_attempts, media_asset_id, media_filename")
     .eq("id", body.message_id)
     .maybeSingle();
 
@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
       .eq("id", msg.patient_id)
       .maybeSingle();
     institution = (p as any)?.institution ?? "";
-  } else {
+  } else if (msg.patient_id) {
     const { data: p } = await admin
       .from("patients")
       .select("phone, institution")
@@ -144,6 +144,15 @@ Deno.serve(async (req) => {
       .maybeSingle();
     toRaw = p?.phone ?? "";
     institution = (p as any)?.institution ?? "";
+  } else if (msg.identity_id) {
+    // Inbox replies to unknown senders carry only identity_id + institution.
+    const { data: ident } = await admin
+      .from("whatsapp_identities")
+      .select("phone_e164, institution")
+      .eq("id", msg.identity_id)
+      .maybeSingle();
+    toRaw = (ident as any)?.phone_e164 ?? "";
+    institution = (ident as any)?.institution ?? (msg as any).institution ?? "";
   }
 
   const cfg = validateWhatsAppConfig(toRaw);
