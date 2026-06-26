@@ -4,6 +4,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN") ?? "";
 const APP_SECRET = Deno.env.get("WHATSAPP_APP_SECRET") ?? "";
+const ENV_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
+const DEFAULT_INSTITUTION = Deno.env.get("WHATSAPP_DEFAULT_INSTITUTION") ?? "";
 
 function hexToBytes(hex: string): Uint8Array {
   const clean = hex.replace(/^sha256=/, "").trim();
@@ -76,13 +78,36 @@ async function resolveChannelInstitution(
   admin: ReturnType<typeof createClient>,
   phoneNumberId: string | null,
 ): Promise<string | null> {
-  if (!phoneNumberId) return null;
+  if (!phoneNumberId) {
+    // No metadata? Fall back to the configured default institution.
+    return DEFAULT_INSTITUTION || null;
+  }
   const { data } = await admin
     .from("whatsapp_channels")
     .select("id, institution")
     .eq("phone_number_id", phoneNumberId)
     .maybeSingle();
-  if (!data) return null;
+  if (!data) {
+    // Single-tenant fallback: when the incoming phone_number_id matches the
+    // env-configured WhatsApp number, use the default institution and
+    // auto-stamp it on its channel row so future calls hit the fast path.
+    if (
+      ENV_PHONE_NUMBER_ID &&
+      DEFAULT_INSTITUTION &&
+      phoneNumberId === ENV_PHONE_NUMBER_ID
+    ) {
+      await admin
+        .from("whatsapp_channels")
+        .update({
+          phone_number_id: phoneNumberId,
+          last_webhook_at: new Date().toISOString(),
+        })
+        .eq("institution", DEFAULT_INSTITUTION)
+        .then(() => {}, () => {});
+      return DEFAULT_INSTITUTION;
+    }
+    return null;
+  }
   // Best-effort: stamp last_webhook_at without blocking the response.
   admin.from("whatsapp_channels")
     .update({ last_webhook_at: new Date().toISOString() })
