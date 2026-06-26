@@ -1109,6 +1109,10 @@ Deno.serve(async (req) => {
       external_message_id: externalId ?? null,
       provider: "meta_whatsapp_cloud",
       last_error: null,
+      rendered_body: renderedBody,
+      resolved_footer_text: resolvedFooterText,
+      footer_delivery_mode: footerDeliveryMode,
+      branding_settings_snapshot: brandingSnapshot(branding),
     })
     .eq("id", msg.id);
 
