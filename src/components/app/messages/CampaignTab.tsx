@@ -25,6 +25,12 @@ import {
   type MessageTemplate,
 } from "@/lib/templates";
 import { createBatch } from "@/lib/whatsapp";
+import {
+  appendSignatureToFreeText,
+  computeFooterCompatibility,
+  resolveSignatureText,
+  type InstitutionWhatsAppSettings,
+} from "@/lib/branding";
 import { TemplateCard, StartBlankCard } from "./TemplateCard";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 import { VariableInput } from "./VariableInput";
@@ -67,6 +73,7 @@ export default function CampaignTab({
   const [sending, setSending] = useState(false);
   const [institution, setInstitution] = useState("");
   const [medicationMode, setMedicationMode] = useState<"all" | "first">("all");
+  const [branding, setBranding] = useState<InstitutionWhatsAppSettings | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -74,6 +81,34 @@ export default function CampaignTab({
         .then(({ data }) => setInstitution(data?.institution ?? ""));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!institution) return;
+    supabase
+      .from("institution_whatsapp_settings" as any)
+      .select("*")
+      .eq("institution", institution)
+      .maybeSingle()
+      .then(({ data }) =>
+        setBranding(((data as unknown) as InstitutionWhatsAppSettings | null) ?? null),
+      );
+  }, [institution]);
+
+  // Cross-tenant safety: a template from a different institution must not be sent.
+  const crossTenantBlocked = useMemo(() => {
+    if (!institution || !selectedTemplate) return false;
+    const ti = (selectedTemplate as any).institution as string | null | undefined;
+    return !!ti && ti !== institution;
+  }, [institution, selectedTemplate]);
+
+  const signatureText = useMemo(() => resolveSignatureText(branding), [branding]);
+  const footerCompat = useMemo(
+    () =>
+      selectedTemplate?.template_kind === "meta"
+        ? computeFooterCompatibility(selectedTemplate.meta_footer_text ?? null, branding)
+        : null,
+    [selectedTemplate, branding],
+  );
 
   // Realtime: refresh medication-derived state whenever medications change anywhere.
   useEffect(() => {
