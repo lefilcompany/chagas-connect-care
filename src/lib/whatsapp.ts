@@ -42,6 +42,31 @@ export function friendlyWhatsAppError(payload: any): string {
   if (code === "IDENTITY_NOT_FOUND")
     return "O destinatário ainda não está vinculado a um número de WhatsApp válido.";
 
+  // Phase 2 (evolução 2) — interactive, media, buttons, OTP, feature flags
+  if (code === "INTERACTIVE_MESSAGE_REQUIRES_OPEN_WINDOW")
+    return "Mensagens interativas só podem ser enviadas com a janela de atendimento de 24h aberta.";
+  if (code === "MEDIA_NOT_UPLOADED")
+    return "A mídia ainda não foi enviada para a Meta. Faça o upload e tente novamente.";
+  if (code === "MEDIA_UPLOAD_FAILED")
+    return payload?.error ?? "Falha ao enviar a mídia para a Meta.";
+  if (code === "MEDIA_MIME_NOT_ALLOWED")
+    return "Tipo de arquivo não permitido para este envio.";
+  if (code === "MEDIA_TOO_LARGE")
+    return "Arquivo acima do limite permitido pela Meta.";
+  if (code === "URL_DOMAIN_NOT_ALLOWED")
+    return "O domínio da URL do botão não está autorizado.";
+  if (code === "BUTTON_INDEX_OUT_OF_RANGE")
+    return "Botão informado não existe no template aprovado.";
+  if (code === "TEMPLATE_DEFINITION_MISMATCH")
+    return "A configuração local difere do template aprovado na Meta. Sincronize antes de enviar.";
+  if (code === "CAROUSEL_CARD_COUNT_MISMATCH")
+    return "Quantidade de cards do carrossel não corresponde ao template aprovado.";
+  if (code === "OTP_EXPIRED") return "O código de verificação expirou. Gere um novo.";
+  if (code === "OTP_TOO_MANY_ATTEMPTS")
+    return "Muitas tentativas para este código. Aguarde antes de tentar novamente.";
+  if (code === "FEATURE_DISABLED")
+    return "Este recurso ainda não está habilitado para a sua instituição.";
+
   if (code === "MISSING_TOKEN") return "Token do WhatsApp não configurado. Avise o administrador.";
   if (code === "MISSING_PHONE_ID") return "Phone Number ID do WhatsApp não configurado.";
   if (code === "INVALID_RECIPIENT") return payload?.error ?? "Número do destinatário inválido.";
