@@ -615,3 +615,98 @@ function KindOption({
     </button>
   );
 }
+
+function FooterStep({
+  form,
+  setForm,
+  branding,
+}: {
+  form: Form;
+  setForm: (f: Form) => void;
+  branding: InstitutionWhatsAppSettings | null;
+}) {
+  const institutionDefault = (branding?.default_template_footer_text ?? "").trim();
+  const compat = computeFooterCompatibility(
+    form.meta_footer_source === "custom" || form.meta_footer_source === "meta_synced"
+      ? form.meta_footer_text
+      : form.meta_footer_source === "institution_default"
+        ? institutionDefault
+        : "",
+    branding,
+  );
+  const options = [
+    { v: "none", label: "Sem rodapé", desc: "Nada é exibido abaixo da mensagem." },
+    {
+      v: "institution_default",
+      label: "Padrão da instituição",
+      desc: institutionDefault
+        ? `"${institutionDefault}" — definido em Configurações > WhatsApp.`
+        : "Configure o padrão na aba Identidade e assinatura.",
+    },
+    { v: "custom", label: "Personalizado", desc: "Você escreve um rodapé específico (até 60 caracteres)." },
+    {
+      v: "meta_synced",
+      label: "Sincronizado da Meta",
+      desc: "Use o rodapé exatamente como foi aprovado na Meta. Edite criando uma nova versão.",
+    },
+  ] as const;
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        O rodapé aparece em texto menor abaixo da mensagem. Para Templates Meta ele faz parte
+        da definição aprovada e não pode ser alterado em runtime.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((opt) => (
+          <button
+            key={opt.v}
+            type="button"
+            onClick={() => setForm({ ...form, meta_footer_source: opt.v })}
+            className={`text-left rounded-lg border-2 p-3 transition-colors ${
+              form.meta_footer_source === opt.v
+                ? "border-primary bg-primary/5"
+                : "border-border bg-card hover:bg-muted/50"
+            }`}
+          >
+            <div className="font-semibold text-sm text-brand">{opt.label}</div>
+            <p className="mt-1 text-xs text-muted-foreground">{opt.desc}</p>
+          </button>
+        ))}
+      </div>
+
+      {(form.meta_footer_source === "custom" || form.meta_footer_source === "meta_synced") && (
+        <div className="space-y-1.5">
+          <Label>Texto do rodapé</Label>
+          <Input
+            value={form.meta_footer_text}
+            maxLength={60}
+            onChange={(e) => setForm({ ...form, meta_footer_text: e.target.value })}
+            placeholder="Ex: Mensagem oficial do Hospital Central"
+          />
+          <p className="text-right text-[11px] text-muted-foreground">
+            {form.meta_footer_text.length}/60
+          </p>
+        </div>
+      )}
+
+      {form.template_kind === "meta" && (
+        <div
+          className={`rounded-lg border p-3 text-xs ${
+            compat === "differs_from_institution_default"
+              ? "border-amber-500/40 bg-amber-500/5 text-amber-900 dark:text-amber-200"
+              : "border-border bg-muted/30 text-muted-foreground"
+          }`}
+        >
+          {compat === "matches_institution_default" &&
+            "✓ Rodapé idêntico ao padrão configurado para a instituição."}
+          {compat === "differs_from_institution_default" &&
+            "⚠ Este rodapé difere do padrão da instituição. Para conciliá-los, será necessário criar uma nova versão na Meta."}
+          {compat === "no_local_footer" &&
+            "Nenhum rodapé local. O envio usará o padrão da instituição quando aplicável."}
+          {compat === "no_institution_default" &&
+            "Sem padrão institucional configurado — configure em Configurações > WhatsApp."}
+        </div>
+      )}
+    </div>
+  );
+}
