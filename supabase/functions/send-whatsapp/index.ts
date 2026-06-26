@@ -285,13 +285,24 @@ Deno.serve(async (req) => {
   if (!willSendTemplate && !WHATSAPP_TEST_MODE) {
     let windowOpen = false;
     if (identityId) {
-      const { data: conv } = await admin
+      // Look across every identity that shares a phone variant (BR mobile "9"
+      // duplication) so we don't falsely close the window.
+      const { data: sibs } = await admin
+        .from("whatsapp_identities")
+        .select("id")
+        .eq("institution", institution)
+        .in("phone_e164", brPhoneVariants(to));
+      const ids = (sibs ?? []).map((s: any) => s.id);
+      if (!ids.includes(identityId)) ids.push(identityId);
+      const { data: convs } = await admin
         .from("whatsapp_conversations")
         .select("service_window_expires_at")
-        .eq("identity_id", identityId)
-        .maybeSingle();
-      const exp = (conv as any)?.service_window_expires_at as string | null | undefined;
-      windowOpen = !!(exp && new Date(exp).getTime() > Date.now());
+        .in("identity_id", ids);
+      windowOpen = (convs ?? []).some(
+        (c: any) =>
+          c.service_window_expires_at &&
+          new Date(c.service_window_expires_at).getTime() > Date.now(),
+      );
     }
     if (!windowOpen) {
       await admin.from("messages").update({
