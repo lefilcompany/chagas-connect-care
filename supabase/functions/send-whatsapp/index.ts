@@ -893,6 +893,56 @@ Deno.serve(async (req) => {
           }
         }
         action = { name: "cta_url", parameters: { display_text: display, url } };
+      } else if (itype === "product") {
+        // Single Product Message (SPM). Requires Meta catalog id (env or
+        // passed in payload) and a product retailer id.
+        const catalogId = String((interactive as any).catalog_id ?? Deno.env.get("WHATSAPP_CATALOG_ID") ?? "").trim();
+        const productId = String((interactive as any).product_retailer_id ?? "").trim();
+        if (!catalogId) return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "catalog_id obrigatório (defina WHATSAPP_CATALOG_ID ou envie no payload).");
+        if (!productId) return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "product_retailer_id obrigatório.");
+        // SPM does not accept header.
+        if (headerObj) return await failInteractive("INTERACTIVE_HEADER_INVALID", "Single Product Message não aceita cabeçalho.");
+        action = { catalog_id: catalogId, product_retailer_id: productId };
+      } else if (itype === "product_list") {
+        // Multi-Product Message (MPM). Header text + sections of products.
+        const catalogId = String((interactive as any).catalog_id ?? Deno.env.get("WHATSAPP_CATALOG_ID") ?? "").trim();
+        if (!catalogId) return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "catalog_id obrigatório (defina WHATSAPP_CATALOG_ID ou envie no payload).");
+        if (!headerObj || (headerObj as any).type !== "text") {
+          return await failInteractive("INTERACTIVE_HEADER_INVALID", "Lista de produtos exige cabeçalho de texto.");
+        }
+        const sections = (interactive as any).sections;
+        if (!Array.isArray(sections) || sections.length < 1 || sections.length > 10) {
+          return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "Lista de produtos exige 1–10 seções.");
+        }
+        let totalProducts = 0;
+        const builtSections: Record<string, unknown>[] = [];
+        const seen = new Set<string>();
+        for (const s of sections) {
+          const title = String((s as any)?.title ?? "").trim();
+          const items = (s as any)?.product_items;
+          if (sections.length > 1 && (!title || title.length > 24)) {
+            return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "Cada seção precisa de título com até 24 caracteres quando há mais de uma seção.");
+          }
+          if (!Array.isArray(items) || items.length === 0) {
+            return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "Cada seção precisa de pelo menos um produto.");
+          }
+          const builtItems: Record<string, unknown>[] = [];
+          for (const it of items) {
+            const pid = String((it as any)?.product_retailer_id ?? "").trim();
+            if (!pid) return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "product_retailer_id é obrigatório em cada item.");
+            if (seen.has(pid)) return await failInteractive("INTERACTIVE_PRODUCT_INVALID", `Produto duplicado: "${pid}".`);
+            seen.add(pid);
+            totalProducts++;
+            builtItems.push({ product_retailer_id: pid });
+          }
+          const section: Record<string, unknown> = { product_items: builtItems };
+          if (title) section.title = title;
+          builtSections.push(section);
+        }
+        if (totalProducts < 1 || totalProducts > 30) {
+          return await failInteractive("INTERACTIVE_PRODUCT_INVALID", "Lista aceita entre 1 e 30 produtos no total.");
+        }
+        action = { catalog_id: catalogId, sections: builtSections };
       } else {
         return await failInteractive("INTERACTIVE_INVALID_TYPE", `Tipo de mensagem interativa não suportado: "${itype}". Use button, list ou cta_url.`);
       }
@@ -902,7 +952,8 @@ Deno.serve(async (req) => {
         body: { text: bodyText },
         action,
       };
-      if (headerObj) interactivePayload.header = headerObj;
+      // SPM forbids header — we already validated that above.
+      if (headerObj && itype !== "product") interactivePayload.header = headerObj;
       if (footerText) interactivePayload.footer = { text: footerText };
 
       metaPayload = {
