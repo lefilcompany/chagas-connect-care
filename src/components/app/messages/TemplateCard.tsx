@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Edit3, Send, FilePlus2, Lock } from "lucide-react";
+import { Copy, Edit3, Send, FilePlus2, Lock, ShieldCheck, AlertTriangle } from "lucide-react";
 import { type MessageTemplate } from "@/lib/templates";
 import { getTemplateDescription } from "@/lib/templateDescriptions";
 import { WhatsAppPreview } from "./WhatsAppPreview";
@@ -37,16 +37,30 @@ export function TemplateCard({
   onDuplicate: () => void;
 }) {
   const isDefault = !!template.is_default;
+  const isMetaApproved = template.template_kind === "meta" && template.meta_status === "approved";
+  const footerDiverges = !!template.meta_has_local_differences;
 
   return (
     <article className="flex h-full flex-col rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-display text-base font-bold text-brand break-words">{template.name}</h3>
-        {isDefault && (
-          <Badge variant="outline" className="shrink-0 text-[10px] border-primary/40 text-primary">
-            <Lock className="mr-0.5 h-3 w-3" /> Padrão
-          </Badge>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-1 shrink-0">
+          {isMetaApproved && (
+            <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-300">
+              <ShieldCheck className="mr-0.5 h-3 w-3" /> Meta aprovado
+            </Badge>
+          )}
+          {footerDiverges && (
+            <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="mr-0.5 h-3 w-3" /> Rodapé divergente
+            </Badge>
+          )}
+          {isDefault && (
+            <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
+              <Lock className="mr-0.5 h-3 w-3" /> Padrão
+            </Badge>
+          )}
+        </div>
       </div>
       {template.description && (
         <div className="mt-2 rounded-lg bg-primary/5 py-2">
