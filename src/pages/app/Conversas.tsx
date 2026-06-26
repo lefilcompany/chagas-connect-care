@@ -168,20 +168,6 @@ export default function Conversas() {
     enabled: !!activeIdentity,
   });
 
-  const { data: quickReplies } = useQuery({
-    queryKey: ["quick-replies", institution],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("quick_replies")
-        .select("id, label, body, category")
-        .eq("institution", institution)
-        .eq("is_active", true)
-        .order("label");
-      return (data ?? []) as any[];
-    },
-    enabled: !!institution,
-  });
-
   // Realtime: refetch on any change for this institution
   useEffect(() => {
     if (!institution) return;
