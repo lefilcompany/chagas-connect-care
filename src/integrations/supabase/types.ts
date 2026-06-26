@@ -1319,6 +1319,7 @@ export type Database = {
           id: string
           institution: string | null
           linked_identity_id: string | null
+          payload: Json | null
           phone_e164: string | null
           received_at: string
           status: string
@@ -1332,6 +1333,7 @@ export type Database = {
           id?: string
           institution?: string | null
           linked_identity_id?: string | null
+          payload?: Json | null
           phone_e164?: string | null
           received_at?: string
           status?: string
@@ -1345,6 +1347,7 @@ export type Database = {
           id?: string
           institution?: string | null
           linked_identity_id?: string | null
+          payload?: Json | null
           phone_e164?: string | null
           received_at?: string
           status?: string
