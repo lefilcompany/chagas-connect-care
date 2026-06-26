@@ -217,6 +217,19 @@ export default function Conversas() {
   const windowStatus = getWindowStatus(activeConv?.service_window_expires_at ?? null);
   const windowOpen = windowStatus.state === "open";
 
+  const defaultQuickReplies = [
+    { id: "qr-greet", label: "👋 Saudação", body: "Olá! Tudo bem? Como podemos ajudar?" },
+    { id: "qr-wait", label: "⏳ Aguarde", body: "Recebemos sua mensagem. A equipe vai responder em instantes, por favor aguarde." },
+    { id: "qr-confirm", label: "✅ Confirmar consulta", body: "Confirmando sua consulta. Pode comparecer no horário marcado? Responda SIM ou NÃO." },
+    { id: "qr-reschedule", label: "📅 Reagendar", body: "Sem problema. Qual o melhor dia e horário para reagendar?" },
+    { id: "qr-med", label: "💊 Lembrete medicação", body: "Lembrete: não esqueça de tomar sua medicação hoje, conforme orientado pela equipe." },
+    { id: "qr-thanks", label: "🙏 Encerrar", body: "Obrigado pelo contato! Qualquer dúvida estamos por aqui." },
+  ];
+  const mergedQuickReplies = [
+    ...(quickReplies ?? []),
+    ...defaultQuickReplies,
+  ];
+
   async function handleSend() {
     if (!activeConv || !composer.trim()) return;
     if (!windowOpen) {
