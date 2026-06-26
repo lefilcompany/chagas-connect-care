@@ -338,7 +338,12 @@ Deno.serve(async (req) => {
           const interactionType: string | null = m?.interactive?.type ?? (m?.button ? "button" : null);
 
           const phone_e164 = normalizeBR(from);
+          // First try scoped lookup; fall back to global so an already-known sender
+          // is still matched when the channel/phone_number_id couldn't be resolved.
           let identity = await findIdentity(admin, from, phone_e164, channelInstitution);
+          if (!identity) {
+            identity = await findIdentity(admin, from, phone_e164, null);
+          }
 
           // Unknown sender: create a lightweight identity (no patient/contact link)
           // so the inbox can show the conversation and the team can invite the
