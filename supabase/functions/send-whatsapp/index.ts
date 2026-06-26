@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
   if (!WHATSAPP_TEST_MODE && (msg as any).template_id) {
     const { data: tpl } = await admin
       .from("message_templates")
-      .select("template_kind, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text")
+      .select("template_kind, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text, meta_buttons")
       .eq("id", (msg as any).template_id)
       .maybeSingle();
     tplRow = tpl;
@@ -382,6 +382,148 @@ Deno.serve(async (req) => {
     const components: Record<string, unknown>[] = [];
     if (headerComponent) components.push(headerComponent);
     if (params.length) components.push({ type: "body", parameters: params });
+
+    // ---- Buttons (Phase 4) -----------------------------------------------
+    // Definitions stored on the template; runtime values come from
+    // template_variables.__buttons as Array<{ index, sub_type, payload?, url_param?, copy_code? }>.
+    type BtnDef =
+      | { type: "QUICK_REPLY"; text?: string }
+      | { type: "URL"; text?: string; url: string }
+      | { type: "PHONE_NUMBER"; text?: string; phone_number: string }
+      | { type: "COPY_CODE"; text?: string };
+    type BtnInput = {
+      index: number;
+      sub_type: "quick_reply" | "url" | "copy_code";
+      payload?: string;
+      url_param?: string;
+      copy_code?: string;
+    };
+    const btnDefsRaw = (tplRow as any).meta_buttons;
+    const btnDefs: BtnDef[] = Array.isArray(btnDefsRaw) ? (btnDefsRaw as BtnDef[]) : [];
+    const btnInputsRaw = ((msg as any).template_variables as Record<string, unknown> | null)?.__buttons;
+    const btnInputs: BtnInput[] = Array.isArray(btnInputsRaw) ? (btnInputsRaw as BtnInput[]) : [];
+
+    if (btnInputs.length > 0) {
+      // URL allowlist via env. Empty or "*" disables hostname restriction
+      // (HTTPS scheme is still enforced for URL buttons).
+      const allowEnv = (Deno.env.get("WHATSAPP_URL_ALLOWLIST") ?? "").trim();
+      const allowAll = allowEnv === "" || allowEnv === "*";
+      const allowList = allowAll
+        ? []
+        : allowEnv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+      const failMessage = async (code: string, errorMsg: string) => {
+        await admin.from("messages").update({
+          status: "failed",
+          failed_at: new Date().toISOString(),
+          last_error: errorMsg,
+        }).eq("id", msg.id);
+        return json(200, { ok: false, error_code: code, error: errorMsg });
+      };
+
+      for (const inp of btnInputs) {
+        if (typeof inp?.index !== "number" || inp.index < 0 || inp.index >= btnDefs.length) {
+          return await failMessage(
+            "BUTTON_INDEX_OUT_OF_RANGE",
+            `Botão de índice ${inp?.index} não existe no template.`,
+          );
+        }
+        const def = btnDefs[inp.index];
+        if (def.type === "QUICK_REPLY") {
+          if (inp.sub_type !== "quick_reply" || !inp.payload || inp.payload.length === 0) {
+            return await failMessage(
+              "TEMPLATE_PARAMETER_MISSING",
+              `Payload do botão "${def.text ?? inp.index}" ausente.`,
+            );
+          }
+          if (inp.payload.length > 256) {
+            return await failMessage(
+              "TEMPLATE_PARAMETER_MISSING",
+              `Payload do botão "${def.text ?? inp.index}" excede 256 caracteres.`,
+            );
+          }
+        } else if (def.type === "URL") {
+          if (inp.sub_type !== "url" || !inp.url_param) {
+            return await failMessage(
+              "TEMPLATE_PARAMETER_MISSING",
+              `Parâmetro de URL do botão "${def.text ?? inp.index}" ausente.`,
+            );
+          }
+          let parsed: URL | null = null;
+          try {
+            parsed = new URL((def.url ?? "").replace("{{1}}", inp.url_param));
+          } catch {
+            parsed = null;
+          }
+          if (!parsed) {
+            return await failMessage(
+              "URL_DOMAIN_NOT_ALLOWED",
+              `URL inválida no botão "${def.text ?? inp.index}".`,
+            );
+          }
+          if (parsed.protocol !== "https:") {
+            return await failMessage(
+              "URL_DOMAIN_NOT_ALLOWED",
+              `URLs de botão precisam usar HTTPS (recebido: ${parsed.protocol}).`,
+            );
+          }
+          if (!allowAll) {
+            const host = parsed.hostname.toLowerCase();
+            const allowed = allowList.some((d) => host === d || host.endsWith("." + d));
+            if (!allowed) {
+              return await failMessage(
+                "URL_DOMAIN_NOT_ALLOWED",
+                `Domínio "${host}" não está na allowlist configurada (WHATSAPP_URL_ALLOWLIST).`,
+              );
+            }
+          }
+        } else if (def.type === "COPY_CODE") {
+          if (inp.sub_type !== "copy_code" || !inp.copy_code) {
+            return await failMessage(
+              "TEMPLATE_PARAMETER_MISSING",
+              `Código do botão "Copiar" ausente.`,
+            );
+          }
+          if (inp.copy_code.length > 15) {
+            return await failMessage(
+              "TEMPLATE_PARAMETER_MISSING",
+              `Código do botão "Copiar" excede 15 caracteres.`,
+            );
+          }
+        } else if (def.type === "PHONE_NUMBER") {
+          // Static button — runtime params are not supported by Meta.
+          // We accept the entry silently and emit no component.
+          continue;
+        }
+      }
+
+      for (const inp of btnInputs) {
+        const def = btnDefs[inp.index];
+        if (def.type === "QUICK_REPLY") {
+          components.push({
+            type: "button",
+            sub_type: "quick_reply",
+            index: String(inp.index),
+            parameters: [{ type: "payload", payload: inp.payload }],
+          });
+        } else if (def.type === "URL") {
+          components.push({
+            type: "button",
+            sub_type: "url",
+            index: String(inp.index),
+            parameters: [{ type: "text", text: inp.url_param }],
+          });
+        } else if (def.type === "COPY_CODE") {
+          components.push({
+            type: "button",
+            sub_type: "copy_code",
+            index: String(inp.index),
+            parameters: [{ type: "coupon_code", coupon_code: inp.copy_code }],
+          });
+        }
+        // PHONE_NUMBER: no runtime component
+      }
+    }
 
     metaPayload = {
       messaging_product: "whatsapp",
