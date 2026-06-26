@@ -271,6 +271,60 @@ export type Database = {
         }
         Relationships: []
       }
+      institution_whatsapp_settings: {
+        Row: {
+          append_signature_to_text: boolean
+          application_display_name: string | null
+          brand_name: string | null
+          created_at: string
+          created_by: string | null
+          custom_signature_text: string | null
+          default_template_footer_text: string | null
+          id: string
+          institution: string
+          signature_enabled: boolean
+          signature_mode: string
+          updated_at: string
+          updated_by: string | null
+          use_as_template_footer_default: boolean
+          use_native_interactive_footer: boolean
+        }
+        Insert: {
+          append_signature_to_text?: boolean
+          application_display_name?: string | null
+          brand_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_signature_text?: string | null
+          default_template_footer_text?: string | null
+          id?: string
+          institution: string
+          signature_enabled?: boolean
+          signature_mode?: string
+          updated_at?: string
+          updated_by?: string | null
+          use_as_template_footer_default?: boolean
+          use_native_interactive_footer?: boolean
+        }
+        Update: {
+          append_signature_to_text?: boolean
+          application_display_name?: string | null
+          brand_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_signature_text?: string | null
+          default_template_footer_text?: string | null
+          id?: string
+          institution?: string
+          signature_enabled?: boolean
+          signature_mode?: string
+          updated_at?: string
+          updated_by?: string | null
+          use_as_template_footer_default?: boolean
+          use_native_interactive_footer?: boolean
+        }
+        Relationships: []
+      }
       medications: {
         Row: {
           created_at: string
@@ -399,17 +453,21 @@ export type Database = {
           meta_carousel_cards: Json | null
           meta_category: string | null
           meta_definition: Json | null
+          meta_footer_source: string | null
           meta_footer_text: string | null
+          meta_has_local_differences: boolean
           meta_header_parameter_order: Json | null
           meta_header_text: string | null
           meta_header_type: string | null
           meta_language: string
           meta_last_synced_at: string | null
           meta_parameter_order: Json
+          meta_parent_template_id: string | null
           meta_rejection_reason: string | null
           meta_status: string
           meta_template_id: string | null
           meta_template_name: string | null
+          meta_version: number | null
           name: string
           rejection_reason: string | null
           segment_id: string | null
@@ -441,17 +499,21 @@ export type Database = {
           meta_carousel_cards?: Json | null
           meta_category?: string | null
           meta_definition?: Json | null
+          meta_footer_source?: string | null
           meta_footer_text?: string | null
+          meta_has_local_differences?: boolean
           meta_header_parameter_order?: Json | null
           meta_header_text?: string | null
           meta_header_type?: string | null
           meta_language?: string
           meta_last_synced_at?: string | null
           meta_parameter_order?: Json
+          meta_parent_template_id?: string | null
           meta_rejection_reason?: string | null
           meta_status?: string
           meta_template_id?: string | null
           meta_template_name?: string | null
+          meta_version?: number | null
           name: string
           rejection_reason?: string | null
           segment_id?: string | null
@@ -483,17 +545,21 @@ export type Database = {
           meta_carousel_cards?: Json | null
           meta_category?: string | null
           meta_definition?: Json | null
+          meta_footer_source?: string | null
           meta_footer_text?: string | null
+          meta_has_local_differences?: boolean
           meta_header_parameter_order?: Json | null
           meta_header_text?: string | null
           meta_header_type?: string | null
           meta_language?: string
           meta_last_synced_at?: string | null
           meta_parameter_order?: Json
+          meta_parent_template_id?: string | null
           meta_rejection_reason?: string | null
           meta_status?: string
           meta_template_id?: string | null
           meta_template_name?: string | null
+          meta_version?: number | null
           name?: string
           rejection_reason?: string | null
           segment_id?: string | null
@@ -502,12 +568,21 @@ export type Database = {
           updated_at?: string
           variables?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "message_templates_meta_parent_template_id_fkey"
+            columns: ["meta_parent_template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {
           batch_id: string | null
           body: string
+          branding_settings_snapshot: Json | null
           channel: Database["public"]["Enums"]["message_channel"]
           contact_id: string | null
           created_at: string
@@ -516,6 +591,7 @@ export type Database = {
           direction: string
           external_message_id: string | null
           failed_at: string | null
+          footer_delivery_mode: string | null
           id: string
           interaction_id: string | null
           interaction_title: string | null
@@ -533,6 +609,8 @@ export type Database = {
           raw_message_type: string | null
           reaction_emoji: string | null
           read_at: string | null
+          rendered_body: string | null
+          resolved_footer_text: string | null
           scheduled_for: string | null
           send_attempts: number
           sent_at: string | null
@@ -544,6 +622,7 @@ export type Database = {
         Insert: {
           batch_id?: string | null
           body: string
+          branding_settings_snapshot?: Json | null
           channel?: Database["public"]["Enums"]["message_channel"]
           contact_id?: string | null
           created_at?: string
@@ -552,6 +631,7 @@ export type Database = {
           direction?: string
           external_message_id?: string | null
           failed_at?: string | null
+          footer_delivery_mode?: string | null
           id?: string
           interaction_id?: string | null
           interaction_title?: string | null
@@ -569,6 +649,8 @@ export type Database = {
           raw_message_type?: string | null
           reaction_emoji?: string | null
           read_at?: string | null
+          rendered_body?: string | null
+          resolved_footer_text?: string | null
           scheduled_for?: string | null
           send_attempts?: number
           sent_at?: string | null
@@ -580,6 +662,7 @@ export type Database = {
         Update: {
           batch_id?: string | null
           body?: string
+          branding_settings_snapshot?: Json | null
           channel?: Database["public"]["Enums"]["message_channel"]
           contact_id?: string | null
           created_at?: string
@@ -588,6 +671,7 @@ export type Database = {
           direction?: string
           external_message_id?: string | null
           failed_at?: string | null
+          footer_delivery_mode?: string | null
           id?: string
           interaction_id?: string | null
           interaction_title?: string | null
@@ -605,6 +689,8 @@ export type Database = {
           raw_message_type?: string | null
           reaction_emoji?: string | null
           read_at?: string | null
+          rendered_body?: string | null
+          resolved_footer_text?: string | null
           scheduled_for?: string | null
           send_attempts?: number
           sent_at?: string | null

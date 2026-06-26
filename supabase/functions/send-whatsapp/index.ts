@@ -1,5 +1,13 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import {
+  resolveInstitutionBranding,
+  resolveSignatureText,
+  appendSignatureToFreeText,
+  resolveInteractiveFooter,
+  brandingSnapshot,
+  type InstitutionWhatsAppSettings,
+} from "../_shared/institution-branding.ts";
 
 const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
 const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
@@ -197,7 +205,7 @@ Deno.serve(async (req) => {
   if (!WHATSAPP_TEST_MODE && (msg as any).template_id) {
     const { data: tpl } = await admin
       .from("message_templates")
-      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text, meta_buttons, meta_authentication_config")
+      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text, meta_footer_text, meta_buttons, meta_authentication_config")
       .eq("id", (msg as any).template_id)
       .maybeSingle();
     tplRow = tpl;
@@ -269,12 +277,39 @@ Deno.serve(async (req) => {
     .update({ send_attempts: ((msg as any).send_attempts ?? 0) + 1 })
     .eq("id", msg.id);
 
-  // Build payload: prefer Meta template when message references an approved one
+  // Resolve institution branding (signature / footer policy) once per send.
+  let branding: InstitutionWhatsAppSettings | null = null;
+  try {
+    branding = await resolveInstitutionBranding(admin, institution);
+  } catch (_e) {
+    branding = null;
+  }
+  const signatureText = resolveSignatureText(branding);
+
+  // Audit fields populated as we build the payload.
+  let renderedBody: string | null = null;
+  let resolvedFooterText: string | null = null;
+  let footerDeliveryMode: "none" | "body_signature" | "interactive_footer" | "meta_template_footer" = "none";
+
+  // For plain text, optionally append the institution signature inside the bubble.
+  const baseText = msg.body ?? "";
+  if (
+    branding?.append_signature_to_text &&
+    signatureText &&
+    !willSendTemplate &&
+    !WHATSAPP_TEST_MODE
+  ) {
+    renderedBody = appendSignatureToFreeText(baseText, signatureText);
+    resolvedFooterText = signatureText;
+    footerDeliveryMode = "body_signature";
+  } else {
+    renderedBody = baseText;
+  }
   let metaPayload: Record<string, unknown> = {
     messaging_product: "whatsapp",
     to,
     type: "text",
-    text: { body: msg.body, preview_url: false },
+    text: { body: renderedBody, preview_url: false },
   };
   let sendKind: "text" | "template" = "text";
   let usedTemplateName: string | null = null;
@@ -954,7 +989,13 @@ Deno.serve(async (req) => {
       };
       // SPM forbids header — we already validated that above.
       if (headerObj && itype !== "product") interactivePayload.header = headerObj;
-      if (footerText) interactivePayload.footer = { text: footerText };
+      // Resolve footer: explicit override > institution policy.
+      const finalFooter = resolveInteractiveFooter(branding, footerText || null);
+      if (finalFooter) {
+        interactivePayload.footer = { text: finalFooter };
+        resolvedFooterText = finalFooter;
+        footerDeliveryMode = "interactive_footer";
+      }
 
       metaPayload = {
         messaging_product: "whatsapp",
@@ -964,6 +1005,26 @@ Deno.serve(async (req) => {
       };
       sendKind = "text"; // not a template
     }
+  }
+
+  // For Meta templates the footer is static and lives on the approved
+  // definition. We only record it for audit; never inject at runtime.
+  if (willSendTemplate && tplRow) {
+    const isAuth =
+      (tplRow as any).meta_category === "AUTHENTICATION" ||
+      !!(tplRow as any).meta_authentication_config;
+    const tplFooter = ((tplRow as any).meta_footer_text ?? "") as string;
+    if (!isAuth && tplFooter) {
+      resolvedFooterText = tplFooter;
+      footerDeliveryMode = "meta_template_footer";
+    } else if (isAuth) {
+      footerDeliveryMode = tplFooter ? "meta_template_footer" : "none";
+      resolvedFooterText = tplFooter || null;
+    } else {
+      footerDeliveryMode = "none";
+    }
+    // Templates carry their own approved body — never override with signature.
+    renderedBody = null;
   }
 
   // Call Meta Cloud API
@@ -1048,6 +1109,10 @@ Deno.serve(async (req) => {
       external_message_id: externalId ?? null,
       provider: "meta_whatsapp_cloud",
       last_error: null,
+      rendered_body: renderedBody,
+      resolved_footer_text: resolvedFooterText,
+      footer_delivery_mode: footerDeliveryMode,
+      branding_settings_snapshot: brandingSnapshot(branding),
     })
     .eq("id", msg.id);
 

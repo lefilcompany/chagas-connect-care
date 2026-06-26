@@ -22,6 +22,7 @@ import Integrations from "./pages/app/Integrations";
 import Profile from "./pages/app/Profile";
 import Segments from "./pages/app/Segments";
 import SegmentEditor from "./pages/app/SegmentEditor";
+import WhatsAppSettings from "./pages/app/WhatsAppSettings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="segmentos/:id/duplicar" element={<SegmentEditor />} />
               <Route path="relatorios" element={<Reports />} />
               <Route path="integracoes" element={<Integrations />} />
+              <Route path="configuracoes/whatsapp" element={<WhatsAppSettings />} />
               <Route path="perfil" element={<Profile />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
