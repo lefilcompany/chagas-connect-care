@@ -147,6 +147,8 @@ export type QueueAndSendInput = {
   template_name?: string | null;
   template_variables?: Record<string, string> | null;
   batch_id?: string | null;
+  media_asset_id?: string | null;
+  media_filename?: string | null;
 };
 
 export type QueueAndSendResult = {
@@ -193,6 +195,8 @@ export async function queueAndSend(input: QueueAndSendInput): Promise<QueueAndSe
       template_name: input.template_name ?? null,
       template_variables: input.template_variables ?? {},
       batch_id: input.batch_id ?? null,
+      media_asset_id: input.media_asset_id ?? null,
+      media_filename: input.media_filename ?? null,
     } as any)
     .select("id")
     .maybeSingle();
