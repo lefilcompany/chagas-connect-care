@@ -17,9 +17,24 @@ type SubmitBody = {
   token: string;
   full_name: string;
   birth_date?: string | null;
+  email?: string | null;
+  cpf?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  notes?: string | null;
   relation?: string | null;
   consent: boolean;
 };
+
+function cleanText(value: unknown, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+function cleanDate(value: unknown) {
+  const text = cleanText(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -84,6 +99,13 @@ Deno.serve(async (req) => {
   const phone = (invite as any).phone as string | null;
   const waId = (invite as any).wa_id as string | null;
   const fullName = body.full_name.trim();
+  const email = cleanText(body.email);
+  const cpf = cleanText(body.cpf).replace(/\D/g, "");
+  const address = cleanText(body.address);
+  const city = cleanText(body.city);
+  const state = cleanText(body.state).toUpperCase().slice(0, 2);
+  const birthDate = cleanDate(body.birth_date);
+  const notes = cleanText(body.notes);
   const nowIso = new Date().toISOString();
 
   let patientId: string | null = (invite as any).patient_id ?? null;
@@ -94,17 +116,21 @@ Deno.serve(async (req) => {
       full_name: fullName,
       phone: phone ?? "",
       institution,
-      stage: "ativo",
+      stage: "diagnostico",
       channel_pref: "whatsapp",
-      email: "",
-      cpf: "",
-      address: "",
-      city: "",
-      state: "",
+      email,
+      cpf,
+      address,
+      city,
+      state,
       status: "ativo",
-      birth_date: body.birth_date ?? null,
+      birth_date: birthDate,
+      notes,
     } as any).select("id").maybeSingle();
-    if (pErr || !p) return json(500, { error: "Falha ao criar paciente" });
+    if (pErr || !p) {
+      console.error("[public-onboarding] patient_insert_failed", pErr);
+      return json(500, { error: "Falha ao criar paciente", details: pErr?.message ?? null });
+    }
     patientId = (p as any).id;
   } else {
     if (!patientId) return json(400, { error: "Paciente vinculado não informado" });
@@ -115,17 +141,21 @@ Deno.serve(async (req) => {
       phone: phone ?? "",
       channel_pref: "whatsapp",
       receives_reminders: true,
-      email: "",
-      cpf: "",
-      address: "",
-      city: "",
-      state: "",
+      email,
+      cpf,
+      address,
+      city,
+      state,
       status: "ativo",
       authorization_status: "active",
       authorization_scope: ["lembretes", "educativo"],
       authorized_at: nowIso,
+      birth_date: birthDate,
     } as any).select("id").maybeSingle();
-    if (cErr || !c) return json(500, { error: "Falha ao criar contato" });
+    if (cErr || !c) {
+      console.error("[public-onboarding] contact_insert_failed", cErr);
+      return json(500, { error: "Falha ao criar contato", details: cErr?.message ?? null });
+    }
     contactId = (c as any).id;
   }
 
@@ -157,7 +187,12 @@ Deno.serve(async (req) => {
       contact_id: contactId,
       full_name: fullName,
       relation: body.relation ?? null,
-      birth_date: body.birth_date ?? null,
+      birth_date: birthDate,
+      email,
+      cpf,
+      address,
+      city,
+      state,
     },
   } as any).eq("id", (invite as any).id);
 
