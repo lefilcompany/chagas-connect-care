@@ -366,7 +366,7 @@ export default function Conversas() {
                         : "bg-primary text-primary-foreground self-end ml-auto",
                     )}
                   >
-                    {m.body}
+                    {renderWithLinks(m.body)}
                     <div className="text-[10px] opacity-70 mt-1">
                       {m.sent_at ? new Date(m.sent_at).toLocaleString() : ""}
                       {m.direction === "outbound" && m.status ? ` · ${m.status}` : ""}
