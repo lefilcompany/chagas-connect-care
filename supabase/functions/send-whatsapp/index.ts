@@ -386,6 +386,70 @@ Deno.serve(async (req) => {
     };
   }
 
+  // Free-form media (image/video/document/audio) inside the open 24h window.
+  // Triggered when the message has a media_asset_id and is NOT a template,
+  // NOT a test-mode send, and NOT a free-form interactive payload.
+  const hasInteractive =
+    !!((msg as any).template_variables?.__interactive);
+  if (
+    !willSendTemplate &&
+    !WHATSAPP_TEST_MODE &&
+    !hasInteractive &&
+    (msg as any).media_asset_id
+  ) {
+    const assetId = (msg as any).media_asset_id as string;
+    const { data: asset } = await admin
+      .from("whatsapp_media_assets")
+      .select("meta_media_id, status, filename, mime_type, media_type")
+      .eq("id", assetId)
+      .maybeSingle();
+    const mediaId = (asset as any)?.meta_media_id as string | null;
+    if (!mediaId || (asset as any)?.status !== "uploaded") {
+      await admin.from("messages").update({
+        status: "failed",
+        failed_at: new Date().toISOString(),
+        last_error: "Mídia ainda não disponível na Meta",
+      }).eq("id", msg.id);
+      return json(200, {
+        ok: false,
+        error_code: "MEDIA_NOT_UPLOADED",
+        error: "A mídia ainda não foi enviada para a Meta.",
+      });
+    }
+    const mt = String((asset as any).media_type || "").toLowerCase();
+    const kind: "image" | "video" | "document" | "audio" | null =
+      mt === "image" || mt === "video" || mt === "document" || mt === "audio" ? mt : null;
+    if (!kind) {
+      await admin.from("messages").update({
+        status: "failed",
+        failed_at: new Date().toISOString(),
+        last_error: `Tipo de mídia não suportado em envio livre: ${mt}`,
+      }).eq("id", msg.id);
+      return json(200, {
+        ok: false,
+        error_code: "MEDIA_MIME_NOT_ALLOWED",
+        error: "Tipo de mídia não suportado para envio livre.",
+      });
+    }
+    const mediaObj: Record<string, unknown> = { id: mediaId };
+    const caption = (msg.body ?? "").trim();
+    if (kind === "document") {
+      const filename = (msg as any).media_filename || (asset as any)?.filename;
+      if (filename) mediaObj.filename = filename;
+      if (caption) mediaObj.caption = caption;
+    } else if (kind === "image" || kind === "video") {
+      if (caption) mediaObj.caption = caption;
+    }
+    metaPayload = {
+      messaging_product: "whatsapp",
+      to,
+      type: kind,
+      [kind]: mediaObj,
+    };
+    sendKind = "text"; // not a template send
+    renderedBody = caption || null;
+  }
+
   if (willSendTemplate && tplRow) {
     const vars = ((msg as any).template_variables ?? {}) as Record<string, string>;
     // ---- AUTHENTICATION / OTP (Phase 5) ----------------------------------
