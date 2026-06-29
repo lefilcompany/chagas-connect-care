@@ -465,7 +465,7 @@ Deno.serve(async (req) => {
               } as any);
               continue;
             }
-            const { data: created } = await admin
+            const { data: created, error: createErr } = await admin
               .from("whatsapp_identities")
               .insert({
                 institution: channelInstitution,
@@ -477,6 +477,13 @@ Deno.serve(async (req) => {
               .select("id, institution, patient_id, contact_id")
               .maybeSingle();
             if (!created) {
+              console.error("whatsapp-webhook: identity insert failed", {
+                code: createErr?.code,
+                message: createErr?.message,
+                details: createErr?.details,
+                wa_id: from,
+                institution: channelInstitution,
+              });
               await admin.from("whatsapp_unmatched_events").insert({
                 external_message_id: extId ?? null,
                 wa_id: from,
@@ -510,7 +517,7 @@ Deno.serve(async (req) => {
 
           const nowIso = new Date().toISOString();
 
-          await admin.from("messages").insert({
+          const { error: insertMsgErr } = await admin.from("messages").insert({
             patient_id: patientId,
             identity_id: identity.id,
             institution: identity.institution,
@@ -527,6 +534,15 @@ Deno.serve(async (req) => {
             interaction_title: interactionTitle,
             raw_message_type: rawType,
           } as any);
+          if (insertMsgErr) {
+            console.error("whatsapp-webhook: message insert failed", {
+              code: insertMsgErr.code,
+              message: insertMsgErr.message,
+              details: insertMsgErr.details,
+              external_message_id: extId,
+              identity_id: identity.id,
+            });
+          }
 
           // Open/renew service window (24h).
           const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
