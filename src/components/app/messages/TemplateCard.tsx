@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Edit3, Send, FilePlus2, Lock, ShieldCheck, AlertTriangle } from "lucide-react";
-import { type MessageTemplate } from "@/lib/templates";
+import { Copy, Edit3, Send, FilePlus2, Lock, ShieldCheck, AlertTriangle, Clock, XCircle, PauseCircle } from "lucide-react";
+import { META_STATUS_LABEL, type MessageTemplate } from "@/lib/templates";
 import { getTemplateDescription } from "@/lib/templateDescriptions";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 
@@ -37,17 +37,33 @@ export function TemplateCard({
   onDuplicate: () => void;
 }) {
   const isDefault = !!template.is_default;
-  const isMetaApproved = template.template_kind === "meta" && template.meta_status === "approved";
+  const isMeta = template.template_kind === "meta";
+  const status = template.meta_status;
   const footerDiverges = !!template.meta_has_local_differences;
 
   return (
-    <article className="flex h-full flex-col rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
+    <article className="grid h-full grid-rows-[auto_auto_1fr_auto] rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-display text-base font-bold text-brand break-words">{template.name}</h3>
         <div className="flex flex-wrap items-center justify-end gap-1 shrink-0">
-          {isMetaApproved && (
+          {isMeta && status === "approved" && (
             <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-300">
               <ShieldCheck className="mr-0.5 h-3 w-3" /> Meta aprovado
+            </Badge>
+          )}
+          {isMeta && status === "submitted" && (
+            <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-300">
+              <Clock className="mr-0.5 h-3 w-3" /> Em análise
+            </Badge>
+          )}
+          {isMeta && status === "rejected" && (
+            <Badge variant="outline" className="text-[10px] border-rose-500/40 text-rose-700 dark:text-rose-300">
+              <XCircle className="mr-0.5 h-3 w-3" /> Rejeitado
+            </Badge>
+          )}
+          {isMeta && status === "paused" && (
+            <Badge variant="outline" className="text-[10px] border-slate-500/40 text-slate-700 dark:text-slate-300">
+              <PauseCircle className="mr-0.5 h-3 w-3" /> {META_STATUS_LABEL.paused}
             </Badge>
           )}
           {footerDiverges && (
@@ -71,10 +87,15 @@ export function TemplateCard({
       )}
 
       <div className="mt-3">
-        <WhatsAppPreview body={template.body} variant="compact" />
+        <WhatsAppPreview
+          body={template.body}
+          variant="compact"
+          resolveExamples
+          footer={template.meta_footer_text ?? undefined}
+        />
       </div>
 
-      <div className="mt-auto flex items-center gap-1.5 pt-4">
+      <div className="flex items-center gap-1.5 pt-4">
         <Button variant="hero" size="sm" className="flex-1" onClick={onUse}>
           <Send className="h-3.5 w-3.5" /> Usar objetivo
         </Button>

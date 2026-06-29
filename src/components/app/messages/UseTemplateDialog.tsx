@@ -18,9 +18,10 @@ import {
   ChevronLeft, ChevronRight, Send, AlertTriangle, Users, User as UserIcon,
 } from "lucide-react";
 import {
-  extractVariables, renderTemplate, autofillVariables, pickVariantBody, getVariableLabel,
+  extractVariables, renderTemplate, autofillVariables, pickVariantBody,
   VARIANT_LABEL, type MessageTemplate, type TemplateVariant,
 } from "@/lib/templates";
+import { getSemanticVariable } from "@/lib/metaVariables";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 import { queueAndSendFromTemplate } from "@/lib/whatsapp";
 import { VariableInput } from "./VariableInput";
@@ -405,12 +406,18 @@ export function UseTemplateDialog({
               ) : (
                 detectedVars.map((v) => (
                   <div key={v} className="space-y-1.5">
-                    <Label className="text-xs font-medium">{getVariableLabel(v)}</Label>
+                    <Label className="text-xs font-medium">
+                      {getSemanticVariable(v).label}
+                    </Label>
+                    {getSemanticVariable(v).description && (
+                      <p className="text-[11px] text-muted-foreground">
+                        {getSemanticVariable(v).description}
+                      </p>
+                    )}
                     <VariableInput
                       varKey={v}
                       value={vars[v] ?? ""}
                       onChange={(val) => setVars({ ...vars, [v]: val })}
-                      placeholder={`Preencha ${v.replace(/_/g, " ")}`}
                     />
                   </div>
                 ))
@@ -418,7 +425,12 @@ export function UseTemplateDialog({
             </div>
             <div className="space-y-2">
               <Label className="text-xs uppercase">Pré-visualização</Label>
-              <WhatsAppPreview body={renderedBody} recipientName={recipientName || "Destinatário"} />
+              <WhatsAppPreview
+                body={renderedBody}
+                recipientName={recipientName || "Destinatário"}
+                resolveExamples
+                variableValues={vars}
+              />
             </div>
           </div>
         )}
@@ -446,7 +458,13 @@ export function UseTemplateDialog({
                   <p><span className="text-muted-foreground">Total:</span> {selectedContacts.length} envios</p>
                 )}
               </div>
-              <WhatsAppPreview body={renderedBody} recipientName={recipientName || "Destinatário"} highlightVars={false} />
+              <WhatsAppPreview
+                body={renderedBody}
+                recipientName={recipientName || "Destinatário"}
+                highlightVars={false}
+                resolveExamples
+                variableValues={vars}
+              />
             </div>
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
