@@ -424,7 +424,7 @@ export default function WhatsAppSettings() {
         </TabsContent>
 
         <TabsContent value="channel">
-          <ChannelTab institution={institution} />
+          <ChannelTab institution={institution} isAdmin={isAdmin} />
         </TabsContent>
 
         <TabsContent value="diagnostics">
