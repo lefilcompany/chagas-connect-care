@@ -33,12 +33,19 @@ export default function OnboardingForm() {
   useEffect(() => {
     (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke(
-          `public-onboarding?token=${encodeURIComponent(token)}`,
-          { method: "GET" as any },
+        const projectRef = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID
+          ?? "czrstjmhgfewlsetsrvl";
+        const anonKey = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY
+          ?? (import.meta as any).env?.VITE_SUPABASE_ANON_KEY
+          ?? "";
+        const res = await fetch(
+          `https://${projectRef}.supabase.co/functions/v1/public-onboarding?token=${encodeURIComponent(token)}`,
+          { headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` } },
         );
-        if (error) throw error;
-        if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "Convite inválido");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !(data as any)?.ok) {
+          throw new Error((data as any)?.error ?? `Convite inválido (HTTP ${res.status})`);
+        }
         setInvite(data as InviteInfo);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Convite inválido");
