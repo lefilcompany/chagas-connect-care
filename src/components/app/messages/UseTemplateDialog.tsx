@@ -61,6 +61,21 @@ export function UseTemplateDialog({
   const [contactIds, setContactIds] = useState<string[]>([]);
   const [vars, setVars] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
+  const [failures, setFailures] = useState<
+    Array<{
+      recipient: string;
+      message_id: string | null;
+      error: string;
+      error_code?: string;
+      meta_error?: {
+        code?: number;
+        error_subcode?: number;
+        message?: string;
+        fbtrace_id?: string;
+        http_status?: number;
+      };
+    }>
+  >([]);
 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: qk.patients,
@@ -120,6 +135,7 @@ export function UseTemplateDialog({
     setPatientId(lockedPatientId ?? "");
     setContactIds([]);
     setVars({});
+    setFailures([]);
   }, [open, template?.id, lockedPatientId, initialMode]);
 
   // Auto-fill variables when patient / first contact selected
@@ -168,6 +184,7 @@ export function UseTemplateDialog({
   const handleSend = async () => {
     if (!canAdvance0) return toast.error("Selecione um destinatário válido");
     setSending(true);
+    setFailures([]);
     const targets = mode === "contact"
       ? selectedContacts.map((c) => ({
           contact_id: c.id as string | null,
@@ -182,7 +199,7 @@ export function UseTemplateDialog({
       : [{ contact_id: null as string | null, name: patient?.full_name ?? "", extraVars: {} as Record<string, string> }];
 
     let ok = 0;
-    let fail = 0;
+    const localFailures: typeof failures = [];
     for (const t of targets) {
       const perVars = { ...vars, ...t.extraVars };
       const result = await queueAndSendFromTemplate({
@@ -199,13 +216,35 @@ export function UseTemplateDialog({
         created_by: user?.id ?? null,
         recipient_name: t.name || null,
       });
-      if (result.ok) ok++; else fail++;
+      if (result.ok) {
+        ok++;
+      } else {
+        localFailures.push({
+          recipient: t.name || "Destinatário",
+          message_id: result.message_id,
+          error: result.error ?? "Falha desconhecida no envio",
+          error_code: result.error_code,
+          meta_error: result.meta_error,
+        });
+      }
     }
     setSending(false);
+    setFailures(localFailures);
     qc.invalidateQueries({ queryKey: qk.messages });
-    if (ok === 0) return toast.error(`Falha ao enviar (${fail})`);
-    if (fail > 0) toast.success(`${ok} mensagem(ns) enviada(s), ${fail} falharam`);
-    else toast.success(targets.length > 1 ? `${ok} mensagens enviadas` : "Mensagem enviada");
+    const fail = localFailures.length;
+    if (ok === 0) {
+      const first = localFailures[0];
+      toast.error(first?.error ?? "Falha ao enviar mensagem");
+      // Keep dialog open so the user can read the diagnostic panel.
+      return;
+    }
+    if (fail > 0) {
+      toast.warning(`${ok} mensagem(ns) enviada(s), ${fail} falharam`, {
+        description: localFailures[0]?.error,
+      });
+      return;
+    }
+    toast.success(targets.length > 1 ? `${ok} mensagens enviadas` : "Mensagem enviada");
     onOpenChange(false);
   };
 
@@ -413,6 +452,7 @@ export function UseTemplateDialog({
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>Revise a mensagem antes de enviar. Ela será registrada no histórico do paciente.</span>
             </div>
+            {failures.length > 0 && <FailuresPanel failures={failures} />}
           </div>
         )}
 
@@ -498,5 +538,89 @@ function RecipientOption({
         <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
       </div>
     </button>
+  );
+}
+
+function FailuresPanel({
+  failures,
+}: {
+  failures: Array<{
+    recipient: string;
+    message_id: string | null;
+    error: string;
+    error_code?: string;
+    meta_error?: {
+      code?: number;
+      error_subcode?: number;
+      message?: string;
+      fbtrace_id?: string;
+      http_status?: number;
+    };
+  }>;
+}) {
+  const copyDiagnostic = () => {
+    const text = failures
+      .map((f, i) => {
+        const meta = f.meta_error
+          ? `\n  meta.code=${f.meta_error.code ?? "-"} subcode=${f.meta_error.error_subcode ?? "-"} http=${f.meta_error.http_status ?? "-"} fbtrace=${f.meta_error.fbtrace_id ?? "-"}\n  meta.message=${f.meta_error.message ?? "-"}`
+          : "";
+        return `#${i + 1} ${f.recipient}\n  code=${f.error_code ?? "-"}\n  error=${f.error}${meta}\n  message_id=${f.message_id ?? "-"}`;
+      })
+      .join("\n\n");
+    navigator.clipboard?.writeText(text).then(
+      () => toast.success("Diagnóstico copiado"),
+      () => toast.error("Não foi possível copiar"),
+    );
+  };
+  return (
+    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-semibold text-destructive">
+          <AlertTriangle className="h-4 w-4" />
+          {failures.length === 1
+            ? "1 envio falhou"
+            : `${failures.length} envios falharam`}
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={copyDiagnostic}>
+          Copiar diagnóstico
+        </Button>
+      </div>
+      <ul className="mt-2 space-y-2">
+        {failures.map((f, i) => (
+          <li key={i} className="rounded border border-destructive/20 bg-background/60 p-2">
+            <div className="font-medium text-foreground">{f.recipient}</div>
+            <div className="text-destructive mt-0.5">{f.error}</div>
+            <div className="mt-1 text-muted-foreground space-x-2">
+              {f.error_code && (
+                <code className="rounded bg-muted px-1 py-0.5">{f.error_code}</code>
+              )}
+              {f.meta_error?.code != null && (
+                <code className="rounded bg-muted px-1 py-0.5">
+                  meta:{f.meta_error.code}
+                  {f.meta_error.error_subcode != null
+                    ? `/${f.meta_error.error_subcode}`
+                    : ""}
+                </code>
+              )}
+              {f.meta_error?.fbtrace_id && (
+                <code className="rounded bg-muted px-1 py-0.5">
+                  fbtrace:{f.meta_error.fbtrace_id}
+                </code>
+              )}
+            </div>
+            {f.meta_error?.message && (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-muted-foreground">
+                  Detalhes técnicos da Meta
+                </summary>
+                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px] text-muted-foreground">
+                  {f.meta_error.message}
+                </pre>
+              </details>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
