@@ -7,25 +7,27 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { getSemanticVariable } from "@/lib/metaVariables";
 
-/** Heuristic: variable name suggests a calendar date. */
+/** Catalog-first: use semantic catalog, fall back to heuristics for unknown keys. */
 export function isDateVariable(key: string): boolean {
+  const cat = getSemanticVariable(key);
+  if (cat.type === "date") return true;
+  if (cat.type === "time") return false;
   const k = key.toLowerCase();
-  if (/(hora|horario|hour|time|horario_inicio|horario_fim|horario_consulta|hora_consulta|hora_medicacao)/.test(k)) return false;
+  if (/(hora|horario|hour|time)/.test(k)) return false;
   return /(^|_)(data|date|dia|vencimento|prazo|agendamento|retorno|consulta_em|nascimento)(_|$)/.test(k)
-    || k === "data"
-    || k.startsWith("data_")
-    || k.endsWith("_data");
+    || k.startsWith("data_") || k.endsWith("_data");
 }
 
-/** Heuristic: variable name suggests a time (hour). */
 export function isTimeVariable(key: string): boolean {
+  const cat = getSemanticVariable(key);
+  if (cat.type === "time") return true;
+  if (cat.type === "date") return false;
   const k = key.toLowerCase();
   return /(^|_)(hora|horario|hour|time)(_|$)/.test(k)
-    || k.startsWith("hora_")
-    || k.startsWith("horario_")
-    || k.endsWith("_hora")
-    || k.endsWith("_horario");
+    || k.startsWith("hora_") || k.startsWith("horario_")
+    || k.endsWith("_hora") || k.endsWith("_horario");
 }
 
 function formatTimeInput(raw: string): string {
