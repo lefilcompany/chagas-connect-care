@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, RefreshCw, GitBranch } from "lucide-react";
 import { type MessageTemplate } from "@/lib/templates";
 import { useFolders } from "@/hooks/useFolders";
 import { StartBlankCard, TemplateCard } from "./TemplateCard";
@@ -34,9 +34,28 @@ export default function TemplatesTab({
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<MessageTemplate | null>(null);
+  const [versioningParent, setVersioningParent] = useState<MessageTemplate | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const [useOpen, setUseOpen] = useState(false);
   const [usingTpl, setUsingTpl] = useState<MessageTemplate | null>(null);
+
+  // Realtime: refresh templates whenever the table changes for this institution.
+  useEffect(() => {
+    const channel = supabase
+      .channel("message_templates_realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "message_templates" },
+        () => {
+          qc.invalidateQueries({ queryKey: qk.templates });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -98,13 +117,40 @@ export default function TemplatesTab({
   };
 
   const openEdit = (t: MessageTemplate | null) => {
+    setVersioningParent(null);
     setEditing(t);
     setEditorOpen(true);
   };
 
+  const openNewVersion = (t: MessageTemplate) => {
+    if (t.template_kind !== "meta") {
+      toast.error("Versionamento disponível apenas para templates Meta.");
+      return;
+    }
+    setEditing(null);
+    setVersioningParent(t);
+    setEditorOpen(true);
+  };
+
+  const syncFromMeta = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-whatsapp-templates", { body: {} });
+      if (error) throw new Error(error.message);
+      if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "Falha na sincronização");
+      const d: any = data;
+      toast.success(`Sincronizados ${d.updated}/${d.count} templates Meta.${d.unmapped ? ` ${d.unmapped} sem vínculo local.` : ""}`);
+      qc.invalidateQueries({ queryKey: qk.templates });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao sincronizar");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-card p-3 grid gap-2 sm:grid-cols-[1fr_220px_auto]">
+      <div className="rounded-xl border border-border bg-card p-3 grid gap-2 sm:grid-cols-[1fr_220px_auto_auto]">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -123,6 +169,10 @@ export default function TemplatesTab({
             ))}
           </SelectContent>
         </Select>
+        <Button variant="outline" onClick={syncFromMeta} disabled={syncing} title="Sincronizar status com a Meta">
+          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+          Sincronizar Meta
+        </Button>
         <Button variant="outline" onClick={() => openEdit(null)}>
           <Plus className="h-4 w-4" /> Novo objetivo
         </Button>
@@ -137,14 +187,16 @@ export default function TemplatesTab({
             onUse={() => openUse(t)}
             onEdit={() => openEdit(t)}
             onDuplicate={() => duplicate(t)}
+            onNewVersion={t.template_kind === "meta" ? () => openNewVersion(t) : undefined}
           />
         ))}
       </div>
 
       <TemplateEditorDialog
         open={editorOpen}
-        onOpenChange={(o) => { setEditorOpen(o); if (!o) setEditing(null); }}
+        onOpenChange={(o) => { setEditorOpen(o); if (!o) { setEditing(null); setVersioningParent(null); } }}
         editing={editing}
+        parentTemplate={versioningParent}
         onSavedUse={(t) => openUse(t)}
       />
 
