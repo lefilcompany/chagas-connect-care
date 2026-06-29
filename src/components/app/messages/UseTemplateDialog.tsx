@@ -540,3 +540,87 @@ function RecipientOption({
     </button>
   );
 }
+
+function FailuresPanel({
+  failures,
+}: {
+  failures: Array<{
+    recipient: string;
+    message_id: string | null;
+    error: string;
+    error_code?: string;
+    meta_error?: {
+      code?: number;
+      error_subcode?: number;
+      message?: string;
+      fbtrace_id?: string;
+      http_status?: number;
+    };
+  }>;
+}) {
+  const copyDiagnostic = () => {
+    const text = failures
+      .map((f, i) => {
+        const meta = f.meta_error
+          ? `\n  meta.code=${f.meta_error.code ?? "-"} subcode=${f.meta_error.error_subcode ?? "-"} http=${f.meta_error.http_status ?? "-"} fbtrace=${f.meta_error.fbtrace_id ?? "-"}\n  meta.message=${f.meta_error.message ?? "-"}`
+          : "";
+        return `#${i + 1} ${f.recipient}\n  code=${f.error_code ?? "-"}\n  error=${f.error}${meta}\n  message_id=${f.message_id ?? "-"}`;
+      })
+      .join("\n\n");
+    navigator.clipboard?.writeText(text).then(
+      () => toast.success("Diagnóstico copiado"),
+      () => toast.error("Não foi possível copiar"),
+    );
+  };
+  return (
+    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-semibold text-destructive">
+          <AlertTriangle className="h-4 w-4" />
+          {failures.length === 1
+            ? "1 envio falhou"
+            : `${failures.length} envios falharam`}
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={copyDiagnostic}>
+          Copiar diagnóstico
+        </Button>
+      </div>
+      <ul className="mt-2 space-y-2">
+        {failures.map((f, i) => (
+          <li key={i} className="rounded border border-destructive/20 bg-background/60 p-2">
+            <div className="font-medium text-foreground">{f.recipient}</div>
+            <div className="text-destructive mt-0.5">{f.error}</div>
+            <div className="mt-1 text-muted-foreground space-x-2">
+              {f.error_code && (
+                <code className="rounded bg-muted px-1 py-0.5">{f.error_code}</code>
+              )}
+              {f.meta_error?.code != null && (
+                <code className="rounded bg-muted px-1 py-0.5">
+                  meta:{f.meta_error.code}
+                  {f.meta_error.error_subcode != null
+                    ? `/${f.meta_error.error_subcode}`
+                    : ""}
+                </code>
+              )}
+              {f.meta_error?.fbtrace_id && (
+                <code className="rounded bg-muted px-1 py-0.5">
+                  fbtrace:{f.meta_error.fbtrace_id}
+                </code>
+              )}
+            </div>
+            {f.meta_error?.message && (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-muted-foreground">
+                  Detalhes técnicos da Meta
+                </summary>
+                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px] text-muted-foreground">
+                  {f.meta_error.message}
+                </pre>
+              </details>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
