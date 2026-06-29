@@ -283,7 +283,7 @@ export default function Conversas() {
     const res = await uploadWhatsAppMedia(file);
     setUploading(false);
     if (!res.ok) {
-      toast.error(res.error || "Falha ao enviar mídia");
+      toast.error(("error" in res && res.error) || "Falha ao enviar mídia");
       return;
     }
     setAttachment(res.asset);
