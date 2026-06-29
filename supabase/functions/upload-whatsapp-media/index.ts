@@ -163,10 +163,18 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Persist to private bucket: {institution}/{yyyy}/{mm}/{sha}-{name}
+  // Persist to private bucket: {institution_slug}/{yyyy}/{mm}/{sha}-{name}
   const now = new Date();
-  const safeName = (file.name || `${kind}.bin`).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
-  const storagePath = `${institution}/${now.getUTCFullYear()}/${String(
+  const slugify = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 60) || "institution";
+  const institutionSlug = slugify(institution);
+  const safeName = slugify(file.name || `${kind}.bin`).slice(0, 80);
+  const storagePath = `${institutionSlug}/${now.getUTCFullYear()}/${String(
     now.getUTCMonth() + 1,
   ).padStart(2, "0")}/${sha.slice(0, 16)}-${safeName}`;
 
