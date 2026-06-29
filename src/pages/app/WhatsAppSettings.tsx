@@ -462,6 +462,7 @@ function TemplatesMetaTab({ institution, isAdmin }: { institution: string; isAdm
         .from("message_templates")
         .select("id,name,meta_template_name,meta_language,meta_status,meta_category,meta_footer_text,meta_has_local_differences,meta_last_synced_at")
         .eq("template_kind", "meta")
+        .eq("institution", institution)
         .order("meta_last_synced_at", { ascending: false, nullsFirst: false });
       if (error) throw error;
       return data ?? [];
