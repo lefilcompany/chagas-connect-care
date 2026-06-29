@@ -154,6 +154,16 @@ export type QueueAndSendResult = {
   ok: boolean;
   error?: string;
   external_message_id?: string | null;
+  error_code?: string;
+  meta_error?: {
+    code?: number;
+    error_subcode?: number;
+    message?: string;
+    type?: string;
+    fbtrace_id?: string;
+    http_status?: number;
+  };
+  raw?: unknown;
 };
 
 /**
@@ -205,11 +215,27 @@ export async function queueAndSend(input: QueueAndSendInput): Promise<QueueAndSe
         message_id: inserted.id,
         ok: false,
         error: data ? friendlyWhatsAppError(data) : error.message,
+        error_code: (data as any)?.error_code,
+        meta_error: (data as any)?.meta_error,
+        raw: data ?? error,
       };
     }
-    const payload = data as { ok?: boolean; error?: string; external_message_id?: string | null };
+    const payload = data as {
+      ok?: boolean;
+      error?: string;
+      external_message_id?: string | null;
+      error_code?: string;
+      meta_error?: QueueAndSendResult["meta_error"];
+    };
     if (payload?.ok === false) {
-      return { message_id: inserted.id, ok: false, error: friendlyWhatsAppError(payload) };
+      return {
+        message_id: inserted.id,
+        ok: false,
+        error: friendlyWhatsAppError(payload),
+        error_code: payload.error_code,
+        meta_error: payload.meta_error,
+        raw: payload,
+      };
     }
     return {
       message_id: inserted.id,
