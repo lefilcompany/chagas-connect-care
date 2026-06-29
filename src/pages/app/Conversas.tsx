@@ -19,9 +19,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Send, UserPlus, Clock, AlertCircle, MessageCircle } from "lucide-react";
+import { Paperclip, X, Loader2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatWindowLabel, getWindowStatus } from "@/lib/whatsapp";
 import { queueAndSend } from "@/lib/whatsapp";
+import { uploadWhatsAppMedia, type UploadedMediaAsset } from "@/lib/whatsappMedia";
 
 type ConvRow = {
   identity_id: string;
@@ -44,6 +46,8 @@ type Msg = {
   sent_at: string | null;
   status: string | null;
   read_at: string | null;
+  media_asset_id: string | null;
+  media_filename: string | null;
 };
 
 function initials(name: string) {
@@ -91,6 +95,13 @@ export default function Conversas() {
   const [activeIdentity, setActiveIdentity] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [attachment, setAttachment] = useState<UploadedMediaAsset | null>(null);
+  const [attachmentName, setAttachmentName] = useState<string>("");
+  const [uploading, setUploading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const MAX_TEXT = 4096;
 
   useEffect(() => {
     if (!user) return;
@@ -181,7 +192,7 @@ export default function Conversas() {
       if (!activeIdentity) return [] as Msg[];
       const { data } = await supabase
         .from("messages")
-        .select("id, direction, body, sent_at, status, read_at")
+        .select("id, direction, body, sent_at, status, read_at, media_asset_id, media_filename")
         .eq("identity_id", activeIdentity)
         .order("sent_at", { ascending: true })
         .limit(300);
@@ -226,13 +237,19 @@ export default function Conversas() {
   const windowOpen = windowStatus.state === "open";
 
   async function handleSend() {
-    if (!activeConv || !composer.trim()) return;
+    if (!activeConv) return;
+    if (!composer.trim() && !attachment) return;
     if (!windowOpen) {
       toast.error("Janela de 24h fechada. Use um Template Meta de Utilidade.");
       return;
     }
     const text = composer.trim();
+    const att = attachment;
+    const attName = attachmentName;
+    setSending(true);
     setComposer("");
+    setAttachment(null);
+    setAttachmentName("");
     const res = await queueAndSend({
       patient_id: activeConv.patient_id,
       contact_id: activeConv.contact_id,
@@ -241,12 +258,37 @@ export default function Conversas() {
       body: text,
       message_type: "inbox_reply",
       created_by: user?.id ?? null,
+      media_asset_id: att?.media_asset_id ?? null,
+      media_filename: att?.media_type === "document" ? attName : null,
     });
+    setSending(false);
     if (!res.ok) {
       toast.error(res.error ?? "Falha ao enviar");
+      // Restore composer so the user doesn't lose what they wrote
+      setComposer(text);
+      if (att) {
+        setAttachment(att);
+        setAttachmentName(attName);
+      }
     }
     qc.invalidateQueries({ queryKey: ["inbox-thread", activeConv.identity_id] });
     qc.invalidateQueries({ queryKey: ["inbox-conversations", institution] });
+  }
+
+  async function handlePickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    const res = await uploadWhatsAppMedia(file);
+    setUploading(false);
+    if (!res.ok) {
+      toast.error(res.error || "Falha ao enviar mídia");
+      return;
+    }
+    setAttachment(res.asset);
+    setAttachmentName(file.name);
+    toast.success("Mídia pronta para enviar");
   }
 
   return (
@@ -366,7 +408,13 @@ export default function Conversas() {
                         : "bg-primary text-primary-foreground self-end ml-auto",
                     )}
                   >
-                    {renderWithLinks(m.body)}
+                    {m.media_asset_id && (
+                      <div className="flex items-center gap-1.5 text-xs opacity-90 mb-1 border-b border-current/20 pb-1">
+                        <Paperclip className="h-3 w-3" />
+                        <span className="truncate">{m.media_filename || "Anexo"}</span>
+                      </div>
+                    )}
+                    {m.body && renderWithLinks(m.body)}
                     <div className="text-[10px] opacity-70 mt-1">
                       {m.sent_at ? new Date(m.sent_at).toLocaleString() : ""}
                       {m.direction === "outbound" && m.status ? ` · ${m.status}` : ""}
@@ -383,22 +431,76 @@ export default function Conversas() {
 
               <div className="p-3 border-t">
                 {windowOpen ? (
-                  <div className="flex gap-2 items-end">
-                    <Textarea
-                      value={composer}
-                      onChange={(e) => setComposer(e.target.value)}
-                      placeholder="Escreva uma resposta..."
-                      className="min-h-[60px]"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                          e.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                    />
-                    <Button onClick={handleSend} disabled={!composer.trim()}>
-                      <Send className="h-4 w-4" /> Enviar
-                    </Button>
+                  <div className="space-y-2">
+                    {attachment && (
+                      <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1.5 text-xs">
+                        {attachment.media_type === "image" ? (
+                          <Paperclip className="h-3.5 w-3.5 text-emerald-600" />
+                        ) : (
+                          <FileText className="h-3.5 w-3.5 text-emerald-600" />
+                        )}
+                        <span className="flex-1 truncate">
+                          {attachmentName} ·{" "}
+                          <span className="text-muted-foreground">
+                            {attachment.media_type} · {(attachment.size_bytes / 1024).toFixed(0)} KB
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setAttachment(null); setAttachmentName(""); }}
+                          className="rounded p-1 hover:bg-muted"
+                          aria-label="Remover anexo"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex gap-2 items-end">
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        className="hidden"
+                        accept="image/jpeg,image/png,video/mp4,video/3gpp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        onChange={handlePickFile}
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        onClick={() => fileRef.current?.click()}
+                        disabled={uploading || sending || !!attachment}
+                        title="Anexar imagem, vídeo ou documento"
+                      >
+                        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                      </Button>
+                      <div className="flex-1">
+                        <Textarea
+                          value={composer}
+                          onChange={(e) => setComposer(e.target.value.slice(0, MAX_TEXT))}
+                          placeholder={attachment ? "Adicione uma legenda (opcional)…" : "Escreva uma resposta… (Enter envia, Shift+Enter quebra linha)"}
+                          className="min-h-[60px] resize-none"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                              e.preventDefault();
+                              handleSend();
+                            }
+                          }}
+                        />
+                        <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                          <span>Janela 24h aberta · respostas livres permitidas</span>
+                          <span className={cn(composer.length > MAX_TEXT * 0.9 && "text-amber-600")}>
+                            {composer.length}/{MAX_TEXT}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={handleSend}
+                        disabled={sending || uploading || (!composer.trim() && !attachment)}
+                      >
+                        {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Enviar
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
