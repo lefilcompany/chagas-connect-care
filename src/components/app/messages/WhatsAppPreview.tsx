@@ -1,4 +1,5 @@
 import { Check, ExternalLink, Phone, Reply } from "lucide-react";
+import { renderWithExamples } from "@/lib/metaVariables";
 
 export type WhatsAppPreviewMessageType =
   | "text"
