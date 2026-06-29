@@ -178,12 +178,20 @@ export function UseTemplateDialog({
       ? !!patientId && !!recipientPhone
       : !!patientId && contactIds.length > 0;
 
+  const missingVars = detectedVars.filter((v) => !(vars[v] ?? "").trim());
+  const canAdvance1 = missingVars.length === 0;
+
   const toggleContact = (id: string) => {
     setContactIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   };
 
   const handleSend = async () => {
     if (!canAdvance0) return toast.error("Selecione um destinatário válido");
+    if (!canAdvance1) {
+      return toast.error(
+        `Preencha todos os campos obrigatórios (${missingVars.length} pendente${missingVars.length > 1 ? "s" : ""})`,
+      );
+    }
     setSending(true);
     setFailures([]);
     const targets = mode === "contact"
@@ -408,6 +416,7 @@ export function UseTemplateDialog({
                   <div key={v} className="space-y-1.5">
                     <Label className="text-xs font-medium">
                       {getSemanticVariable(v).label}
+                      <span className="ml-1 text-destructive" aria-hidden="true">*</span>
                     </Label>
                     {getSemanticVariable(v).description && (
                       <p className="text-[11px] text-muted-foreground">
@@ -419,6 +428,9 @@ export function UseTemplateDialog({
                       value={vars[v] ?? ""}
                       onChange={(val) => setVars({ ...vars, [v]: val })}
                     />
+                    {!(vars[v] ?? "").trim() && (
+                      <p className="text-[11px] text-destructive">Campo obrigatório.</p>
+                    )}
                   </div>
                 ))
               )}
@@ -491,12 +503,14 @@ export function UseTemplateDialog({
               <Button
                 variant="hero"
                 onClick={() => setStep((s) => s + 1)}
-                disabled={step === 0 && !canAdvance0}
+                disabled={
+                  (step === 0 && !canAdvance0) || (step === 1 && !canAdvance1)
+                }
               >
                 Avançar <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button variant="hero" onClick={handleSend} disabled={sending}>
+              <Button variant="hero" onClick={handleSend} disabled={sending || !canAdvance1}>
                 <Send className="h-4 w-4" /> {sending ? "Enviando..." : "Enviar mensagem"}
               </Button>
             )}
