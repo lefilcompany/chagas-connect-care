@@ -61,6 +61,21 @@ export function UseTemplateDialog({
   const [contactIds, setContactIds] = useState<string[]>([]);
   const [vars, setVars] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
+  const [failures, setFailures] = useState<
+    Array<{
+      recipient: string;
+      message_id: string | null;
+      error: string;
+      error_code?: string;
+      meta_error?: {
+        code?: number;
+        error_subcode?: number;
+        message?: string;
+        fbtrace_id?: string;
+        http_status?: number;
+      };
+    }>
+  >([]);
 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: qk.patients,
@@ -168,6 +183,7 @@ export function UseTemplateDialog({
   const handleSend = async () => {
     if (!canAdvance0) return toast.error("Selecione um destinatário válido");
     setSending(true);
+    setFailures([]);
     const targets = mode === "contact"
       ? selectedContacts.map((c) => ({
           contact_id: c.id as string | null,
@@ -182,7 +198,7 @@ export function UseTemplateDialog({
       : [{ contact_id: null as string | null, name: patient?.full_name ?? "", extraVars: {} as Record<string, string> }];
 
     let ok = 0;
-    let fail = 0;
+    const localFailures: typeof failures = [];
     for (const t of targets) {
       const perVars = { ...vars, ...t.extraVars };
       const result = await queueAndSendFromTemplate({
@@ -199,13 +215,35 @@ export function UseTemplateDialog({
         created_by: user?.id ?? null,
         recipient_name: t.name || null,
       });
-      if (result.ok) ok++; else fail++;
+      if (result.ok) {
+        ok++;
+      } else {
+        localFailures.push({
+          recipient: t.name || "Destinatário",
+          message_id: result.message_id,
+          error: result.error ?? "Falha desconhecida no envio",
+          error_code: result.error_code,
+          meta_error: result.meta_error,
+        });
+      }
     }
     setSending(false);
+    setFailures(localFailures);
     qc.invalidateQueries({ queryKey: qk.messages });
-    if (ok === 0) return toast.error(`Falha ao enviar (${fail})`);
-    if (fail > 0) toast.success(`${ok} mensagem(ns) enviada(s), ${fail} falharam`);
-    else toast.success(targets.length > 1 ? `${ok} mensagens enviadas` : "Mensagem enviada");
+    const fail = localFailures.length;
+    if (ok === 0) {
+      const first = localFailures[0];
+      toast.error(first?.error ?? "Falha ao enviar mensagem");
+      // Keep dialog open so the user can read the diagnostic panel.
+      return;
+    }
+    if (fail > 0) {
+      toast.warning(`${ok} mensagem(ns) enviada(s), ${fail} falharam`, {
+        description: localFailures[0]?.error,
+      });
+      return;
+    }
+    toast.success(targets.length > 1 ? `${ok} mensagens enviadas` : "Mensagem enviada");
     onOpenChange(false);
   };
 
