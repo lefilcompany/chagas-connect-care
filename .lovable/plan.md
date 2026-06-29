@@ -1,89 +1,114 @@
-## Caixa de Entrada WhatsApp + Cadastro Público
 
-Adicionar uma nova área "Conversas" que mostra cada chat com pacientes/familiares/cuidadores, respeitando a janela de 24h do WhatsApp, e um fluxo de onboarding para contatos desconhecidos via link público — sempre usando formatos gratuitos (mensagem de serviço dentro da janela ou Template de UTILIDADE fora dela).
+# Correção integral: banco, webhook e diagnóstico WhatsApp
 
-### 1. Banco de dados
+## Diagnóstico da causa raiz
 
-Migration única:
+`last_webhook_at` nunca é atualizado por dois motivos combinados:
 
-- `messages`: garantir `direction` ('inbound'|'outbound') e `read_at` (verificar antes de adicionar); índice `(institution, identity_id, sent_at desc)`.
-- Nova `quick_replies` (sugestões por categoria/objetivo, escopo por instituição, RLS).
-- Nova `onboarding_invites`:
-  - `token` (uuid público), `institution`, `wa_id`, `phone`, `intended_role` ('paciente'|'familiar'|'cuidador'), `patient_id` opcional, `status` ('pending'|'completed'|'expired'), `expires_at`, `completed_at`, `created_by`.
-  - RLS: equipe da instituição lê/cria; leitura pública só via edge function pelo token.
-- `whatsapp_identities`: apenas consulta da vinculação existente (`patient_id`/`contact_id`) para classificar conhecido/desconhecido.
-- GRANT + RLS conforme padrão.
+1. **Atualização fire-and-forget** em `resolveChannelInstitution` (`whatsapp-webhook/index.ts`): o `.update(...).then(()=>{},()=>{})` sem `await` permite que a Edge Function retorne `200` antes do UPDATE persistir.
+2. **Canal sem `phone_number_id` correto**: quando a linha de `whatsapp_channels` da instituição não tem o `phone_number_id` da Meta (`1091284440743937`), o `eq("phone_number_id", phoneNumberId).maybeSingle()` retorna `null`, o fallback do `WHATSAPP_DEFAULT_INSTITUTION` só estampa via `.then()` (também sem await), e o diagnóstico — que olha o `last_webhook_at` mais recente *de qualquer* canal — continua nulo.
 
-### 2. Edge functions
+Adicionalmente, `whatsapp-diagnostics` consulta o canal globalmente (`order().limit(1)`), não filtra pela instituição do usuário, e colapsa "aguardando primeiro evento" em `nao_configurado`.
 
-- `whatsapp-webhook` (update): no inbound, além de renovar janela 24h, classifica identidade como conhecida/desconhecida e dispara realtime `inbox:{institution}` evento `new_message`.
-- `create-onboarding-invite` (nova): equipe gera token e envia o convite **sempre como formato gratuito**:
-  - Janela 24h aberta → mensagem `interactive` `button` (resposta de serviço, custo zero) com botão `url` "Fazer cadastro" → `https://<app>/cadastro/{token}`.
-  - Janela fechada → Template de categoria **UTILITY** pré-aprovado (`onboarding_invite_utility`) com botão `url` dinâmico recebendo o `{{token}}`. Nada de Marketing.
-  - Retorna a URL gerada e o modo usado.
-- `public-onboarding` (nova, `verify_jwt=false`): GET valida token e devolve dados mínimos; POST cria `patients` ou `contacts` conforme `intended_role`, vincula `whatsapp_identities`, marca invite `completed`. Rate limit por IP/token.
+## Banco de dados (uma migration incremental)
 
-### 3. Frontend — área "Conversas" (`/app/conversas`)
+**Tabela `whatsapp_channels`** (sem recriar):
+- Índice único parcial `whatsapp_channels_phone_number_id_unique` em `(phone_number_id) WHERE phone_number_id IS NOT NULL`.
+- Índice `whatsapp_channels_institution_idx` em `(institution)`.
+- Coluna nova `last_internal_test_at timestamptz` (separar teste interno de evento real).
+- **Não** apagar duplicados; conflitos viram estado `conflito` no diagnóstico.
 
-Layout inbox em 2 colunas:
+**RLS de `whatsapp_channels`** (revisar):
+- `SELECT`: usuário autenticado vê apenas canais da própria `institution` (via `get_user_institution(auth.uid())`).
+- `INSERT`/`UPDATE`/`DELETE`: apenas `has_role(auth.uid(),'admin')` E mesma instituição.
+- Frontend perde permissão de tocar `last_webhook_at` (a coluna fica restrita a `service_role` via política `WITH CHECK` que bloqueia mudanças nessa coluna por não-service-role; alternativa: revogar UPDATE direto e usar somente Edge Functions admin).
+
+**Nova tabela `whatsapp_webhook_activity`** (auditoria técnica, sem PII):
+- Campos: `id, channel_id, institution, phone_number_id, event_type, source ('meta'), received_at, processed, error_code, created_at`.
+- GRANT: `SELECT` para `authenticated` (filtrado por RLS para admins da mesma instituição), `ALL` para `service_role`.
+- RLS: admins veem só a própria instituição; ninguém escreve via frontend.
+
+**Backfill seguro**: nenhuma inserção automática de canal com instituição fictícia. Migration apenas garante schema/índices/RLS.
+
+**Filtro institucional em `message_templates`**: confirmar via RLS existente; se a consulta do frontend não filtra, ajustar no `src/pages/app/WhatsAppSettings.tsx` (filtro explícito por `institution = profile.institution`).
+
+## Backend
+
+### `supabase/functions/whatsapp-webhook/index.ts`
+
+- Nova função tipada `resolveWhatsAppChannel(admin, phoneNumberId)` retornando `{ id, institution, phone_number_id } | { conflict: true } | null`. Usa `.eq("phone_number_id", phoneNumberId).eq("status","active")`, sem fuzzy match.
+- Fallback `WHATSAPP_DEFAULT_INSTITUTION` mantido **apenas** quando: `phoneNumberId === ENV_PHONE_NUMBER_ID` E não existe linha conflitante E `DEFAULT_INSTITUTION` está setada. Nesse caso faz `upsert` síncrono (await) do canal e segue.
+- Nova função `stampWebhookActivity(admin, channelId, eventType)` que faz `await admin.from("whatsapp_channels").update({ last_webhook_at, updated_at }).eq("id", channelId)` e insere uma linha em `whatsapp_webhook_activity` (sem corpo da mensagem, sem telefone completo — apenas `phone_number_id`).
+- Chamada `await stampWebhookActivity(...)` após validar assinatura, parsear JSON e resolver canal — **uma vez por change**, válida para `messages` (qualquer tipo) e `statuses` (sent/delivered/read/failed/button/list/media).
+- Eventos com remetente desconhecido continuam criando identidade `unknown` mas também estampam atividade.
+- Eventos sem canal resolvido vão para `whatsapp_unmatched_events` E ainda assim registram `whatsapp_webhook_activity` com `channel_id = null` e `processed=false`.
+
+### Nova Edge Function `supabase/functions/repair-whatsapp-channel/index.ts`
+
+- `verify_jwt` padrão (autenticada).
+- Valida JWT via `getClaims`, exige `has_role(uid,'admin')`, lê `profiles.institution`.
+- Lê do ambiente: `WHATSAPP_WABA_ID`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TOKEN`, `WHATSAPP_GRAPH_VERSION`.
+- Consulta Graph API para validar WABA e número (sem expor IDs).
+- `upsert` em `whatsapp_channels` na instituição do admin com os IDs do ambiente; recusa se outra instituição já possuir aquele `phone_number_id` (retorna `conflict`).
+- Atualiza apenas: `waba_id, phone_number_id, display_phone_number, display_name, quality_rating, status, last_synced_at, updated_at`. **Nunca** `last_webhook_at`.
+- Retorno: `{ ok, channel: { configured, institution, display_phone_number (mascarado), status } }`. Nenhum token ou ID completo.
+
+### `supabase/functions/whatsapp-diagnostics/index.ts`
+
+- Continua exigindo admin.
+- Lê `profiles.institution` do usuário e busca apenas o canal `active` daquela instituição.
+- Novo estado `webhook_recent` retorna:
+  - `nao_configurado` — sem canal ou canal sem `phone_number_id`.
+  - `conflito` — `phone_number_id` do canal ≠ `WHATSAPP_PHONE_NUMBER_ID` do ambiente.
+  - `aguardando_evento` — canal correto, `last_webhook_at` nulo.
+  - `configurado` — `last_webhook_at` < 7 dias.
+  - `sem_eventos_recentes` — `last_webhook_at` ≥ 7 dias.
+- Novo check `subscribed_apps`: chama `/{WABA_ID}/subscribed_apps` e compara contra `META_APP_ID` quando possível; retorna apenas estado.
+
+### `supabase/config.toml`
+
+- Mantém `[functions.whatsapp-webhook] verify_jwt = false`. Nenhuma outra função recebe esse override.
+
+## Frontend (`src/pages/app/WhatsAppSettings.tsx`)
+
+- Tipo `State` ampliado: `configurado | aguardando_evento | sem_eventos_recentes | nao_configurado | conflito | desconhecido`.
+- Ícones/cores distintos por estado (verde, amarelo-relógio, amarelo-alerta, vermelho, vermelho, cinza). "Aguardando evento" deixa de ser tratado como erro.
+- Botão **"Corrigir vínculo do canal"** aparece para admin quando o estado for `nao_configurado` ou `conflito`. Abre `AlertDialog` com o texto pedido; ao confirmar, chama `supabase.functions.invoke('repair-whatsapp-channel')`, mostra loading, faz refetch do diagnóstico e da aba Canal.
+- Aba **Canal**: mostra display name, número mascarado (`+55 81 ****-7343`), modo, status, qualidade, `last_synced_at`, `last_webhook_at`, instituição e situação do vínculo. Nenhum token/secret/Authorization.
+- Lista de Templates Meta passa a filtrar `institution = profile.institution` explicitamente.
+
+## Testes
+
+Validar via `supabase--curl_edge_functions` e `supabase--read_query`:
+
+- Handshake GET (token certo → 200+challenge; errado → 403).
+- POST sem assinatura / assinatura inválida → 403.
+- POST válido com `phone_number_id` real → 200, `last_webhook_at` populado **antes** da resposta (consultar imediatamente), linha em `whatsapp_webhook_activity`.
+- POST com `phone_number_id` desconhecido → não toca canal real, registra atividade não-processada.
+- Diagnóstico em cada estado (sem canal, canal sem evento, evento recente, evento antigo, conflito).
+- `repair-whatsapp-channel`: usuário comum → 403; admin → 200; admin de outra instituição → não sobrescreve canal alheio.
+
+## Deploy
+
+Após migration aprovada e tipos regenerados, publicar:
+- `whatsapp-webhook` (mantém `verify_jwt=false` via config.toml)
+- `whatsapp-diagnostics`
+- `repair-whatsapp-channel`
+
+## Pós-deploy (ação do admin)
+
+1. Enviar mensagem real de WhatsApp pessoal para **+55 81 8942-7343**.
+2. Reabrir `/app/configuracoes/whatsapp` → aba Diagnóstico → "Webhook recebendo eventos" deve ficar **configurado**.
+3. Se ainda estiver `nao_configurado`/`conflito`, clicar **Corrigir vínculo do canal** e repetir o teste.
+
+## Arquivos tocados
 
 ```text
-┌─────────────────┬──────────────────────────────┐
-│ Lista de chats  │  Conversa selecionada        │
-│ • badge não lida│  Header: nome / paciente /   │
-│ • último trecho │          janela 24h restante │
-│ • janela aberta │  Histórico de mensagens      │
-│ • desconhecido  │  ─────────────────────────── │
-│                 │  [Respostas rápidas]         │
-│                 │  [Composer]                  │
-└─────────────────┴──────────────────────────────┘
+supabase/migrations/<timestamp>_whatsapp_channels_activity.sql   (novo)
+supabase/functions/whatsapp-webhook/index.ts                     (refatorado)
+supabase/functions/whatsapp-diagnostics/index.ts                 (refatorado)
+supabase/functions/repair-whatsapp-channel/index.ts              (novo)
+src/pages/app/WhatsAppSettings.tsx                               (estados + botão reparo + filtro)
 ```
 
-Componentes em `src/components/app/inbox/`:
-
-- `ConversationList.tsx` — agrupa por `identity_id`, badge não lida, chip "janela aberta Xh", chip "desconhecido".
-- `ConversationView.tsx` — bolhas inbound/outbound, marca como lida ao abrir.
-- `WindowStatusBadge.tsx` — usa helper existente em `whatsapp.ts`.
-- `QuickRepliesBar.tsx` — 3-5 sugestões a partir de `quick_replies` e da categoria do último inbound.
-- `MessageComposer.tsx`:
-  - Janela aberta → envio de texto livre (mensagem de serviço, gratuita).
-  - Janela fechada → composer desabilitado, com CTA "Enviar Template" abrindo `UseTemplateDialog` (apenas Templates de UTILIDADE).
-- `UnknownContactPanel.tsx` — quando identidade desconhecida: botão "Enviar convite de cadastro" abre dialog (escolhe `intended_role` e paciente opcional) e chama `create-onboarding-invite`, que decide automaticamente entre interactive (janela aberta) ou Template UTILITY (janela fechada).
-
-Realtime: canal `inbox:{institution}` para atualizar lista e badge global de não lidas no item de menu "Conversas" no `AppLayout`.
-
-### 4. Frontend — página pública de cadastro
-
-Rota `/cadastro/:token` (fora do `/app`, sem auth):
-
-- `src/pages/public/OnboardingForm.tsx` com layout próprio, identidade da instituição.
-- Fluxo:
-  1. GET `public-onboarding` valida token.
-  2. Form curto adaptado ao `intended_role`:
-     - paciente: nome, data nasc., contato preferencial, consentimento LGPD.
-     - familiar/cuidador: nome, parentesco, paciente vinculado pré-preenchido, consentimento.
-  3. POST cria registro e mostra tela de sucesso.
-  4. Token inválido/expirado/usado → tela amigável.
-- Não é o cadastro de equipe; sem senha, sem login.
-
-### 5. Integração com envio existente (somente formatos gratuitos)
-
-- `send-whatsapp`: já suporta `interactive` e `template` com botão URL. O convite usa:
-  - **Mensagem de serviço `interactive` com botão URL** quando a janela de 24h estiver aberta (gratuita, sem categoria de marketing).
-  - **Template de UTILIDADE** (`onboarding_invite_utility`, pt_BR, pré-aprovado pela Meta) com botão `url` dinâmico quando a janela estiver fechada — também gratuito dentro das regras de utilidade.
-- Nunca usar Template MARKETING ou AUTHENTICATION para o convite.
-- Adicionar o domínio público (`<published-url>/cadastro/`) ao `WHATSAPP_URL_ALLOWLIST`.
-- Bloquear envio livre fora da janela com mensagem clara apontando para Templates de utilidade.
-
-### 6. Rotas/menu
-
-- `App.tsx`: adicionar `/app/conversas` e `/cadastro/:token` (fora do AppLayout).
-- `AppLayout`: novo item "Conversas" com badge de não lidas.
-
-### Resumo do que muda
-
-- 1 migration (quick_replies, onboarding_invites, colunas auxiliares em messages).
-- 3 edge functions (1 update, 2 novas) — todas no caminho gratuito.
-- Nova área Conversas com lista + chat + composer + quick replies + painel desconhecido.
-- Nova página pública de cadastro via token.
-- Realtime por instituição e badge de não lidas no menu.
+Confirma para eu implementar?
