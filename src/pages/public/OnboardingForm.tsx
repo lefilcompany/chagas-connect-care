@@ -27,6 +27,11 @@ export default function OnboardingForm() {
 
   const [fullName, setFullName] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [email, setEmail] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
   const [relation, setRelation] = useState("");
   const [consent, setConsent] = useState(false);
 
@@ -66,6 +71,11 @@ export default function OnboardingForm() {
           token,
           full_name: fullName,
           birth_date: birthDate || null,
+          email: email.trim() || null,
+          cpf: cpf.replace(/\D/g, "") || null,
+          address: address.trim() || null,
+          city: city.trim() || null,
+          state: state.trim().toUpperCase() || null,
           relation: invite.intended_role === "paciente" ? null : (relation || invite.intended_role),
           consent,
         },
@@ -124,12 +134,34 @@ export default function OnboardingForm() {
               <Label htmlFor="full_name">Nome completo</Label>
               <Input id="full_name" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
             </div>
+            <div>
+              <Label htmlFor="email">E-mail</Label>
+              <Input id="email" type="email" placeholder="Opcional" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="cpf">CPF</Label>
+              <Input id="cpf" inputMode="numeric" placeholder="Opcional" value={cpf} onChange={(e) => setCpf(e.target.value.replace(/\D/g, "").slice(0, 11))} />
+            </div>
             {invite.intended_role === "paciente" && (
               <div>
                 <Label htmlFor="birth">Data de nascimento</Label>
                 <Input id="birth" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
               </div>
             )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="city">Cidade</Label>
+                <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="state">Estado</Label>
+                <Input id="state" maxLength={2} value={state} onChange={(e) => setState(e.target.value.toUpperCase().slice(0, 2))} />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="address">Endereço</Label>
+              <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
+            </div>
             {invite.intended_role !== "paciente" && (
               <div>
                 <Label htmlFor="relation">Grau de parentesco / função</Label>
