@@ -486,8 +486,31 @@ Deno.serve(async (req) => {
         });
       }
     } else {
-      // Fallback to legacy behavior when ordering is not configured.
-      params = Object.values(vars).map((v) => ({ type: "text", text: String(v ?? "") }));
+      // Detect whether the approved Meta body actually needs positional
+      // parameters. If the template uses {{1}}, {{2}}, ... we must have an
+      // explicit semantic→positional mapping (meta_parameter_order). Falling
+      // back to Object.values() leaks the random JS object ordering into the
+      // approved template and silently produces TEMPLATE_PARAMETER_COUNT or
+      // TEMPLATE_PARAMETER_FORMAT rejections at the Meta API.
+      const bodyText = String(
+        (tplRow as any)?.meta_definition?.components?.find?.(
+          (c: any) => String(c?.type ?? "").toUpperCase() === "BODY",
+        )?.text ?? "",
+      );
+      const positional = /\{\{\s*\d+\s*\}\}/.test(bodyText);
+      if (positional) {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: "Mapeamento de variáveis do template Meta não configurado (meta_parameter_order vazio).",
+        }).eq("id", msg.id);
+        return json(200, {
+          ok: false,
+          error_code: "TEMPLATE_PARAMETER_ORDER_MISSING",
+          error: "Este template tem variáveis posicionais ({{1}}, {{2}}, ...) mas o mapeamento para os campos do sistema ainda não foi configurado. Edite o template e defina a ordem das variáveis.",
+        });
+      }
+      // No positional variables → send template with no body parameters.
+      params = [];
     }
     sendKind = "template";
     usedTemplateName = tplRow.meta_template_name;
