@@ -30,11 +30,13 @@ export function TemplateCard({
   onUse,
   onEdit,
   onDuplicate,
+  onNewVersion,
 }: {
   template: MessageTemplate;
   onUse: () => void;
   onEdit: () => void;
   onDuplicate: () => void;
+  onNewVersion?: () => void;
 }) {
   const isDefault = !!template.is_default;
   const isMeta = template.template_kind === "meta";
@@ -76,6 +78,9 @@ export function TemplateCard({
               <Lock className="mr-0.5 h-3 w-3" /> Padrão
             </Badge>
           )}
+          {template.meta_version && template.meta_version > 1 && (
+            <Badge variant="outline" className="text-[10px]">v{template.meta_version}</Badge>
+          )}
         </div>
       </div>
       {template.description && (
@@ -112,6 +117,11 @@ export function TemplateCard({
         <Button variant="ghost" size="icon" onClick={onDuplicate} aria-label="Duplicar" title="Duplicar">
           <Copy className="h-4 w-4" />
         </Button>
+        {onNewVersion && (
+          <Button variant="ghost" size="icon" onClick={onNewVersion} aria-label="Nova versão" title="Criar nova versão para a Meta">
+            <GitBranch className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </article>
   );
