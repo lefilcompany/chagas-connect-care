@@ -66,13 +66,15 @@ export function VariableInput({
   const isDate = isDateVariable(varKey);
   const isTime = isTimeVariable(varKey);
   const [open, setOpen] = React.useState(false);
+  const cat = getSemanticVariable(varKey);
+  const ph = placeholder ?? (cat.example ? `Ex.: ${cat.example}` : undefined);
 
   if (isTime) {
     return (
       <Input
         value={value}
         onChange={(e) => onChange(formatTimeInput(e.target.value))}
-        placeholder={placeholder ?? "HH:mm"}
+        placeholder={ph ?? "HH:mm"}
         className={className}
         inputMode="numeric"
         maxLength={5}
@@ -85,8 +87,10 @@ export function VariableInput({
       <Input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={ph}
         className={className}
+        type={cat.type === "url" ? "url" : cat.type === "phone" ? "tel" : "text"}
+        inputMode={cat.type === "code" ? "numeric" : undefined}
       />
     );
   }
@@ -98,7 +102,7 @@ export function VariableInput({
       <Input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? "dd/mm/aaaa"}
+        placeholder={ph ?? "dd/mm/aaaa"}
         className="flex-1"
       />
       <Popover open={open} onOpenChange={setOpen}>
