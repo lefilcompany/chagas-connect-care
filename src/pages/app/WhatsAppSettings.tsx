@@ -620,7 +620,9 @@ function ChannelTab({ institution, isAdmin }: { institution: string; isAdmin: bo
 // Diagnostics tab
 // =========================================================
 function DiagnosticsTab({ isAdmin }: { isAdmin: boolean }) {
+  const qc = useQueryClient();
   const [running, setRunning] = useState(false);
+  const [repairing, setRepairing] = useState(false);
   const [checks, setChecks] = useState<Array<{ id: string; label: string; state: string; detail?: string }>>([]);
 
   async function onRun() {
@@ -634,6 +636,23 @@ function DiagnosticsTab({ isAdmin }: { isAdmin: boolean }) {
     setChecks((data as any).checks ?? []);
   }
 
+  async function onRepair() {
+    setRepairing(true);
+    const { data: res, error } = await supabase.functions.invoke("repair-whatsapp-channel", { body: {} });
+    setRepairing(false);
+    if (error || !(res as any)?.ok) {
+      toast.error(error?.message ?? (res as any)?.error ?? "Falha ao corrigir o canal.");
+      return;
+    }
+    toast.success("Canal vinculado com sucesso.");
+    qc.invalidateQueries({ queryKey: ["whatsappChannels"] });
+    await onRun();
+  }
+
+  const needsRepair = checks.some(
+    (c) => c.id === "channel_binding" && (c.state === "nao_configurado" || c.state === "conflito"),
+  );
+
   return (
     <Card className="space-y-4 p-5">
       <div className="flex items-start justify-between gap-3">
@@ -643,10 +662,15 @@ function DiagnosticsTab({ isAdmin }: { isAdmin: boolean }) {
             Mostra apenas o estado de cada item — nunca exibe valores sensíveis.
           </p>
         </div>
-        <Button size="sm" onClick={onRun} disabled={!isAdmin || running}>
-          <RefreshCw className={"h-4 w-4 " + (running ? "animate-spin" : "")} />
-          {running ? "Executando…" : "Executar diagnóstico"}
-        </Button>
+        <div className="flex gap-2">
+          {isAdmin && needsRepair && (
+            <RepairChannelButton onConfirm={onRepair} loading={repairing} />
+          )}
+          <Button size="sm" onClick={onRun} disabled={!isAdmin || running}>
+            <RefreshCw className={"h-4 w-4 " + (running ? "animate-spin" : "")} />
+            {running ? "Executando…" : "Executar diagnóstico"}
+          </Button>
+        </div>
       </div>
       {checks.length === 0 ? (
         <p className="text-sm text-muted-foreground">Clique em "Executar diagnóstico" para começar.</p>
@@ -654,21 +678,68 @@ function DiagnosticsTab({ isAdmin }: { isAdmin: boolean }) {
         <ul className="divide-y divide-border rounded-md border border-border">
           {checks.map((c) => (
             <li key={c.id} className="flex items-center gap-3 p-3 text-sm">
-              {c.state === "configurado" ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              ) : c.state === "nao_configurado" ? (
-                <XCircle className="h-4 w-4 text-red-600" />
-              ) : (
-                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-              )}
+              <StateIcon state={c.state} />
               <span className="flex-1">{c.label}</span>
               <span className="text-xs text-muted-foreground">
-                {c.state}{c.detail ? ` · ${c.detail}` : ""}
+                {prettyState(c.state)}{c.detail ? ` · ${c.detail}` : ""}
               </span>
             </li>
           ))}
         </ul>
       )}
     </Card>
+  );
+}
+
+function prettyState(s: string): string {
+  switch (s) {
+    case "configurado": return "configurado";
+    case "aguardando_evento": return "aguardando evento";
+    case "sem_eventos_recentes": return "sem eventos recentes";
+    case "nao_configurado": return "não configurado";
+    case "conflito": return "conflito";
+    default: return "desconhecido";
+  }
+}
+
+function StateIcon({ state }: { state: string }) {
+  switch (state) {
+    case "configurado":
+      return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+    case "aguardando_evento":
+      return <Clock className="h-4 w-4 text-amber-600" />;
+    case "sem_eventos_recentes":
+      return <AlertTriangle className="h-4 w-4 text-amber-600" />;
+    case "nao_configurado":
+    case "conflito":
+      return <XCircle className="h-4 w-4 text-red-600" />;
+    default:
+      return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
+  }
+}
+
+function RepairChannelButton({ onConfirm, loading }: { onConfirm: () => void; loading: boolean }) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button size="sm" variant="outline" disabled={loading}>
+          <Wrench className={"h-4 w-4 " + (loading ? "animate-pulse" : "")} />
+          {loading ? "Corrigindo…" : "Corrigir vínculo do canal"}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Corrigir vínculo do canal</AlertDialogTitle>
+          <AlertDialogDescription>
+            O sistema validará os identificadores configurados no servidor e corrigirá o vínculo deste
+            canal com sua instituição. Nenhuma credencial será exibida ou alterada.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>Confirmar</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
