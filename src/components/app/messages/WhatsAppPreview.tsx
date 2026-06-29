@@ -29,6 +29,8 @@ export function WhatsAppPreview({
   buttons,
   messageType = "text",
   templateStatus,
+  resolveExamples = false,
+  variableValues,
 }: {
   body: string;
   recipientName?: string;
@@ -44,13 +46,17 @@ export function WhatsAppPreview({
   messageType?: WhatsAppPreviewMessageType;
   /** When set, shows a small status chip (Aprovado/Em análise/etc.). */
   templateStatus?: string;
+  /** When true, `{var}` placeholders are replaced by catalog examples. */
+  resolveExamples?: boolean;
+  variableValues?: Record<string, string>;
 }) {
   const now = new Date();
   const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
   const renderText = (text: string) => {
-    if (!highlightVars) return text;
-    const parts = text.split(/(\{[a-zA-Z0-9_]+\})/g);
+    const resolved = resolveExamples ? renderWithExamples(text, variableValues ?? {}) : text;
+    if (!highlightVars || resolveExamples) return resolved;
+    const parts = resolved.split(/(\{[a-zA-Z0-9_]+\})/g);
     return parts.map((p, i) =>
       /^\{[a-zA-Z0-9_]+\}$/.test(p) ? (
         <span
