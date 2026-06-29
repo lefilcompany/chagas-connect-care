@@ -966,6 +966,7 @@ export type Database = {
           display_phone_number: string | null
           id: string
           institution: string
+          last_internal_test_at: string | null
           last_synced_at: string | null
           last_webhook_at: string | null
           mode: string
@@ -982,6 +983,7 @@ export type Database = {
           display_phone_number?: string | null
           id?: string
           institution: string
+          last_internal_test_at?: string | null
           last_synced_at?: string | null
           last_webhook_at?: string | null
           mode?: string
@@ -998,6 +1000,7 @@ export type Database = {
           display_phone_number?: string | null
           id?: string
           institution?: string
+          last_internal_test_at?: string | null
           last_synced_at?: string | null
           last_webhook_at?: string | null
           mode?: string
@@ -1360,6 +1363,53 @@ export type Database = {
             columns: ["linked_identity_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_identities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_webhook_activity: {
+        Row: {
+          channel_id: string | null
+          created_at: string
+          error_code: string | null
+          event_type: string
+          id: string
+          institution: string | null
+          phone_number_id: string | null
+          processed: boolean
+          received_at: string
+          source: string
+        }
+        Insert: {
+          channel_id?: string | null
+          created_at?: string
+          error_code?: string | null
+          event_type: string
+          id?: string
+          institution?: string | null
+          phone_number_id?: string | null
+          processed?: boolean
+          received_at?: string
+          source?: string
+        }
+        Update: {
+          channel_id?: string | null
+          created_at?: string
+          error_code?: string | null
+          event_type?: string
+          id?: string
+          institution?: string | null
+          phone_number_id?: string | null
+          processed?: boolean
+          received_at?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_webhook_activity_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_channels"
             referencedColumns: ["id"]
           },
         ]
