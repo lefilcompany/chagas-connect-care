@@ -13,7 +13,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Info, Settings, RefreshCw, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
+import { Info, Settings, RefreshCw, CheckCircle2, XCircle, HelpCircle, Clock, AlertTriangle, Wrench } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { WhatsAppPreview } from "@/components/app/messages/WhatsAppPreview";
 import { APP_DISPLAY_NAME, DEFAULT_POWERED_BY_TEXT } from "@/config/application";
 
@@ -413,7 +424,7 @@ export default function WhatsAppSettings() {
         </TabsContent>
 
         <TabsContent value="channel">
-          <ChannelTab institution={institution} />
+          <ChannelTab institution={institution} isAdmin={isAdmin} />
         </TabsContent>
 
         <TabsContent value="diagnostics">
@@ -451,6 +462,7 @@ function TemplatesMetaTab({ institution, isAdmin }: { institution: string; isAdm
         .from("message_templates")
         .select("id,name,meta_template_name,meta_language,meta_status,meta_category,meta_footer_text,meta_has_local_differences,meta_last_synced_at")
         .eq("template_kind", "meta")
+        .eq("institution", institution)
         .order("meta_last_synced_at", { ascending: false, nullsFirst: false });
       if (error) throw error;
       return data ?? [];
@@ -527,8 +539,17 @@ function TemplatesMetaTab({ institution, isAdmin }: { institution: string; isAdm
 // =========================================================
 // Channel tab
 // =========================================================
-function ChannelTab({ institution }: { institution: string }) {
-  const { data, isLoading } = useQuery({
+function maskPhoneFront(p: string | null | undefined): string {
+  if (!p) return "—";
+  const s = String(p);
+  if (s.length < 4) return s;
+  return s.slice(0, Math.max(0, s.length - 4)).replace(/\d/g, "*") + s.slice(-4);
+}
+
+function ChannelTab({ institution, isAdmin }: { institution: string; isAdmin: boolean }) {
+  const qc = useQueryClient();
+  const [repairing, setRepairing] = useState(false);
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["whatsappChannels", institution],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -541,13 +562,29 @@ function ChannelTab({ institution }: { institution: string }) {
     enabled: !!institution,
   });
 
+  async function doRepair() {
+    setRepairing(true);
+    const { data: res, error } = await supabase.functions.invoke("repair-whatsapp-channel", { body: {} });
+    setRepairing(false);
+    if (error || !(res as any)?.ok) {
+      toast.error(error?.message ?? (res as any)?.error ?? "Falha ao corrigir o canal.");
+      return;
+    }
+    toast.success("Canal vinculado com sucesso.");
+    qc.invalidateQueries({ queryKey: ["whatsappChannels", institution] });
+    refetch();
+  }
+
   if (isLoading) return <Skeleton className="h-32 w-full" />;
   const channels = (data as any[]) ?? [];
 
   return (
     <div className="space-y-4">
       <Card className="space-y-3 p-5">
-        <p className="text-sm font-medium">Canal compartilhado</p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm font-medium">Canal compartilhado</p>
+          {isAdmin && <RepairChannelButton onConfirm={doRepair} loading={repairing} />}
+        </div>
         {channels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Nenhum canal cadastrado para esta instituição.
@@ -555,10 +592,13 @@ function ChannelTab({ institution }: { institution: string }) {
         ) : (
           channels.map((c) => (
             <div key={c.id} className="rounded-md border border-border p-3 text-sm">
-              <p className="font-medium">{c.display_name ?? c.display_phone_number ?? "Sem nome"}</p>
+              <p className="font-medium">{c.display_name ?? maskPhoneFront(c.display_phone_number) ?? "Sem nome"}</p>
               <p className="text-xs text-muted-foreground">
-                Modo: {c.mode} · Status: {c.status}
+                Número: {maskPhoneFront(c.display_phone_number)} · Modo: {c.mode} · Status: {c.status}
+                {c.quality_rating ? ` · Qualidade: ${c.quality_rating}` : ""}
+                {c.last_synced_at ? ` · Sincronizado: ${new Date(c.last_synced_at).toLocaleString()}` : ""}
                 {c.last_webhook_at ? ` · Último webhook: ${new Date(c.last_webhook_at).toLocaleString()}` : ""}
+                {!c.phone_number_id ? " · Vínculo pendente" : ""}
               </p>
               {c.notes && <p className="mt-1 text-xs text-muted-foreground">{c.notes}</p>}
             </div>
@@ -580,7 +620,9 @@ function ChannelTab({ institution }: { institution: string }) {
 // Diagnostics tab
 // =========================================================
 function DiagnosticsTab({ isAdmin }: { isAdmin: boolean }) {
+  const qc = useQueryClient();
   const [running, setRunning] = useState(false);
+  const [repairing, setRepairing] = useState(false);
   const [checks, setChecks] = useState<Array<{ id: string; label: string; state: string; detail?: string }>>([]);
 
   async function onRun() {
@@ -594,6 +636,23 @@ function DiagnosticsTab({ isAdmin }: { isAdmin: boolean }) {
     setChecks((data as any).checks ?? []);
   }
 
+  async function onRepair() {
+    setRepairing(true);
+    const { data: res, error } = await supabase.functions.invoke("repair-whatsapp-channel", { body: {} });
+    setRepairing(false);
+    if (error || !(res as any)?.ok) {
+      toast.error(error?.message ?? (res as any)?.error ?? "Falha ao corrigir o canal.");
+      return;
+    }
+    toast.success("Canal vinculado com sucesso.");
+    qc.invalidateQueries({ queryKey: ["whatsappChannels"] });
+    await onRun();
+  }
+
+  const needsRepair = checks.some(
+    (c) => c.id === "channel_binding" && (c.state === "nao_configurado" || c.state === "conflito"),
+  );
+
   return (
     <Card className="space-y-4 p-5">
       <div className="flex items-start justify-between gap-3">
@@ -603,10 +662,15 @@ function DiagnosticsTab({ isAdmin }: { isAdmin: boolean }) {
             Mostra apenas o estado de cada item — nunca exibe valores sensíveis.
           </p>
         </div>
-        <Button size="sm" onClick={onRun} disabled={!isAdmin || running}>
-          <RefreshCw className={"h-4 w-4 " + (running ? "animate-spin" : "")} />
-          {running ? "Executando…" : "Executar diagnóstico"}
-        </Button>
+        <div className="flex gap-2">
+          {isAdmin && needsRepair && (
+            <RepairChannelButton onConfirm={onRepair} loading={repairing} />
+          )}
+          <Button size="sm" onClick={onRun} disabled={!isAdmin || running}>
+            <RefreshCw className={"h-4 w-4 " + (running ? "animate-spin" : "")} />
+            {running ? "Executando…" : "Executar diagnóstico"}
+          </Button>
+        </div>
       </div>
       {checks.length === 0 ? (
         <p className="text-sm text-muted-foreground">Clique em "Executar diagnóstico" para começar.</p>
@@ -614,21 +678,68 @@ function DiagnosticsTab({ isAdmin }: { isAdmin: boolean }) {
         <ul className="divide-y divide-border rounded-md border border-border">
           {checks.map((c) => (
             <li key={c.id} className="flex items-center gap-3 p-3 text-sm">
-              {c.state === "configurado" ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              ) : c.state === "nao_configurado" ? (
-                <XCircle className="h-4 w-4 text-red-600" />
-              ) : (
-                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-              )}
+              <StateIcon state={c.state} />
               <span className="flex-1">{c.label}</span>
               <span className="text-xs text-muted-foreground">
-                {c.state}{c.detail ? ` · ${c.detail}` : ""}
+                {prettyState(c.state)}{c.detail ? ` · ${c.detail}` : ""}
               </span>
             </li>
           ))}
         </ul>
       )}
     </Card>
+  );
+}
+
+function prettyState(s: string): string {
+  switch (s) {
+    case "configurado": return "configurado";
+    case "aguardando_evento": return "aguardando evento";
+    case "sem_eventos_recentes": return "sem eventos recentes";
+    case "nao_configurado": return "não configurado";
+    case "conflito": return "conflito";
+    default: return "desconhecido";
+  }
+}
+
+function StateIcon({ state }: { state: string }) {
+  switch (state) {
+    case "configurado":
+      return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+    case "aguardando_evento":
+      return <Clock className="h-4 w-4 text-amber-600" />;
+    case "sem_eventos_recentes":
+      return <AlertTriangle className="h-4 w-4 text-amber-600" />;
+    case "nao_configurado":
+    case "conflito":
+      return <XCircle className="h-4 w-4 text-red-600" />;
+    default:
+      return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
+  }
+}
+
+function RepairChannelButton({ onConfirm, loading }: { onConfirm: () => void; loading: boolean }) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button size="sm" variant="outline" disabled={loading}>
+          <Wrench className={"h-4 w-4 " + (loading ? "animate-pulse" : "")} />
+          {loading ? "Corrigindo…" : "Corrigir vínculo do canal"}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Corrigir vínculo do canal</AlertDialogTitle>
+          <AlertDialogDescription>
+            O sistema validará os identificadores configurados no servidor e corrigirá o vínculo deste
+            canal com sua instituição. Nenhuma credencial será exibida ou alterada.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>Confirmar</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

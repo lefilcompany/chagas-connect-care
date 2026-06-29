@@ -73,47 +73,126 @@ async function findIdentity(
   return null;
 }
 
-/** Resolve the institution that owns a Meta `phone_number_id`. */
-async function resolveChannelInstitution(
+type ResolvedChannel = {
+  id: string;
+  institution: string;
+  phone_number_id: string;
+};
+
+/**
+ * Resolve the channel row that owns a Meta `phone_number_id`. Returns the row
+ * when there is a single active match. Returns `null` when no row matches and
+ * `{ conflict: true }` when more than one row claims the same number.
+ *
+ * Side-effects (caller-controlled):
+ *  - When no row exists AND the incoming id equals ENV_PHONE_NUMBER_ID AND
+ *    DEFAULT_INSTITUTION is configured AND no other institution already owns
+ *    that id, we self-heal by stamping the channel row for DEFAULT_INSTITUTION.
+ */
+async function resolveWhatsAppChannel(
   admin: ReturnType<typeof createClient>,
   phoneNumberId: string | null,
-): Promise<string | null> {
-  if (!phoneNumberId) {
-    // No metadata? Fall back to the configured default institution.
-    return DEFAULT_INSTITUTION || null;
-  }
-  const { data } = await admin
+): Promise<ResolvedChannel | { conflict: true } | null> {
+  if (!phoneNumberId) return null;
+
+  const { data: rows, error } = await admin
     .from("whatsapp_channels")
-    .select("id, institution")
-    .eq("phone_number_id", phoneNumberId)
-    .maybeSingle();
-  if (!data) {
-    // Single-tenant fallback: when the incoming phone_number_id matches the
-    // env-configured WhatsApp number, use the default institution and
-    // auto-stamp it on its channel row so future calls hit the fast path.
-    if (
-      ENV_PHONE_NUMBER_ID &&
-      DEFAULT_INSTITUTION &&
-      phoneNumberId === ENV_PHONE_NUMBER_ID
-    ) {
-      await admin
-        .from("whatsapp_channels")
-        .update({
-          phone_number_id: phoneNumberId,
-          last_webhook_at: new Date().toISOString(),
-        })
-        .eq("institution", DEFAULT_INSTITUTION)
-        .then(() => {}, () => {});
-      return DEFAULT_INSTITUTION;
-    }
+    .select("id, institution, phone_number_id, status")
+    .eq("phone_number_id", phoneNumberId);
+
+  if (error) {
+    console.error("resolveWhatsAppChannel select error", error.code);
     return null;
   }
-  // Best-effort: stamp last_webhook_at without blocking the response.
-  admin.from("whatsapp_channels")
-    .update({ last_webhook_at: new Date().toISOString() })
-    .eq("id", (data as any).id)
-    .then(() => {}, () => {});
-  return (data as any).institution ?? null;
+
+  const list = (rows ?? []) as Array<any>;
+  if (list.length > 1) return { conflict: true };
+  if (list.length === 1) {
+    const row = list[0];
+    return {
+      id: row.id,
+      institution: row.institution,
+      phone_number_id: row.phone_number_id,
+    };
+  }
+
+  // Single-tenant self-heal: only if incoming id equals the env-configured id.
+  if (
+    ENV_PHONE_NUMBER_ID &&
+    DEFAULT_INSTITUTION &&
+    phoneNumberId === ENV_PHONE_NUMBER_ID
+  ) {
+    // Make sure no other institution already claims this id (would conflict
+    // with the unique partial index anyway).
+    const { data: existing } = await admin
+      .from("whatsapp_channels")
+      .select("id, institution")
+      .eq("phone_number_id", phoneNumberId)
+      .maybeSingle();
+    if (existing && (existing as any).institution !== DEFAULT_INSTITUTION) {
+      return { conflict: true };
+    }
+
+    const { data: updated } = await admin
+      .from("whatsapp_channels")
+      .update({
+        phone_number_id: phoneNumberId,
+        status: "active",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("institution", DEFAULT_INSTITUTION)
+      .is("phone_number_id", null)
+      .select("id, institution, phone_number_id")
+      .maybeSingle();
+    if (updated) {
+      return {
+        id: (updated as any).id,
+        institution: (updated as any).institution,
+        phone_number_id: (updated as any).phone_number_id,
+      };
+    }
+  }
+  return null;
+}
+
+/** Persist webhook activity for the channel + audit row. Always awaited. */
+async function stampWebhookActivity(
+  admin: ReturnType<typeof createClient>,
+  channel: ResolvedChannel | null,
+  phoneNumberId: string | null,
+  eventType: string,
+  processed: boolean,
+  errorCode: string | null,
+): Promise<void> {
+  const now = new Date().toISOString();
+  if (channel) {
+    const { error } = await admin
+      .from("whatsapp_channels")
+      .update({ last_webhook_at: now, updated_at: now })
+      .eq("id", channel.id);
+    if (error) {
+      console.error("stampWebhookActivity channel update error", {
+        code: error.code, event_type: eventType,
+      });
+    }
+  }
+  const { error: auditErr } = await admin
+    .from("whatsapp_webhook_activity")
+    .insert({
+      channel_id: channel?.id ?? null,
+      institution: channel?.institution ?? null,
+      phone_number_id: phoneNumberId,
+      event_type: eventType,
+      source: "meta",
+      received_at: now,
+      processed,
+      error_code: errorCode,
+    } as any);
+  if (auditErr) {
+    console.error("stampWebhookActivity audit insert error", {
+      code: auditErr.code, event_type: eventType,
+    });
+  }
 }
 
 const OPT_OUT_KEYWORDS = ["PARAR", "SAIR", "CANCELAR", "NAO QUERO", "NÃO QUERO", "REMOVER", "STOP"];
@@ -255,7 +334,33 @@ Deno.serve(async (req) => {
       for (const change of changes) {
         const value = change?.value ?? {};
         const phoneNumberId: string | null = value?.metadata?.phone_number_id ?? null;
-        const channelInstitution = await resolveChannelInstitution(admin, phoneNumberId);
+        const resolved = await resolveWhatsAppChannel(admin, phoneNumberId);
+        const channel: ResolvedChannel | null =
+          resolved && (resolved as any).conflict !== true
+            ? (resolved as ResolvedChannel)
+            : null;
+        const channelInstitution = channel?.institution ?? null;
+        const hasConflict = !!(resolved && (resolved as any).conflict === true);
+
+        // Determine a coarse event_type for auditing/stamping. Status updates
+        // and inbound messages both count as real webhook activity.
+        const auditEventType =
+          Array.isArray(value?.messages) && value.messages.length > 0
+            ? `inbound:${value.messages[0]?.type ?? "unknown"}`
+            : Array.isArray(value?.statuses) && value.statuses.length > 0
+              ? `status:${value.statuses[0]?.status ?? "unknown"}`
+              : "other";
+
+        // Stamp activity for every valid POST, even when the channel could not
+        // be resolved — auditors still see the attempt without leaking PII.
+        await stampWebhookActivity(
+          admin,
+          channel,
+          phoneNumberId,
+          auditEventType,
+          !!channel,
+          hasConflict ? "channel_conflict" : !channel ? "channel_unresolved" : null,
+        );
 
         // Status updates
         const statuses: any[] = Array.isArray(value?.statuses) ? value.statuses : [];
