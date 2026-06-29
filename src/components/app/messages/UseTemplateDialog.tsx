@@ -135,6 +135,7 @@ export function UseTemplateDialog({
     setPatientId(lockedPatientId ?? "");
     setContactIds([]);
     setVars({});
+    setFailures([]);
   }, [open, template?.id, lockedPatientId, initialMode]);
 
   // Auto-fill variables when patient / first contact selected
@@ -451,6 +452,7 @@ export function UseTemplateDialog({
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>Revise a mensagem antes de enviar. Ela será registrada no histórico do paciente.</span>
             </div>
+            {failures.length > 0 && <FailuresPanel failures={failures} />}
           </div>
         )}
 
