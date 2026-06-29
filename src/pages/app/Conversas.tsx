@@ -50,6 +50,28 @@ function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
+const URL_RE = /(https?:\/\/[^\s]+)/g;
+function renderWithLinks(text: string) {
+  if (!text) return null;
+  const parts = text.split(URL_RE);
+  return parts.map((part, i) => {
+    if (i % 2 === 1) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline font-medium break-all hover:opacity-80"
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 function timeAgo(iso: string | null) {
   if (!iso) return "";
   const d = Date.now() - new Date(iso).getTime();
@@ -344,7 +366,7 @@ export default function Conversas() {
                         : "bg-primary text-primary-foreground self-end ml-auto",
                     )}
                   >
-                    {m.body}
+                    {renderWithLinks(m.body)}
                     <div className="text-[10px] opacity-70 mt-1">
                       {m.sent_at ? new Date(m.sent_at).toLocaleString() : ""}
                       {m.direction === "outbound" && m.status ? ` · ${m.status}` : ""}
