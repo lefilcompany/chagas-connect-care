@@ -425,7 +425,12 @@ export function UseTemplateDialog({
             </div>
             <div className="space-y-2">
               <Label className="text-xs uppercase">Pré-visualização</Label>
-              <WhatsAppPreview body={renderedBody} recipientName={recipientName || "Destinatário"} />
+              <WhatsAppPreview
+                body={renderedBody}
+                recipientName={recipientName || "Destinatário"}
+                resolveExamples
+                variableValues={vars}
+              />
             </div>
           </div>
         )}
@@ -453,7 +458,13 @@ export function UseTemplateDialog({
                   <p><span className="text-muted-foreground">Total:</span> {selectedContacts.length} envios</p>
                 )}
               </div>
-              <WhatsAppPreview body={renderedBody} recipientName={recipientName || "Destinatário"} highlightVars={false} />
+              <WhatsAppPreview
+                body={renderedBody}
+                recipientName={recipientName || "Destinatário"}
+                highlightVars={false}
+                resolveExamples
+                variableValues={vars}
+              />
             </div>
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
