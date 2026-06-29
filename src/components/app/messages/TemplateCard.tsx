@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Edit3, Send, FilePlus2, Lock, ShieldCheck, AlertTriangle, Clock, XCircle, PauseCircle } from "lucide-react";
+import { Copy, Edit3, Send, FilePlus2, Lock, ShieldCheck, AlertTriangle, Clock, XCircle, PauseCircle, GitBranch } from "lucide-react";
 import { META_STATUS_LABEL, type MessageTemplate } from "@/lib/templates";
 import { getTemplateDescription } from "@/lib/templateDescriptions";
 import { WhatsAppPreview } from "./WhatsAppPreview";
