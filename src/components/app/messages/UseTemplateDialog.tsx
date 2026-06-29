@@ -406,12 +406,18 @@ export function UseTemplateDialog({
               ) : (
                 detectedVars.map((v) => (
                   <div key={v} className="space-y-1.5">
-                    <Label className="text-xs font-medium">{getVariableLabel(v)}</Label>
+                    <Label className="text-xs font-medium">
+                      {getSemanticVariable(v).label}
+                    </Label>
+                    {getSemanticVariable(v).description && (
+                      <p className="text-[11px] text-muted-foreground">
+                        {getSemanticVariable(v).description}
+                      </p>
+                    )}
                     <VariableInput
                       varKey={v}
                       value={vars[v] ?? ""}
                       onChange={(val) => setVars({ ...vars, [v]: val })}
-                      placeholder={`Preencha ${v.replace(/_/g, " ")}`}
                     />
                   </div>
                 ))
