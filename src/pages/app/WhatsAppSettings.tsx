@@ -13,7 +13,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Info, Settings, RefreshCw, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
+import { Info, Settings, RefreshCw, CheckCircle2, XCircle, HelpCircle, Clock, AlertTriangle, Wrench } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { WhatsAppPreview } from "@/components/app/messages/WhatsAppPreview";
 import { APP_DISPLAY_NAME, DEFAULT_POWERED_BY_TEXT } from "@/config/application";
 
