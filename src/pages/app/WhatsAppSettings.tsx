@@ -539,8 +539,17 @@ function TemplatesMetaTab({ institution, isAdmin }: { institution: string; isAdm
 // =========================================================
 // Channel tab
 // =========================================================
-function ChannelTab({ institution }: { institution: string }) {
-  const { data, isLoading } = useQuery({
+function maskPhoneFront(p: string | null | undefined): string {
+  if (!p) return "—";
+  const s = String(p);
+  if (s.length < 4) return s;
+  return s.slice(0, Math.max(0, s.length - 4)).replace(/\d/g, "*") + s.slice(-4);
+}
+
+function ChannelTab({ institution, isAdmin }: { institution: string; isAdmin: boolean }) {
+  const qc = useQueryClient();
+  const [repairing, setRepairing] = useState(false);
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["whatsappChannels", institution],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -553,13 +562,29 @@ function ChannelTab({ institution }: { institution: string }) {
     enabled: !!institution,
   });
 
+  async function doRepair() {
+    setRepairing(true);
+    const { data: res, error } = await supabase.functions.invoke("repair-whatsapp-channel", { body: {} });
+    setRepairing(false);
+    if (error || !(res as any)?.ok) {
+      toast.error(error?.message ?? (res as any)?.error ?? "Falha ao corrigir o canal.");
+      return;
+    }
+    toast.success("Canal vinculado com sucesso.");
+    qc.invalidateQueries({ queryKey: ["whatsappChannels", institution] });
+    refetch();
+  }
+
   if (isLoading) return <Skeleton className="h-32 w-full" />;
   const channels = (data as any[]) ?? [];
 
   return (
     <div className="space-y-4">
       <Card className="space-y-3 p-5">
-        <p className="text-sm font-medium">Canal compartilhado</p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm font-medium">Canal compartilhado</p>
+          {isAdmin && <RepairChannelButton onConfirm={doRepair} loading={repairing} />}
+        </div>
         {channels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Nenhum canal cadastrado para esta instituição.
@@ -567,10 +592,13 @@ function ChannelTab({ institution }: { institution: string }) {
         ) : (
           channels.map((c) => (
             <div key={c.id} className="rounded-md border border-border p-3 text-sm">
-              <p className="font-medium">{c.display_name ?? c.display_phone_number ?? "Sem nome"}</p>
+              <p className="font-medium">{c.display_name ?? maskPhoneFront(c.display_phone_number) ?? "Sem nome"}</p>
               <p className="text-xs text-muted-foreground">
-                Modo: {c.mode} · Status: {c.status}
+                Número: {maskPhoneFront(c.display_phone_number)} · Modo: {c.mode} · Status: {c.status}
+                {c.quality_rating ? ` · Qualidade: ${c.quality_rating}` : ""}
+                {c.last_synced_at ? ` · Sincronizado: ${new Date(c.last_synced_at).toLocaleString()}` : ""}
                 {c.last_webhook_at ? ` · Último webhook: ${new Date(c.last_webhook_at).toLocaleString()}` : ""}
+                {!c.phone_number_id ? " · Vínculo pendente" : ""}
               </p>
               {c.notes && <p className="mt-1 text-xs text-muted-foreground">{c.notes}</p>}
             </div>
