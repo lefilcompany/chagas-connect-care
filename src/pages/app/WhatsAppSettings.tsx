@@ -13,18 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Info, Settings, RefreshCw, CheckCircle2, XCircle, HelpCircle, Clock, AlertTriangle, Wrench } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Info, Settings } from "lucide-react";
 import { WhatsAppPreview } from "@/components/app/messages/WhatsAppPreview";
 import { APP_DISPLAY_NAME, DEFAULT_POWERED_BY_TEXT } from "@/config/application";
 
@@ -200,9 +189,6 @@ export default function WhatsAppSettings() {
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="overview">Visão geral</TabsTrigger>
           <TabsTrigger value="identity">Identidade e assinatura</TabsTrigger>
-          <TabsTrigger value="templates">Templates Meta</TabsTrigger>
-          <TabsTrigger value="channel">Canal</TabsTrigger>
-          <TabsTrigger value="diagnostics">Diagnóstico</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -419,17 +405,6 @@ export default function WhatsAppSettings() {
           )}
         </TabsContent>
 
-        <TabsContent value="templates">
-          <TemplatesMetaTab institution={institution} isAdmin={isAdmin} />
-        </TabsContent>
-
-        <TabsContent value="channel">
-          <ChannelTab institution={institution} isAdmin={isAdmin} />
-        </TabsContent>
-
-        <TabsContent value="diagnostics">
-          <DiagnosticsTab isAdmin={isAdmin} />
-        </TabsContent>
       </Tabs>
 
       {dirty && isAdmin && (
