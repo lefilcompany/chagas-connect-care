@@ -26,7 +26,8 @@ import WhatsAppSettings from "./pages/app/WhatsAppSettings";
 import Conversas from "./pages/app/Conversas";
 import OnboardingForm from "./pages/public/OnboardingForm";
 import WhatsAppAdmin from "./pages/superadmin/WhatsAppAdmin";
-import { SuperadminRoute } from "@/components/superadmin/SuperadminRoute";
+import SuperadminLayout from "@/components/superadmin/SuperadminLayout";
+import SuperadminLogin from "./pages/superadmin/SuperadminLogin";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,14 +58,11 @@ const App = () => (
             <Route path="/termos-de-uso" element={<TermsOfUse />} />
             <Route path="/exclusao-de-dados" element={<DataDeletion />} />
             <Route path="/cadastro/:token" element={<OnboardingForm />} />
-            <Route
-              path="/superadmin/whatsapp"
-              element={
-                <SuperadminRoute>
-                  <WhatsAppAdmin />
-                </SuperadminRoute>
-              }
-            />
+            <Route path="/superadmin/login" element={<SuperadminLogin />} />
+            <Route path="/superadmin" element={<SuperadminLayout />}>
+              <Route index element={<WhatsAppAdmin />} />
+              <Route path="whatsapp" element={<WhatsAppAdmin />} />
+            </Route>
             <Route path="/app" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="pacientes" element={<Patients />} />

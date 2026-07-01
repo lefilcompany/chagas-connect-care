@@ -29,18 +29,12 @@ export function SuperadminRoute({ children }: { children: ReactNode }) {
   });
 
   if (loading || (user && isLoading)) {
-    return <div className="p-8 text-sm text-muted-foreground">Verificando permissões…</div>;
-  }
-  if (!user) return <Navigate to="/auth" replace />;
-  if (!isSuper) {
     return (
-      <div className="p-8 max-w-md mx-auto text-center space-y-2">
-        <h1 className="text-lg font-semibold">Acesso negado</h1>
-        <p className="text-sm text-muted-foreground">
-          Esta área é restrita a superadministradores.
-        </p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300 text-sm">
+        Verificando permissões…
       </div>
     );
   }
+  if (!user || !isSuper) return <Navigate to="/superadmin/login" replace />;
   return <>{children}</>;
 }

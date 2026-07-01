@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchAllAppRoutes, prefetchRoute } from "@/lib/queries";
 import {
   Heart, LayoutDashboard, Users, MessageCircle, BookOpen, BarChart3,
-  UserCircle, LogOut, Menu, X, Target, Settings, Inbox, ShieldCheck,
+  UserCircle, LogOut, Menu, X, Target, Settings, Inbox,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,6 @@ export const AppLayout = () => {
   const queryClient = useQueryClient();
   const [profileName, setProfileName] = useState<string>("");
   const [profileLoaded, setProfileLoaded] = useState(false);
-  const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [open, setOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
 
@@ -55,13 +54,6 @@ export const AppLayout = () => {
       setProfileName((data?.full_name as string) || user.email || "");
       setProfileLoaded(true);
     });
-    supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "superadmin")
-      .maybeSingle()
-      .then(({ data }) => setIsSuperadmin(!!data));
   }, [user]);
 
   useEffect(() => {
@@ -92,7 +84,7 @@ export const AppLayout = () => {
           <button className="lg:hidden" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {[...nav, ...(isSuperadmin ? [{ to: "/superadmin/whatsapp", label: "Superadmin", icon: ShieldCheck }] : [])].map((n: any) => (
+          {nav.map((n: any) => (
             <NavLink
               key={n.to}
               to={n.to}
