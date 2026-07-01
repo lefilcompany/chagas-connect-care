@@ -1,20 +1,9 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { withEdgeHandler, jsonOk, jsonError, jsonResponse } from "../_shared/http.ts";
+import { requireAuth } from "../_shared/auth.ts";
+import { resolveChannel, templatesUrl } from "../_shared/resolve-channel.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
-const WHATSAPP_WABA_ID = Deno.env.get("WHATSAPP_WABA_ID") ?? "";
-const RAW_VER = Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? "v25.0";
-const GRAPH = /^v\d+\.\d+$/.test(RAW_VER) ? RAW_VER : "v25.0";
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+// Legacy alias so pre-existing `json(status, body)` sites keep working.
+const json = jsonResponse;
 
 const STATUS_MAP: Record<string, string> = {
   APPROVED: "approved",
@@ -96,32 +85,23 @@ function validateComponents(components: any[]): { code: string; error: string } 
   return null;
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json(405, { error: "Method not allowed" });
-
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "Unauthorized" });
-
-  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const token = authHeader.replace("Bearer ", "");
-  const { data: claims, error: authErr } = await authClient.auth.getClaims(token);
-  if (authErr || !claims?.claims) return json(401, { error: "Unauthorized" });
-  const userId = claims.claims.sub as string;
-
-  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const { data: roleRows } = await admin
-    .from("user_roles").select("role").eq("user_id", userId).in("role", ["admin", "superadmin"]);
-  if (!roleRows || roleRows.length === 0) return json(403, { error: "Forbidden" });
-
-  if (!WHATSAPP_TOKEN || !WHATSAPP_WABA_ID) {
-    return json(500, { error: "WHATSAPP_TOKEN or WHATSAPP_WABA_ID missing" });
+Deno.serve(withEdgeHandler(async (req) => {
+  if (req.method !== "POST") {
+    return jsonError(405, "INVALID_INPUT", "Method not allowed");
   }
 
+  const ctx = await requireAuth(req);
+  if (ctx instanceof Response) return ctx;
+  if (!ctx.isAdmin && !ctx.isSuperadmin) {
+    return jsonError(403, "FORBIDDEN", "Requires admin or superadmin role.");
+  }
+  const userId = ctx.userId;
+  const admin = ctx.serviceClient;
+
   let payload: any;
-  try { payload = await req.json(); } catch { return json(400, { error: "Invalid JSON" }); }
+  try { payload = await req.json(); } catch {
+    return jsonError(400, "INVALID_INPUT", "Invalid JSON");
+  }
 
   const baseName = sanitizeName(payload?.name ?? "");
   const language = String(payload?.language ?? "pt_BR");
@@ -129,17 +109,26 @@ Deno.serve(async (req) => {
   const components = Array.isArray(payload?.components) ? payload.components : null;
   const parentTemplateId: string | null = payload?.parent_template_id ?? null;
   const localTemplateId: string | null = payload?.local_template_id ?? null;
-  const institution: string | null = payload?.institution ?? null;
+  const institution: string | null =
+    (payload?.institution as string | null) ?? ctx.institution ?? null;
   const parameterFormat = String(payload?.parameter_format ?? "POSITIONAL").toUpperCase();
 
-  if (!baseName) return json(400, { error: "name is required" });
-  if (!components) return json(400, { error: "components is required" });
+  if (!baseName) return jsonError(400, "INVALID_INPUT", "name is required");
+  if (!components) return jsonError(400, "INVALID_INPUT", "components is required");
   if (!["POSITIONAL", "NAMED"].includes(parameterFormat)) {
-    return json(400, { error_code: "PARAMETER_FORMAT_INVALID", error: "parameter_format deve ser POSITIONAL ou NAMED" });
+    return jsonError(400, "INVALID_INPUT", "parameter_format deve ser POSITIONAL ou NAMED", {
+      error_code: "PARAMETER_FORMAT_INVALID",
+    });
   }
 
+  // Resolve the WABA/token via shared helper (supports per-institution channels).
+  const channel = await resolveChannel(admin, institution);
+  if (channel instanceof Response) return channel;
+
   const validationErr = validateComponents(components);
-  if (validationErr) return json(400, { ok: false, ...validationErr });
+  if (validationErr) {
+    return jsonError(400, "INVALID_INPUT", validationErr.error, { error_code: validationErr.code });
+  }
 
   // If creating a new version, compute name_vN+1.
   let finalName = baseName;
@@ -169,8 +158,7 @@ Deno.serve(async (req) => {
       .not("meta_template_id", "is", null)
       .maybeSingle();
     if (dup) {
-      return json(200, {
-        ok: true,
+      return jsonOk({
         cached: true,
         name: (dup as any).meta_template_name,
         meta_template_id: (dup as any).meta_template_id,
@@ -184,26 +172,26 @@ Deno.serve(async (req) => {
   let res: Response;
   try {
     res = await fetch(
-      `https://graph.facebook.com/${GRAPH}/${WHATSAPP_WABA_ID}/message_templates`,
+      templatesUrl(channel),
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          Authorization: `Bearer ${channel.token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(creationPayload),
       },
     );
   } catch (e) {
-    return json(502, { ok: false, error_code: "NETWORK_ERROR", error: e instanceof Error ? e.message : String(e) });
+    return jsonError(502, "META_API_ERROR", e instanceof Error ? e.message : String(e), {
+      error_code: "NETWORK_ERROR",
+    });
   }
   const metaBody = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = (metaBody as any)?.error ?? {};
-    return json(200, {
-      ok: false,
+    return jsonError(200, "META_API_ERROR", err.message ?? "Meta template create failed", {
       error_code: "META_TEMPLATE_CREATE_FAILED",
-      error: err.message ?? "Meta template create failed",
       meta_error: {
         code: err.code ?? null,
         error_subcode: err.error_subcode ?? null,
@@ -264,11 +252,10 @@ Deno.serve(async (req) => {
     } as any);
   }
 
-  return json(200, {
-    ok: true,
+  return jsonOk({
     name: finalName,
     meta_template_id: metaTemplateId,
     meta_status: metaStatus,
     meta_version: metaVersion,
   });
-});
+}));
