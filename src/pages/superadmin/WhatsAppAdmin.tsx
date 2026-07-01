@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { toast } from "sonner";
+import { RefreshCw, Search } from "lucide-react";
 
 function useCount(table: string, filters: Array<[string, unknown]> = []) {
   return useQuery({
@@ -67,7 +72,11 @@ function OverviewTab() {
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <SyncButton />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((c) => (
         <Card key={c.label}>
           <CardHeader className="pb-2">
@@ -80,17 +89,47 @@ function OverviewTab() {
           </CardContent>
         </Card>
       ))}
+      </div>
     </div>
   );
 }
 
+function SyncButton() {
+  const qc = useQueryClient();
+  const m = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("sync-whatsapp-templates", { body: {} });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      const n = data?.synced ?? data?.count ?? 0;
+      toast.success(`Sincronização concluída${n ? ` — ${n} templates` : ""}.`);
+      qc.invalidateQueries({ queryKey: ["superadmin-templates"] });
+      qc.invalidateQueries({ queryKey: ["last-sync"] });
+      qc.invalidateQueries({ queryKey: ["superadmin-count"] });
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Falha ao sincronizar."),
+  });
+  return (
+    <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => m.mutate()}>
+      <RefreshCw className={"h-4 w-4 mr-2 " + (m.isPending ? "animate-spin" : "")} />
+      Sincronizar templates
+    </Button>
+  );
+}
+
 function TemplatesTab() {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<string>("all");
+  const [selected, setSelected] = useState<any | null>(null);
+
   const { data, isLoading } = useQuery({
     queryKey: ["superadmin-templates"],
     queryFn: async () => {
       const { data } = await supabase
         .from("message_templates")
-        .select("id, institution, name, meta_template_name, meta_language, meta_category, meta_status, meta_version, meta_has_local_differences, meta_rejection_reason, meta_last_synced_at")
+        .select("id, institution, name, meta_template_name, meta_language, meta_category, meta_status, meta_version, meta_has_local_differences, meta_rejection_reason, meta_last_synced_at, meta_header_type, meta_header_text, meta_body_text, meta_footer_text, meta_buttons, meta_template_id")
         .eq("template_kind", "meta")
         .order("meta_last_synced_at", { ascending: false })
         .limit(200);
@@ -98,12 +137,42 @@ function TemplatesTab() {
     },
   });
 
+  const filtered = useMemo(() => {
+    const list = (data ?? []) as any[];
+    const q = search.trim().toLowerCase();
+    return list.filter((t) => {
+      if (status !== "all" && t.meta_status !== status) return false;
+      if (!q) return true;
+      return [t.name, t.meta_template_name, t.institution, t.meta_language, t.meta_category]
+        .some((v) => String(v ?? "").toLowerCase().includes(q));
+    });
+  }, [data, search, status]);
+
   if (isLoading) {
     return <Skeleton className="h-64 w-full" />;
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome, instituição, idioma…" className="pl-8" />
+        </div>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            <SelectItem value="approved">Aprovados</SelectItem>
+            <SelectItem value="submitted">Pendentes</SelectItem>
+            <SelectItem value="rejected">Rejeitados</SelectItem>
+            <SelectItem value="paused">Pausados</SelectItem>
+            <SelectItem value="disabled">Desabilitados</SelectItem>
+          </SelectContent>
+        </Select>
+        <SyncButton />
+      </div>
+      <div className="overflow-x-auto border rounded-md">
       <Table>
         <TableHeader>
           <TableRow>
@@ -117,8 +186,8 @@ function TemplatesTab() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {(data ?? []).map((t: any) => (
-            <TableRow key={t.id}>
+          {filtered.map((t: any) => (
+            <TableRow key={t.id} className="cursor-pointer" onClick={() => setSelected(t)}>
               <TableCell>{t.institution ?? "—"}</TableCell>
               <TableCell className="font-mono text-xs">{t.meta_template_name ?? t.name}</TableCell>
               <TableCell>{t.meta_language ?? "—"}</TableCell>
@@ -134,17 +203,78 @@ function TemplatesTab() {
               </TableCell>
             </TableRow>
           ))}
-          {(data ?? []).length === 0 && (
+          {filtered.length === 0 && (
             <TableRow>
               <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
-                Nenhum template Meta encontrado.
+                Nenhum template corresponde ao filtro.
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
+      </div>
+      <TemplateDetailSheet template={selected} onOpenChange={(o) => !o && setSelected(null)} />
     </div>
   );
+}
+
+function TemplateDetailSheet({ template, onOpenChange }: { template: any | null; onOpenChange: (o: boolean) => void }) {
+  return (
+    <Sheet open={!!template} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+        {template && (
+          <>
+            <SheetHeader>
+              <SheetTitle className="font-mono text-base">{template.meta_template_name ?? template.name}</SheetTitle>
+              <SheetDescription>
+                {template.institution ?? "—"} · {template.meta_language ?? "—"} · {template.meta_category ?? "—"}
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-4 space-y-4 text-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant={template.meta_status === "approved" ? "default" : template.meta_status === "rejected" ? "destructive" : "secondary"}>
+                  {template.meta_status ?? "—"}
+                </Badge>
+                {template.meta_has_local_differences && <Badge variant="destructive">Divergente da Meta</Badge>}
+                {template.meta_version && <Badge variant="outline">v{template.meta_version}</Badge>}
+              </div>
+              {template.meta_rejection_reason && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs">
+                  <div className="font-medium text-destructive mb-1">Motivo da rejeição</div>
+                  <div>{template.meta_rejection_reason}</div>
+                </div>
+              )}
+              <Section label="Header">
+                <div className="text-xs text-muted-foreground mb-1">Tipo: {template.meta_header_type ?? "—"}</div>
+                <Pre>{template.meta_header_text ?? "—"}</Pre>
+              </Section>
+              <Section label="Body"><Pre>{template.meta_body_text ?? "—"}</Pre></Section>
+              <Section label="Footer"><Pre>{template.meta_footer_text ?? "—"}</Pre></Section>
+              <Section label="Botões">
+                <Pre>{template.meta_buttons ? JSON.stringify(template.meta_buttons, null, 2) : "—"}</Pre>
+              </Section>
+              <div className="text-xs text-muted-foreground pt-2 border-t space-y-1">
+                <div>ID Meta: <span className="font-mono">{template.meta_template_id ?? "—"}</span></div>
+                <div>Sincronizado em: {template.meta_last_synced_at ? new Date(template.meta_last_synced_at).toLocaleString() : "—"}</div>
+              </div>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">{label}</div>
+      {children}
+    </div>
+  );
+}
+function Pre({ children }: { children: React.ReactNode }) {
+  return <pre className="bg-muted rounded-md p-2 text-xs whitespace-pre-wrap break-words">{children}</pre>;
 }
 
 function WebhookTab() {
