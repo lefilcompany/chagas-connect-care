@@ -411,7 +411,7 @@ function shouldApplyStatus(current: string | null | undefined, next: string): bo
  *
  * `withEdgeHandler` provides CORS + a last-resort structured 500 fallback.
  */
-export default withEdgeHandler(async (req) => {
+const handler = withEdgeHandler(async (req) => {
   const url = new URL(req.url);
 
   // Meta handshake
@@ -754,4 +754,4 @@ export default withEdgeHandler(async (req) => {
   return jsonOk({ processed: true });
 });
 
-Deno.serve(default);
+Deno.serve(handler);
