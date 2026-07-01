@@ -121,6 +121,9 @@ Deno.serve(async (req) => {
   // Extract footer for storage.
   const footerComp = components.find((c: any) => String(c?.type ?? "").toUpperCase() === "FOOTER");
   const footerText = footerComp?.text ?? null;
+  const parameterFormat = String(payload?.parameter_format ?? "POSITIONAL").toUpperCase();
+  const nowIso = new Date().toISOString();
+  const creationPayload = { name: finalName, language, category, components, parameter_format: parameterFormat };
 
   // Update or insert local record.
   if (localTemplateId) {
@@ -132,10 +135,12 @@ Deno.serve(async (req) => {
       meta_status: metaStatus,
       meta_footer_text: footerText,
       meta_footer_source: footerText ? "meta_synced" : null,
-      meta_definition: metaBody,
+      meta_creation_payload: creationPayload,
+      meta_parameter_format: parameterFormat,
+      meta_submitted_at: nowIso,
+      meta_submitted_by: userId,
       meta_version: metaVersion,
       meta_parent_template_id: parentTemplateId,
-      meta_last_synced_at: new Date().toISOString(),
     }).eq("id", localTemplateId);
   } else if (institution) {
     await admin.from("message_templates").insert({
@@ -148,10 +153,12 @@ Deno.serve(async (req) => {
       meta_status: metaStatus,
       meta_footer_text: footerText,
       meta_footer_source: footerText ? "meta_synced" : null,
-      meta_definition: metaBody,
+      meta_creation_payload: creationPayload,
+      meta_parameter_format: parameterFormat,
+      meta_submitted_at: nowIso,
+      meta_submitted_by: userId,
       meta_version: metaVersion,
       meta_parent_template_id: parentTemplateId,
-      meta_last_synced_at: new Date().toISOString(),
       name: finalName,
       objective: payload?.objective ?? "custom",
     } as any);
