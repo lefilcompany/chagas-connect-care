@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { RefreshCw, Search } from "lucide-react";
+import { ChannelsTab } from "@/components/superadmin/ChannelsTab";
+import { DiagnosticsTab } from "@/components/superadmin/DiagnosticsTab";
 
 function useCount(table: string, filters: Array<[string, unknown]> = []) {
   return useQuery({
@@ -404,11 +406,15 @@ export default function WhatsAppAdmin() {
           <TabsList>
             <TabsTrigger value="overview">Visão geral</TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
+            <TabsTrigger value="channels">Canais</TabsTrigger>
+            <TabsTrigger value="diagnostics">Diagnóstico</TabsTrigger>
             <TabsTrigger value="webhook">Webhook</TabsTrigger>
             <TabsTrigger value="audit">Auditoria</TabsTrigger>
           </TabsList>
           <TabsContent value="overview" className="mt-6"><OverviewTab /></TabsContent>
           <TabsContent value="templates" className="mt-6"><TemplatesTab /></TabsContent>
+          <TabsContent value="channels" className="mt-6"><ChannelsTab /></TabsContent>
+          <TabsContent value="diagnostics" className="mt-6"><DiagnosticsTab /></TabsContent>
           <TabsContent value="webhook" className="mt-6"><WebhookTab /></TabsContent>
           <TabsContent value="audit" className="mt-6"><AuditTab /></TabsContent>
         </Tabs>
