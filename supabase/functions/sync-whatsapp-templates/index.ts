@@ -84,54 +84,98 @@ Deno.serve(async (req) => {
     return json(500, { error: "WHATSAPP_TOKEN or WHATSAPP_WABA_ID missing" });
   }
 
-  const url = `https://graph.facebook.com/${WHATSAPP_GRAPH_VERSION}/${WHATSAPP_WABA_ID}` +
-    `/message_templates?fields=name,language,status,category,id,rejected_reason,quality_score,components&limit=200`;
-  let res: Response;
-  try {
-    res = await fetch(url, { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` } });
-  } catch (e) {
-    return json(502, { ok: false, error: e instanceof Error ? e.message : String(e) });
-  }
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    return json(200, { ok: false, error: (body as any)?.error?.message ?? "Meta sync failed" });
+  // Determine institution scope for this WABA. Default to the env-configured
+  // institution or the caller's own institution; superadmin may pass any.
+  const { data: prof } = await admin
+    .from("profiles").select("institution").eq("id", userId).maybeSingle();
+  const targetInstitution: string =
+    (Deno.env.get("WHATSAPP_DEFAULT_INSTITUTION") ?? "").trim() ||
+    ((prof as any)?.institution ?? "");
+
+  // ---- Paginated fetch of ALL templates on the WABA. -------------------
+  const items: any[] = [];
+  let next: string | null =
+    `https://graph.facebook.com/${WHATSAPP_GRAPH_VERSION}/${WHATSAPP_WABA_ID}` +
+    `/message_templates?fields=name,language,status,category,id,rejected_reason,quality_score,components,parameter_format&limit=100`;
+  let pageGuard = 0;
+  while (next && pageGuard++ < 50) {
+    let res: Response;
+    try {
+      res = await fetch(next, { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` } });
+    } catch (e) {
+      return json(502, { ok: false, error_code: "NETWORK_ERROR", error: e instanceof Error ? e.message : String(e) });
+    }
+    const body: any = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = body?.error ?? {};
+      return json(200, {
+        ok: false,
+        error_code: "META_SYNC_FAILED",
+        error: err.message ?? "Meta sync failed",
+        meta_error: {
+          code: err.code ?? null,
+          error_subcode: err.error_subcode ?? null,
+          message: err.message ?? null,
+          fbtrace_id: err.fbtrace_id ?? null,
+          http_status: res.status,
+        },
+      });
+    }
+    if (Array.isArray(body?.data)) items.push(...body.data);
+    next = body?.paging?.next ?? null;
   }
 
-  const items: any[] = Array.isArray((body as any)?.data) ? (body as any).data : [];
   const nowIso = new Date().toISOString();
   let updated = 0;
-  let unmapped = 0;
+  let created = 0;
 
   for (const t of items) {
     const status = STATUS_MAP[String(t?.status ?? "").toUpperCase()] ?? "submitted";
     const parsed = parseComponents(t?.components);
+    const metaTemplateId = t?.id != null ? String(t.id) : null;
+    const name: string = t?.name ?? "";
+    const language: string = t?.language ?? "pt_BR";
 
-    const { data: existing } = await admin
-      .from("message_templates")
-      .select("id, meta_footer_text, body_patient, body_contact, body_segment")
-      .eq("template_kind", "meta")
-      .eq("meta_template_name", t?.name)
-      .maybeSingle();
-
-    if (!existing) {
-      unmapped++;
-      continue;
+    // Match by meta_template_id first (stable), then by (institution, name, language).
+    let existing: any = null;
+    if (metaTemplateId) {
+      const { data } = await admin
+        .from("message_templates")
+        .select("id, meta_footer_text, meta_definition, meta_body_parameter_order, body_patient, body_contact, body_segment, institution")
+        .eq("meta_template_id", metaTemplateId)
+        .maybeSingle();
+      existing = data;
+    }
+    if (!existing && name && targetInstitution) {
+      const { data } = await admin
+        .from("message_templates")
+        .select("id, meta_footer_text, meta_definition, meta_body_parameter_order, body_patient, body_contact, body_segment, institution")
+        .eq("template_kind", "meta")
+        .eq("institution", targetInstitution)
+        .eq("meta_template_name", name)
+        .eq("meta_language", language)
+        .maybeSingle();
+      existing = data;
     }
 
-    // Determine local-vs-meta divergence (footer + body).
-    const ex: any = existing;
-    const localBody = ex.body_patient ?? ex.body_contact ?? ex.body_segment ?? null;
-    const footerDifferent =
-      (ex.meta_footer_text ?? null) !== (parsed.footerText ?? null);
+    // Compute divergence (structured): local footer/body vs Meta.
+    const localBody = existing
+      ? (existing.body_patient ?? existing.body_contact ?? existing.body_segment ?? null)
+      : null;
+    const footerDifferent = existing
+      ? (existing.meta_footer_text ?? null) !== (parsed.footerText ?? null)
+      : false;
     const bodyDifferent =
-      parsed.bodyText != null && localBody != null && parsed.bodyText !== localBody;
+      existing && parsed.bodyText != null && localBody != null && parsed.bodyText !== localBody;
 
-    const patch: Record<string, unknown> = {
-      meta_template_id: t?.id ?? null,
-      meta_language: t?.language ?? "pt_BR",
+    const commonPatch: Record<string, unknown> = {
+      meta_template_id: metaTemplateId,
+      meta_template_name: name,
+      meta_language: language,
       meta_category: t?.category ?? null,
       meta_status: status,
       meta_rejection_reason: t?.rejected_reason ?? null,
+      meta_rejection_info: t?.rejected_reason ? { reason: t.rejected_reason } : null,
       meta_last_synced_at: nowIso,
       meta_definition: t ?? null,
       meta_header_type: parsed.headerType,
@@ -141,11 +185,27 @@ Deno.serve(async (req) => {
       meta_buttons: parsed.buttons,
       meta_carousel_cards: parsed.carouselCards,
       meta_authentication_config: parsed.authConfig,
-      meta_has_local_differences: footerDifferent || bodyDifferent,
+      meta_parameter_format: t?.parameter_format
+        ? String(t.parameter_format).toUpperCase()
+        : null,
+      meta_has_local_differences: !!(footerDifferent || bodyDifferent),
     };
-    await admin.from("message_templates").update(patch).eq("id", ex.id);
-    updated++;
+
+    if (existing) {
+      await admin.from("message_templates").update(commonPatch).eq("id", existing.id);
+      updated++;
+    } else if (targetInstitution) {
+      // Create a local skeleton so admins can see + adopt this Meta template.
+      await admin.from("message_templates").insert({
+        institution: targetInstitution,
+        template_kind: "meta",
+        name: name,
+        objective: "custom",
+        ...commonPatch,
+      } as any);
+      created++;
+    }
   }
 
-  return json(200, { ok: true, count: items.length, updated, unmapped });
+  return json(200, { ok: true, count: items.length, updated, created });
 });
