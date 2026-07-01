@@ -464,17 +464,23 @@ export type Database = {
           meta_idempotency_key: string | null
           meta_language: string
           meta_last_synced_at: string | null
+          meta_last_webhook_at: string | null
           meta_parameter_format: string | null
           meta_parameter_order: Json
           meta_parent_template_id: string | null
+          meta_quality_score: Json | null
           meta_rejection_info: Json | null
           meta_rejection_reason: string | null
           meta_status: string
+          meta_status_raw: string | null
           meta_submitted_at: string | null
           meta_submitted_by: string | null
+          meta_sync_pending: boolean
           meta_template_id: string | null
           meta_template_name: string | null
+          meta_variable_examples: Json | null
           meta_version: number | null
+          meta_waba_id: string | null
           name: string
           rejection_reason: string | null
           segment_id: string | null
@@ -517,17 +523,23 @@ export type Database = {
           meta_idempotency_key?: string | null
           meta_language?: string
           meta_last_synced_at?: string | null
+          meta_last_webhook_at?: string | null
           meta_parameter_format?: string | null
           meta_parameter_order?: Json
           meta_parent_template_id?: string | null
+          meta_quality_score?: Json | null
           meta_rejection_info?: Json | null
           meta_rejection_reason?: string | null
           meta_status?: string
+          meta_status_raw?: string | null
           meta_submitted_at?: string | null
           meta_submitted_by?: string | null
+          meta_sync_pending?: boolean
           meta_template_id?: string | null
           meta_template_name?: string | null
+          meta_variable_examples?: Json | null
           meta_version?: number | null
+          meta_waba_id?: string | null
           name: string
           rejection_reason?: string | null
           segment_id?: string | null
@@ -570,17 +582,23 @@ export type Database = {
           meta_idempotency_key?: string | null
           meta_language?: string
           meta_last_synced_at?: string | null
+          meta_last_webhook_at?: string | null
           meta_parameter_format?: string | null
           meta_parameter_order?: Json
           meta_parent_template_id?: string | null
+          meta_quality_score?: Json | null
           meta_rejection_info?: Json | null
           meta_rejection_reason?: string | null
           meta_status?: string
+          meta_status_raw?: string | null
           meta_submitted_at?: string | null
           meta_submitted_by?: string | null
+          meta_sync_pending?: boolean
           meta_template_id?: string | null
           meta_template_name?: string | null
+          meta_variable_examples?: Json | null
           meta_version?: number | null
+          meta_waba_id?: string | null
           name?: string
           rejection_reason?: string | null
           segment_id?: string | null
@@ -1451,6 +1469,65 @@ export type Database = {
           processed_at?: string
         }
         Relationships: []
+      }
+      whatsapp_template_submissions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          error_code: string | null
+          error_payload: Json | null
+          id: string
+          idempotency_key: string
+          institution: string
+          local_template_id: string
+          meta_template_id: string | null
+          request_payload: Json | null
+          response_payload: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          error_payload?: Json | null
+          id?: string
+          idempotency_key: string
+          institution: string
+          local_template_id: string
+          meta_template_id?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          error_payload?: Json | null
+          id?: string
+          idempotency_key?: string
+          institution?: string
+          local_template_id?: string
+          meta_template_id?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_template_submissions_local_template_id_fkey"
+            columns: ["local_template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_unmatched_events: {
         Row: {
