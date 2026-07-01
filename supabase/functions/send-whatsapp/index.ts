@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
   if (!WHATSAPP_TEST_MODE && (msg as any).template_id) {
     const { data: tpl } = await admin
       .from("message_templates")
-      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text, meta_footer_text, meta_buttons, meta_authentication_config")
+      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_body_parameter_order, meta_parameter_format, meta_has_local_differences, meta_definition, meta_header_type, meta_header_text, meta_footer_text, meta_buttons, meta_authentication_config")
       .eq("id", (msg as any).template_id)
       .maybeSingle();
     tplRow = tpl;
@@ -260,6 +260,20 @@ Deno.serve(async (req) => {
           last_error: "Template não aprovado pela Meta",
         }).eq("id", msg.id);
         return json(200, { ok: false, error_code: "TEMPLATE_NOT_APPROVED", error: "Este template não está aprovado pela Meta." });
+      }
+      if ((tpl as any).meta_has_local_differences === true) {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: "Template divergente da definição aprovada na Meta",
+        }).eq("id", msg.id);
+        return json(200, { ok: false, error_code: "TEMPLATE_DIVERGENT", error: "Este template diverge da versão aprovada na Meta. Ressincronize antes de enviar." });
+      }
+      if (!(tpl as any).meta_definition) {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: "Definição sincronizada da Meta ausente para o template",
+        }).eq("id", msg.id);
+        return json(200, { ok: false, error_code: "TEMPLATE_DEFINITION_MISSING", error: "Sincronize o template com a Meta antes de enviá-lo." });
       }
       if (!tpl.meta_template_name) {
         await admin.from("messages").update({
@@ -522,8 +536,10 @@ Deno.serve(async (req) => {
       usedTemplateLanguage = tplRow.meta_language || "pt_BR";
       // Skip the generic template build path below.
     } else {
-    const order = Array.isArray(tplRow.meta_parameter_order)
-      ? (tplRow.meta_parameter_order as string[])
+    const order = Array.isArray((tplRow as any).meta_body_parameter_order)
+      ? ((tplRow as any).meta_body_parameter_order as string[])
+      : Array.isArray((tplRow as any).meta_parameter_order)
+      ? ((tplRow as any).meta_parameter_order as string[])
       : [];
     // Detect placeholders that should never reach the Meta API
     const placeholderRe = /\{[a-zA-Z0-9_]+\}/;
