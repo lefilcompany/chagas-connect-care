@@ -1,5 +1,3 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import {
   resolveInstitutionBranding,
   resolveSignatureText,
@@ -8,15 +6,14 @@ import {
   brandingSnapshot,
   type InstitutionWhatsAppSettings,
 } from "../_shared/institution-branding.ts";
+import { withEdgeHandler, jsonResponse, jsonError } from "../_shared/http.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
 const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
 const WHATSAPP_TEST_MODE = (Deno.env.get("WHATSAPP_TEST_MODE") ?? "").toLowerCase() === "true";
 const WHATSAPP_TEST_TEMPLATE_NAME = Deno.env.get("WHATSAPP_TEST_TEMPLATE_NAME") ?? "hello_world";
 const WHATSAPP_TEST_TEMPLATE_LANGUAGE = Deno.env.get("WHATSAPP_TEST_TEMPLATE_LANGUAGE") ?? "en_US";
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
 const RAW_WHATSAPP_GRAPH_VERSION = Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? "v25.0";
 const WHATSAPP_GRAPH_VERSION = /^v\d+\.\d+$/.test(RAW_WHATSAPP_GRAPH_VERSION)
@@ -25,12 +22,9 @@ const WHATSAPP_GRAPH_VERSION = /^v\d+\.\d+$/.test(RAW_WHATSAPP_GRAPH_VERSION)
 
 const META_API = `https://graph.facebook.com/${WHATSAPP_GRAPH_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
 
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+// Legacy alias so existing call sites (`json(status, body)`) route through
+// the shared response builder without touching every internal handler.
+const json = jsonResponse;
 
 function normalizeBRPhone(input: string): string | null {
   const digits = (input ?? "").replace(/\D/g, "");
@@ -85,31 +79,26 @@ function validateWhatsAppConfig(rawPhone: string):
 
 type SendBody = { message_id?: string };
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json(405, { error: "Method not allowed" });
+Deno.serve(withEdgeHandler(async (req) => {
+  if (req.method !== "POST") {
+    return jsonError(405, "INVALID_INPUT", "Method not allowed");
+  }
 
-  // Auth: require valid JWT from app
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "Unauthorized" });
-  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const token = authHeader.replace("Bearer ", "");
-  const { data: claims, error: authErr } = await authClient.auth.getClaims(token);
-  if (authErr || !claims?.claims) return json(401, { error: "Unauthorized" });
+  // Auth via shared helper — returns structured 401 on failure.
+  const ctx = await requireAuth(req);
+  if (ctx instanceof Response) return ctx;
+  const authClient = ctx.userClient;
+  const admin = ctx.serviceClient;
 
   let body: SendBody;
   try {
     body = await req.json();
   } catch {
-    return json(400, { error: "Invalid JSON" });
+    return jsonError(400, "INVALID_INPUT", "Invalid JSON");
   }
   if (!body.message_id || typeof body.message_id !== "string") {
-    return json(400, { error: "message_id is required" });
+    return jsonError(400, "INVALID_INPUT", "message_id is required");
   }
-
-  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   // Authorization: fetch through the caller's RLS-scoped client to ensure
   // the user has access to this message (same institution / owner).
@@ -119,7 +108,7 @@ Deno.serve(async (req) => {
     .eq("id", body.message_id)
     .maybeSingle();
   if (authzErr || !authorized) {
-    return json(403, { error: "Forbidden" });
+    return jsonError(403, "FORBIDDEN", "Access denied to this message.");
   }
 
   // Fetch the message with admin client for full field access
@@ -1301,4 +1290,4 @@ Deno.serve(async (req) => {
     template_name: usedTemplateName,
     template_language: usedTemplateLanguage,
   });
-});
+}));
