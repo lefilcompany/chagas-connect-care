@@ -1290,4 +1290,4 @@ Deno.serve(withEdgeHandler(async (req) => {
     template_name: usedTemplateName,
     template_language: usedTemplateLanguage,
   });
-});
+}));
