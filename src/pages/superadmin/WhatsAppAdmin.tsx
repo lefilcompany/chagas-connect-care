@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -391,18 +391,12 @@ export default function WhatsAppAdmin() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") ?? "overview";
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold">Central Superadmin — WhatsApp</h1>
-            <p className="text-xs text-muted-foreground">Administração global da integração Meta Cloud API.</p>
-          </div>
-          <Button asChild variant="outline" size="sm"><Link to="/app">Voltar ao app</Link></Button>
-        </div>
-      </header>
-      <main className="max-w-7xl mx-auto px-6 py-6">
-        <Tabs value={tab} onValueChange={(v) => setParams({ tab: v })}>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold">WhatsApp</h1>
+        <p className="text-xs text-muted-foreground">Administração global da integração Meta Cloud API.</p>
+      </div>
+      <Tabs value={tab} onValueChange={(v) => setParams({ tab: v })}>
           <TabsList>
             <TabsTrigger value="overview">Visão geral</TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
@@ -418,7 +412,6 @@ export default function WhatsAppAdmin() {
           <TabsContent value="webhook" className="mt-6"><WebhookTab /></TabsContent>
           <TabsContent value="audit" className="mt-6"><AuditTab /></TabsContent>
         </Tabs>
-      </main>
     </div>
   );
 }
