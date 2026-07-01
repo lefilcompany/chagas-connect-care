@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { jsonError, jsonOk, withEdgeHandler } from "../_shared/http.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -392,7 +393,25 @@ function shouldApplyStatus(current: string | null | undefined, next: string): bo
   return nxt > cur;
 }
 
-Deno.serve(async (req) => {
+/**
+ * Meta WhatsApp Cloud webhook.
+ *
+ * Response contract:
+ *  - GET  (handshake): returns the raw `hub.challenge` string as `text/plain`
+ *    with HTTP 200 when `hub.verify_token` matches. Meta requires the exact
+ *    challenge body, so this endpoint does NOT wrap the handshake in JSON.
+ *    On verification failure returns the standardized JSON error contract.
+ *  - POST (events)  : validates the `x-hub-signature-256` HMAC-SHA256 against
+ *    `WHATSAPP_APP_SECRET` over the raw body. Invalid signatures short-circuit
+ *    with a structured `WEBHOOK_SIGNATURE_INVALID` 403. On success the handler
+ *    always replies `{ ok: true }` (HTTP 200) after processing so Meta never
+ *    retries — internal per-event failures are logged and audited via
+ *    `stampWebhookActivity` but never surfaced to Meta.
+ *  - Any other method returns `METHOD_NOT_ALLOWED` (405).
+ *
+ * `withEdgeHandler` provides CORS + a last-resort structured 500 fallback.
+ */
+export default withEdgeHandler(async (req) => {
   const url = new URL(req.url);
 
   // Meta handshake
@@ -401,13 +420,25 @@ Deno.serve(async (req) => {
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
     if (mode === "subscribe" && token && token === VERIFY_TOKEN) {
-      return new Response(challenge ?? "", { status: 200 });
+      // Meta expects the raw challenge string back; do NOT wrap in JSON.
+      return new Response(challenge ?? "", {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
+      });
     }
-    return new Response("Forbidden", { status: 403 });
+    return jsonError(
+      403,
+      "WEBHOOK_VERIFICATION_FAILED",
+      "Handshake do webhook rejeitado: hub.mode ou hub.verify_token inválido.",
+    );
   }
 
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return jsonError(
+      405,
+      "METHOD_NOT_ALLOWED",
+      `Método ${req.method} não permitido para o webhook do WhatsApp.`,
+    );
   }
 
   // Read raw body for signature verification
@@ -416,20 +447,31 @@ Deno.serve(async (req) => {
   // Fail closed: WHATSAPP_APP_SECRET must be configured to verify Meta payloads
   if (!APP_SECRET) {
     console.error("whatsapp-webhook: WHATSAPP_APP_SECRET not configured; rejecting POST");
-    return new Response("Server misconfigured", { status: 503 });
+    return jsonError(
+      503,
+      "WEBHOOK_MISCONFIGURED",
+      "WHATSAPP_APP_SECRET não configurado; assinaturas Meta não podem ser verificadas.",
+    );
   }
 
   const sigHeader = req.headers.get("x-hub-signature-256") ?? "";
   const valid = await verifyMetaSignature(rawBody, sigHeader);
   if (!valid) {
-    return new Response("Forbidden", { status: 403 });
+    return jsonError(
+      403,
+      "WEBHOOK_SIGNATURE_INVALID",
+      "Assinatura x-hub-signature-256 ausente ou inválida.",
+    );
   }
 
   let payload: any;
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    return new Response("ok", { status: 200 });
+    // Malformed JSON after a valid signature — ack so Meta stops retrying,
+    // but flag the structured error for auditability.
+    console.warn("whatsapp-webhook: signed payload was not valid JSON");
+    return jsonOk({ processed: false, reason: "invalid_json" });
   }
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -708,5 +750,8 @@ Deno.serve(async (req) => {
     console.error("whatsapp-webhook error:", e);
   }
 
-  return new Response("ok", { status: 200 });
+  // Always ack 200 to Meta after a signed payload is processed so retries stop.
+  return jsonOk({ processed: true });
 });
+
+Deno.serve(default);
