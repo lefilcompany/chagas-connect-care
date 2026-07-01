@@ -1435,7 +1435,7 @@ export type Database = {
       whatsapp_window_open: { Args: { _identity_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "equipe"
+      app_role: "admin" | "equipe" | "superadmin"
       message_channel: "whatsapp" | "sms"
       patient_stage: "diagnostico" | "agudo" | "cronico"
     }
@@ -1565,7 +1565,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "equipe"],
+      app_role: ["admin", "equipe", "superadmin"],
       message_channel: ["whatsapp", "sms"],
       patient_stage: ["diagnostico", "agudo", "cronico"],
     },
