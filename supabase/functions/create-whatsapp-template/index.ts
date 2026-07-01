@@ -100,7 +100,13 @@ Deno.serve(async (req) => {
           Authorization: `Bearer ${WHATSAPP_TOKEN}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name: finalName, language, category, components }),
+        body: JSON.stringify({
+          name: finalName,
+          language,
+          category,
+          components,
+          parameter_format: String(payload?.parameter_format ?? "POSITIONAL").toUpperCase(),
+        }),
       },
     );
   } catch (e) {
