@@ -29,6 +29,7 @@ export interface TemplateRow {
   body: string | null;
   meta_header_type: string | null;
   meta_header_text: string | null;
+  meta_header_handle: string | null;
   meta_footer_text: string | null;
   meta_buttons: unknown;
   meta_variable_examples: Record<string, string> | null;
@@ -132,10 +133,14 @@ export function createHandler(deps: HandlerDeps) {
       language: tpl.meta_language ?? "pt_BR",
       category: (tpl.meta_category as MetaCategory) ?? "UTILITY",
       body: tpl.body ?? "",
-      header: {
-        type: (tpl.meta_header_type as "text" | "none" | null) === "text" ? "text" : "none",
-        text: tpl.meta_header_text ?? "",
-      },
+      header: (() => {
+        const t = tpl.meta_header_type;
+        if (t === "text") return { type: "text", text: tpl.meta_header_text ?? "" } as const;
+        if (t === "image" || t === "video" || t === "document") {
+          return { type: t, handle: tpl.meta_header_handle ?? "" } as const;
+        }
+        return { type: "none" } as const;
+      })(),
       footer: tpl.meta_footer_text ?? "",
       buttons: (Array.isArray(tpl.meta_buttons) ? tpl.meta_buttons : []) as never,
       variableExamples: tpl.meta_variable_examples ?? {},
