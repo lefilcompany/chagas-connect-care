@@ -1,61 +1,178 @@
-## Próximas fases — Templates Meta WhatsApp
+# Fase 0 — Arquitetura e seams de TDD para Modelos institucionais
 
-A Fase 1 (erro real da Meta + variáveis posicionais bloqueadas) já está em produção. Proponho dividir o restante das 24 seções em 4 fases entregáveis, cada uma autocontida e testável isoladamente.
+Nenhuma linha de código, migration ou teste foi alterada nesta fase. Abaixo está a inspeção do estado atual do repositório, a arquitetura proposta e as seams definitivas para as próximas fases.
 
----
+## 1. Mapa do fluxo atual
 
-### Fase 2 — Variáveis semânticas ponta-a-ponta (seções 5, 11, 12, 13)
+Estado hoje (inspecionado em `src/App.tsx`, `TemplatesTab.tsx`, `TemplateEditorDialog.tsx`, `TemplateCard.tsx`, `UseTemplateDialog.tsx`, `templates.ts`, `queries.ts`, `whatsapp.ts`, funções edge):
 
-**O que entrega:** O administrador escreve `{nome_destinatario}` e nunca vê `{{1}}` na interface, mas o que vai para a Meta continua posicional e auditável.
+- Não existe rota `/app/modelos`. Modelos vivem embutidos em `src/pages/app/Messages.tsx` via `TemplatesTab.tsx` (aba "Modelos") + `CampaignTab.tsx`.
+- Não existe `src/pages/superadmin/WhatsAppAdmin.tsx`. Ações de superadmin (canais, credenciais, sync global, diagnóstico) estão hoje misturadas em `src/pages/app/WhatsAppSettings.tsx` (744 linhas) e nas edge functions `whatsapp-diagnostics`, `repair-whatsapp-channel`, `sync-whatsapp-templates`.
+- Não existe `upload-whatsapp-template-media`. O único uploader é `upload-whatsapp-media` (usado por conversas). Precisará ser criado ou reaproveitado com escopo "template header".
+- Não existe `CONTEXT.md` nem ADRs no repositório.
+- `TemplateEditorDialog.tsx` é um `Dialog` de 1057 linhas que já cobre wizard de 8 passos, mapeamento de variáveis, preview e submissão. É o principal candidato à extração.
+- Leitura/escrita de `message_templates` é feita hoje direto pelo componente via `supabase` client + `fetchers.templates` em `src/lib/queries.ts`. Não há camada de serviço.
+- Realtime já escuta `message_templates` por instituição (via RLS) em `TemplatesTab.tsx`.
+- Envio para Meta: `create-whatsapp-template` (166 l) e `sync-whatsapp-templates` (150 l). Ambos usam `SUPABASE_SERVICE_ROLE_KEY` e chamam `graph.facebook.com`.
+- Envio de mensagem final: `send-whatsapp/index.ts` (1287 l), com builder compartilhado em `supabase/functions/_shared/whatsapp-payload-builder.ts`.
+- `vitest.config.ts` + `src/test/setup.ts` já configuram jsdom + Testing Library. `supabase--test_edge_functions` disponível para Deno tests.
 
-- Novo módulo `src/lib/metaVariables.ts` com:
-  - Catálogo de variáveis canônicas (`nome_destinatario`, `data_consulta`, `hora_consulta`, `local_consulta`, `nome_instituicao`, `nome_profissional`, `codigo_otp`, etc.) com `label`, `description`, `example`, `resolver`.
-  - `semanticToPositional(text, order)` → converte `{nome}` em `{{1}}` mantendo `order` como array de chaves.
-  - `positionalToSemantic(text, order)` → renderiza preview.
-  - `extractSemanticKeys(text)` → ordem de aparição.
-- `VariableInput.tsx` passa a renderizar `label` humano + `example` + tipo (data/hora/texto/url) baseado no catálogo, em vez do nome cru.
-- `UseTemplateDialog.tsx` resolve automaticamente as variáveis derivadas do destinatário (nome, instituição) antes de pedir input.
-- `TemplateCard.tsx` e `WhatsAppPreview.tsx` mostram o texto já substituído por exemplos; nunca `{{1}}`.
+```text
+Hoje                                    Proposto
+--------                                --------
+/app/mensagens (abas)                   /app/mensagens (só campanha/envio)
+  ├─ TemplatesTab  ─────────────►       /app/modelos (lista institucional)
+  │    ├─ TemplateEditorDialog ─►       /app/modelos/novo + /:id (página cheia)
+  │    └─ UseTemplateDialog             UseTemplateDialog (mantido no envio)
+  └─ CampaignTab                        CampaignTab (inalterado)
 
-### Fase 3 — Editor wizard de Template Meta em 8 etapas (seções 3, 6, 9, 14, 15)
+/app/configuracoes/whatsapp             /app/configuracoes/whatsapp (institucional: prefs, assinatura)
+  (hoje mistura credenciais + prefs)    /superadmin/whatsapp (credenciais, WABA, phone id, sync global,
+                                        diagnóstico, auditoria, repair)
+```
 
-**O que entrega:** Substitui `TemplateEditorDialog.tsx` por um wizard que separa objetivo interno × template Meta e impede submissão inválida.
+## 2. Arquitetura proposta
 
-Etapas: (1) Tipo → objetivo interno OU Meta · (2) Identificação (nome técnico, idioma, categoria) · (3) Cabeçalho (none/text/image/video/document + upload) · (4) Corpo + variáveis semânticas · (5) Rodapé (manual ou herdado de `institution_whatsapp_settings`) · (6) Botões (QUICK_REPLY, URL com allowlist, PHONE_NUMBER, COPY_CODE — limite 10/3/3) · (7) Exemplos por variável (obrigatório para submissão à Meta) · (8) Revisão + diff vs versão sincronizada.
+**Camadas** (ordem de dependência, de dentro para fora):
 
-Validação por etapa com Zod; botão "Enviar para aprovação" só habilita na etapa 8 quando tudo válido.
+1. **Domínio puro** (`src/lib/templates/*`, sem React nem Supabase). Funções deterministas testáveis por unit test.
+2. **Serviço institucional** (`src/lib/templates/service.ts`). Fachada sobre `supabase` client + edge functions. Injetável via contexto ou prop nos testes de página.
+3. **Páginas + componentes** (`src/pages/app/modelos/*`, `src/components/app/modelos/*`). Consome o serviço. Testado por RTL com serviço fake.
+4. **Edge functions** (`create-whatsapp-template`, `sync-whatsapp-templates`, `send-whatsapp`, `whatsapp-webhook`, novo `upload-whatsapp-template-media`). Testado por Deno test com `fetch` mockado apenas para `graph.facebook.com`.
 
-### Fase 4 — Sincronização real + versionamento (seções 17, 18, 20)
+**Autorização** (aplicada em UI e RLS/edge):
+- `equipe` (comum): leitura de modelos aprovados da instituição + `UseTemplateDialog`.
+- `admin` institucional: tudo do anterior + criar/editar rascunho, submeter, versionar, ver rejeição.
+- `superadmin`: só canal/WABA/diagnóstico/sync global. **Não** cria modelos cotidianos.
 
-**O que entrega:** O status da Meta é a fonte de verdade e o admin vê quando o local divergiu do oficial.
+## 3. Seams finais
 
-- `sync-whatsapp-templates`: paginação completa do Graph (`fields=name,language,status,category,components,quality_score,rejected_reason`), grava `meta_definition`, `meta_status`, `meta_quality_score`, `meta_rejection_reason`, `meta_last_synced_at`.
-- Detecção de divergência: gera `meta_has_local_differences=true` quando o corpo/cabeçalho/botões locais diferem do `meta_definition` retornado.
-- Versionamento: ao editar um template já APPROVED, cria nova linha com `meta_parent_template_id` apontando para a anterior, em vez de sobrescrever.
-- Botão "Sincronizar agora" em `WhatsAppSettings.tsx` aba Templates, com toast de quantos foram atualizados/divergentes/rejeitados.
+Ajustes sobre a proposta original em **negrito**.
 
-### Fase 5 — Preview e cards definitivos (seções 7, 21, 22)
+### Seam 1 — Página institucional de modelos
+- Interface pública: rota `/app/modelos` renderizando `<TemplatesPage />`.
+- Comportamentos testados por RTL (com `InstitutionTemplateService` fake):
+  - lista apenas modelos da instituição do usuário logado;
+  - status exibido em linguagem humana ("Rascunho", "Em análise Meta", "Aprovado", "Rejeitado");
+  - filtros de busca e categoria funcionam;
+  - modelo aprovado abre `UseTemplateDialog`;
+  - modelo não aprovado não expõe ação "Utilizar" nem "Enviar";
+  - `admin` vê botão "Novo modelo"; `equipe` não vê.
 
-**O que entrega:** Card e preview consistentes; o admin vê exatamente o que o paciente recebe.
+### Seam 2 — Editor institucional
+- Interfaces públicas: `/app/modelos/novo` e `/app/modelos/:templateId` renderizando `<TemplateEditorPage />`.
+- **Decisão sobre `TemplateEditorDialog`**: extrair o miolo do wizard para `<TemplateEditorForm />` (puro, controlado por props). O `Dialog` existente é aposentado e o novo formulário é reutilizado tanto pela página cheia (default) quanto por eventual reabertura em modal no futuro.
+- Comportamentos:
+  - `admin` salva rascunho com dados válidos;
+  - campos obrigatórios/inválidos impedem `Salvar` e `Enviar para análise`;
+  - status é somente leitura;
+  - modelo com status `approved` não é sobrescrito — ação disponível é "Criar nova versão";
+  - `institution` vem sempre do usuário autenticado (nunca de input);
+  - `equipe` recebe bloqueio (redirect ou tela "sem permissão").
 
-- `WhatsAppPreview.tsx` redesenhado: balão verde do destinatário, cabeçalho (texto/imagem/vídeo/doc com thumb), corpo com variáveis resolvidas, rodapé, botões (quick reply cinza, URL com ícone externo, phone, copy code), timestamp, check duplo azul.
-- `TemplateCard.tsx`: altura uniforme via `grid-rows-[auto_1fr_auto]`, badges de status Meta (APPROVED/PENDING/REJECTED/PAUSED), categoria, idioma, contador de uso nas últimas 24h.
-- Filtros: por status, categoria, idioma, "com diferenças locais", "rejeitados".
+### Seam 3 — Serviço institucional
+- Interface pública (arquivo `src/lib/templates/service.ts`):
 
----
+```ts
+export interface InstitutionTemplateService {
+  list(): Promise<MessageTemplate[]>;
+  getById(id: string): Promise<MessageTemplate>;
+  createDraft(input: TemplateDraftInput): Promise<MessageTemplate>;
+  updateDraft(id: string, input: TemplateDraftInput): Promise<MessageTemplate>;
+  submit(id: string): Promise<TemplateSubmissionResult>;
+  syncStatus(id: string): Promise<MessageTemplate>;
+}
+```
 
-### Notas técnicas
+- Implementação real usa `supabase` client + `supabase.functions.invoke`.
+- Testes de página substituem por objeto in-memory. Testes verificam **comportamento visível**, nunca `expect(service.createDraft).toHaveBeenCalled…`.
 
-- Sentry: tratar 0/`net::ERR_BLOCKED_BY_CLIENT` como warning silencioso em `src/integrations/sentry.ts` (não considerar falha de envio).
-- Todo template é filtrado por `institution` no backend (RLS já cobre, reforçar nos selects do frontend).
-- Nenhuma migration destrutiva — apenas `add column if not exists` quando faltar.
-- Edge functions afetadas: `create-whatsapp-template`, `sync-whatsapp-templates`, `send-whatsapp` (já tocada na Fase 1).
+### Seam 4 — Edge Function de criação
+- `POST {SUPABASE_URL}/functions/v1/create-whatsapp-template`
+- Body: `{ "local_template_id": "uuid" }`
+- Comportamentos testados por Deno test (fetch a `graph.facebook.com` mockado):
+  - só admin da instituição do template pode invocar (401/403 caso contrário);
+  - transição de status `draft` → `pending`;
+  - erro Meta grava `last_error` e mantém `draft`.
 
-### Ordem sugerida de execução
+### Seam 5 — Edge Function de sincronização
+- `POST {SUPABASE_URL}/functions/v1/sync-whatsapp-templates`
+- Aceita `{ "template_id"?: uuid }` (único) ou vazio (global — só superadmin).
+- Testes: normalização de status Meta, detecção de divergência.
 
-1. Fase 2 (base para 3 e 5)
-2. Fase 3 (consome Fase 2)
-3. Fase 4 (independente, pode ir em paralelo com 3 se necessário)
-4. Fase 5 (consome Fases 2 e 4)
+### Seam 6 — Webhook
+- `GET /whatsapp-webhook` (verificação) e `POST /whatsapp-webhook` (eventos `message_template_status_update`).
+- Testes: assinatura HMAC válida/ inválida; atualização monotônica de status; auditoria em `whatsapp_webhook_activity`.
 
-Posso começar pela Fase 2 imediatamente após sua aprovação.
+### Seam 7 — Upload de mídia de header
+- `POST {SUPABASE_URL}/functions/v1/upload-whatsapp-template-media` **(a criar)** — separado de `upload-whatsapp-media` porque o fluxo Meta usa `resumable upload API` diferente.
+- Testes: valida MIME/size por tipo de header (IMAGE/VIDEO/DOCUMENT), devolve `handle` para uso em `create-whatsapp-template`.
+
+### Seam 8 — Envio
+- `POST {SUPABASE_URL}/functions/v1/send-whatsapp` (inalterado do ponto de vista contratual).
+- Testes cobrem apenas o caminho "envio por template" para garantir não-regressão.
+
+### Seam 9 — Domínio puro
+- Módulos alvo (`src/lib/templates/*.ts`, sem side-effects):
+  - `variables.ts` — converter variáveis semânticas ↔ placeholders Meta `{{1}}`;
+  - `components.ts` — construir array `components` do payload Meta a partir de rascunho;
+  - `status.ts` — normalizar status Meta (`APPROVED|PENDING|REJECTED|PAUSED|DISABLED`) para status interno humano;
+  - `sendPayload.ts` — construir payload de envio a partir de `MessageTemplate` + variáveis preenchidas;
+  - `diff.ts` — detectar divergência local ↔ Meta (retorna lista de campos discrepantes).
+- Todos testáveis com input/output puros, sem mocks.
+
+### Seam 10 — Limite externo da Meta
+- Mockar exclusivamente `globalThis.fetch` para URLs `https://graph.facebook.com/${GRAPH_VERSION}/...`.
+- Proibido mockar módulos internos (`_shared/whatsapp-payload-builder.ts`, `templates.ts`) para testar outros módulos internos.
+
+## 4. Arquivos de teste sugeridos
+
+```text
+src/lib/templates/__tests__/variables.test.ts
+src/lib/templates/__tests__/components.test.ts
+src/lib/templates/__tests__/status.test.ts
+src/lib/templates/__tests__/sendPayload.test.ts
+src/lib/templates/__tests__/diff.test.ts
+src/pages/app/modelos/__tests__/TemplatesPage.test.tsx
+src/pages/app/modelos/__tests__/TemplateEditorPage.test.tsx
+supabase/functions/create-whatsapp-template/index_test.ts
+supabase/functions/sync-whatsapp-templates/index_test.ts
+supabase/functions/whatsapp-webhook/template_status_test.ts
+supabase/functions/upload-whatsapp-template-media/index_test.ts
+supabase/functions/send-whatsapp/template_send_test.ts
+```
+
+## 5. Dependências entre fases
+
+```text
+Fase 0 (esta) ──► Fase 1 domínio puro (Seam 9)
+                        │
+                        ▼
+                  Fase 2 serviço + páginas RTL (Seams 1, 2, 3)
+                        │
+                        ▼
+                  Fase 3 edge functions (Seams 4, 5, 7, 8)
+                        │
+                        ▼
+                  Fase 4 webhook + auditoria (Seam 6)
+                        │
+                        ▼
+                  Fase 5 separação Superadmin ↔ Institucional (rota /superadmin/whatsapp)
+```
+
+## 6. Riscos identificados
+
+1. **Ausência de `src/pages/superadmin/WhatsAppAdmin.tsx`**: a divisão institucional × superadmin exige criar o painel superadmin (não previsto no enunciado). Recomendo fazer isso na Fase 5 e por enquanto manter `WhatsAppSettings.tsx` como está.
+2. **`upload-whatsapp-template-media` não existe** — o enunciado o cita como já existente. Precisa ser criado na Fase 3.
+3. **`TemplateEditorDialog.tsx` tem 1057 linhas** — extração para `TemplateEditorForm` é necessária, mas exige cuidado para não regredir o wizard de 8 passos. Alternativa mais barata: manter o componente e apenas embrulhá-lo num route wrapper — descartada por dificultar RTL.
+4. **RLS de `message_templates`**: precisa garantir que `equipe` não faça `insert/update`. Já há políticas — validar antes da Fase 2.
+5. **Realtime channel `message_templates_realtime`** hoje está em `TemplatesTab.tsx`; migrar para `TemplatesPage` mantendo o mesmo `channel name` para evitar duplicação.
+6. **Rotas legadas**: aba "Modelos" dentro de `/app/mensagens` deve virar redirect para `/app/modelos` para não quebrar deep links.
+
+## 7. Decisão sobre `TemplateEditorDialog`
+
+**Extrair** o corpo do wizard para `<TemplateEditorForm />` puro (props: `initialValue`, `mode: "create"|"edit"|"version"`, `onSubmit`, `onSaveDraft`, `readOnly`). O `Dialog` atual é removido depois que a página cheia estiver estável. Isso maximiza testabilidade RTL sem duplicar lógica.
+
+## 8. Confirmação
+
+Nenhum arquivo de código, migration ou teste foi criado ou modificado nesta fase. Aguardando confirmação explícita das seams antes de prosseguir para a Fase 1.
