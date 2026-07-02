@@ -260,3 +260,68 @@ export default function MessageTemplateEdit() {
     </div>
   );
 }
+
+function statusLabel(s: string | null | undefined): string {
+  switch (s) {
+    case "submitted": return "Em análise";
+    case "approved": return "Aprovado";
+    case "rejected": return "Rejeitado";
+    case "paused": return "Pausado";
+    case "disabled": return "Desativado";
+    case "error": return "Erro";
+    default: return s ?? "—";
+  }
+}
+
+function MetaStatusPanel({
+  template,
+  onSync,
+  syncing,
+}: {
+  template: MessageTemplate;
+  onSync: () => void;
+  syncing: boolean;
+}) {
+  const rec = template as unknown as {
+    meta_status?: string | null;
+    meta_template_id?: string | null;
+    meta_submitted_at?: string | null;
+    meta_last_synced_at?: string | null;
+    meta_last_webhook_at?: string | null;
+    meta_rejection_reason?: string | null;
+    meta_rejection_info?: { reason?: string | null } | null;
+  };
+  const lastUpdate =
+    rec.meta_last_webhook_at ?? rec.meta_last_synced_at ?? rec.meta_submitted_at ?? null;
+  const reason = rec.meta_rejection_reason ?? rec.meta_rejection_info?.reason ?? null;
+  return (
+    <section
+      aria-label="Status na Meta"
+      className="rounded-lg border bg-card p-4 text-sm space-y-2"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Status:</span>
+          <Badge variant="outline">{statusLabel(rec.meta_status)}</Badge>
+        </div>
+        <Button size="sm" variant="outline" onClick={onSync} disabled={syncing}>
+          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? "Sincronizando…" : "Atualizar status"}
+        </Button>
+      </div>
+      {rec.meta_template_id && (
+        <p className="text-xs text-muted-foreground">
+          ID Meta: <code>{rec.meta_template_id}</code>
+        </p>
+      )}
+      {lastUpdate && (
+        <p className="text-xs text-muted-foreground">
+          Última atualização: {new Date(lastUpdate).toLocaleString("pt-BR")}
+        </p>
+      )}
+      {rec.meta_status === "rejected" && reason && (
+        <p className="text-xs text-destructive">Motivo: {reason}</p>
+      )}
+    </section>
+  );
+}
