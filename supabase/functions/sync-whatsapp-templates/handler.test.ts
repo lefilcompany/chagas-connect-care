@@ -16,7 +16,7 @@ function makeDeps(overrides: Partial<SyncDeps> & {
       if (!p) return Promise.resolve({ ok: true, status: 200, data: [], nextUrl: null });
       return Promise.resolve({ ok: true, status: 200, data: p.data, nextUrl: p.nextUrl });
     },
-    resolveWabaForInstitution: (_: string) => Promise.resolve(overrides.waba ?? "WABA_1"),
+    resolveWabaForInstitution: (_: string) => Promise.resolve(overrides.waba === undefined ? "WABA_1" : overrides.waba),
     loadTemplateById: (_: string) => Promise.resolve(overrides.templateById ?? null),
     findLocalRow: (i: string, item: any) =>
       Promise.resolve(overrides.localByItem ? overrides.localByItem(i, item) : null),
