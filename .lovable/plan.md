@@ -1,103 +1,97 @@
 
-# Fase 6 — Utilização e envio de template aprovado
+# Fase 7 — Revisão, consolidação e remoção de duplicidade
 
-Fatia vertical: usuário abre `/app/modelos`, aciona "Usar modelo" em um template `approved`, preenche variáveis, envia, e vê o WAMID salvo com status `sent`. Modelos fora de `approved` são bloqueados em UI e backend.
+Sem novas features. Só consolidação, com todos os testes existentes permanecendo verdes.
 
-## O que já existe (reutilizar)
+## 1. Auditoria de duplicidade (o que já é único e o que não é)
 
-- `UseTemplateDialog` completo (destinatário / variáveis / preview / envio).
-- `queueAndSendFromTemplate` → insere `messages` em `queued` e chama `send-whatsapp`.
-- `send-whatsapp/index.ts` já valida `meta_status === approved`, `meta_template_name`, opt-out, e persiste o WAMID retornado pela Meta (fluxo `sent` → webhook `delivered`/`read`).
-- Coluna `meta_body_parameter_order` já existe em `message_templates` (grava no editor); coluna legada `meta_parameter_order` ainda é lida no backend.
-- `TemplateCard` catálogo com prop `onUse` e `useDisabledReason` já suporta os textos por status.
+Já existe **uma** implementação canônica de:
 
-## Lacunas cobertas nesta fase
+- Validação de rascunho — `src/lib/templateDraft.ts`
+- Extração/rótulos de variáveis — `src/lib/metaVariables.ts`
+- Badge/labels de status Meta — `META_STATUS_LABEL` em `src/lib/templates.ts`
+- Preview WhatsApp — `src/components/app/messages/WhatsAppPreview.tsx`
+- Payload de criação de template — `supabase/functions/_shared/metaTemplatePayload.ts`
+- Payload de envio de template aprovado — `supabase/functions/_shared/approvedTemplatePayload.ts`
+- Tradução de erros WhatsApp — `supabase/functions/_shared/whatsapp-errors.ts` + `src/lib/whatsapp.ts`
+- Serviço institucional de modelos — `src/services/institutionTemplates.ts`
 
-1. `/app/modelos` não abre o dialog — `onUse` está vazio.
-2. Backend lê a coluna legada `meta_parameter_order`; precisa passar a usar exclusivamente `meta_body_parameter_order`.
-3. Faltam guards: `meta_has_local_differences`, `meta_definition` ausente, `meta_language` ausente, template de outra instituição, canal inativo, WABA divergente, Phone Number ID divergente.
-4. Não há builder puro reutilizável nem testável isoladamente.
-5. Media de header não valida que o `meta_media_id` pertence ao canal/WABA corrente.
+Ainda existem **duas superfícies de edição** de modelo:
 
-## Entregas
+- ✅ Canônica: `MessageTemplateNew` / `MessageTemplateEdit` + `TemplateEditorForm` (rota `/app/modelos/...`)
+- ❌ Legada: `TemplateEditorDialog` usada em `src/pages/app/Content.tsx` (detalhe da pasta) e `TemplatesTab.tsx` (não mais montado em nenhuma rota).
 
-### 1. Builder puro `buildApprovedTemplateMessage`
+Fase 7 elimina a superfície legada.
 
-Novo arquivo `supabase/functions/_shared/approvedTemplatePayload.ts` exportando:
+## 2. Alterações de código
 
-```ts
-buildApprovedTemplateMessage(input): { ok: true; payload } | { ok: false; errorCode; error }
-```
+### 2.1 `src/pages/app/Content.tsx` (detalhe da pasta)
 
-Entrada:
-- `template` sincronizado (`meta_template_name`, `meta_language`, `meta_status`, `meta_has_local_differences`, `meta_definition`, `meta_header_type`, `meta_body_parameter_order`, `meta_buttons`, `meta_carousel_cards`, `institution`, `waba_id`).
-- `to` (E.164 já normalizado).
-- `variables` semânticas (`Record<string,string>`).
-- `header` opcional (`{ format, media_id }` para IMAGE/VIDEO/DOCUMENT; nunca aceita `header_handle`).
-- `buttons` runtime já normalizados.
+- Remover a seção "Objetivos de mensagem" inteira: `sortedTemplates`, `StartBlankCard`, grid de `TemplateCard` de edição, `TemplateEditorDialog`, `UseTemplateDialog`, `duplicateTpl`, estados `editorOpen/editingTpl/useOpen/usingTpl`.
+- Substituir por um **card único "Modelos deste tema"** com CTA `Link` para `/app/modelos?categoria=<folder.value>` (contagem = `templates.length`).
+- Manter tudo relativo a **conteúdos educativos** (`ContentFormDialog`, `SendContentDialog`, busca, pastas).
+- Na visão de pastas, o contador `f.templates` continua exibido, mas o clique da pasta continua abrindo o detalhe (agora só com o card-link).
+- Remover imports mortos: `TemplateEditorDialog`, `StartBlankCard`.
 
-Regras internas:
-- Rejeita se `meta_status !== "approved"` → `TEMPLATE_NOT_APPROVED`.
-- Rejeita se `meta_has_local_differences === true` → `TEMPLATE_LOCAL_DIFFERENCES`.
-- Rejeita se `meta_definition` ausente → `TEMPLATE_DEFINITION_MISSING`.
-- Rejeita se `meta_template_name` ausente → `TEMPLATE_NAME_MISSING`.
-- Rejeita se `meta_language` ausente → `TEMPLATE_LANGUAGE_MISSING`.
-- Usa exclusivamente `meta_body_parameter_order` para BODY; se `{{n}}` existe e a ordem está vazia → `TEMPLATE_PARAMETER_ORDER_MISSING`. Variável ausente/placeholder → `TEMPLATE_PARAMETER_MISSING`.
-- Para header IMAGE/VIDEO/DOCUMENT usa `{ id: media_id }` (nunca `header_handle`). Sem `media_id` → `MEDIA_NOT_UPLOADED`.
-- Não faz `fetch`; recebe tudo já resolvido.
+### 2.2 `src/pages/app/Content.tsx` (busca global)
 
-### 2. Refactor de `send-whatsapp/index.ts`
+- Em `SearchResults`, trocar cliques em templates (`onUse/onEdit/onDuplicate`) por navegação para `/app/modelos?categoria=<folder>` em vez de reabrir a pasta com editor.
+- Alternativa mais simples: manter a seção "Objetivos" só como link para `/app/modelos` filtrado; nenhum botão de editar/duplicar.
 
-- Alterar o `SELECT` do template para incluir `meta_language, meta_has_local_differences, meta_definition, meta_body_parameter_order, waba_id, institution` e remover leitura de `meta_parameter_order`.
-- Delegar montagem do payload de template (não-auth, não-carrossel) para o builder novo. Manter os fluxos AUTHENTICATION e CAROUSEL onde estão (fora do escopo da fatia).
-- Adicionar guards antes da chamada Meta:
-  - `template.institution !== msg.institution` → `TEMPLATE_INSTITUTION_MISMATCH`.
-  - canal (`institution_whatsapp_settings`) inativo → `WHATSAPP_CHANNEL_INACTIVE`.
-  - `template.waba_id` divergente do canal → `WHATSAPP_WABA_MISMATCH`.
-  - `PHONE_NUMBER_ID` do canal divergente do secreto/resolvido → `WHATSAPP_PHONE_NUMBER_MISMATCH`.
-- Para header de mídia, validar que `whatsapp_media_assets.institution` e `channel_id` combinam com o canal usado; senão `MEDIA_CHANNEL_MISMATCH`.
-- Persistir `external_message_id` (WAMID) já é feito — cobrir por teste.
+### 2.3 Remover arquivos legados
 
-### 3. Frontend
+- Apagar `src/components/app/messages/TemplatesTab.tsx` (nenhuma rota importa).
+- Não apagar `TemplateEditorDialog.tsx` neste PR se ainda houver algum caminho oculto — confirmar com `rg` antes; se realmente órfão, apagar junto.
 
-- `MessageTemplates.tsx`: passar a abrir `UseTemplateDialog` no `onUse` (`useState<MessageTemplate | null>` + estado `useOpen`, seguindo padrão de `Content.tsx`). Botão só aparece para `template_kind === "internal"` ou `template_kind === "meta" && meta_status === "approved"`; para os demais status `useDisabledReason` continua exibido, mostrando:
-  - `submitted` → "Aguardando análise da Meta."
-  - `rejected` → "Rejeitado — ver motivo no editor."
-  - `paused` / `disabled` → "Indisponível."
-  - `not_submitted` → "Ainda não submetido."
-- `TemplateCard` catálogo: passar a esconder o botão "Usar modelo" quando `disabledReason` está setado (hoje ele fica visível cinza — manter comportamento visual, apenas garantir `disabled`).
-- Nenhuma mudança em `UseTemplateDialog` além de propagar novos `error_code` que o backend passar a retornar (já são exibidos por `friendlyWhatsAppError`, adicionar as novas chaves ali).
+### 2.4 `/app/modelos` — filtro por categoria via URL
 
-### 4. Migração de dados (não schema)
+Em `src/pages/app/MessageTemplates.tsx`:
 
-- Nada de DDL nesta fase. Apenas parar de ler `meta_parameter_order` no backend. Coluna legada permanece no banco (limpeza é fora de escopo).
+- Ler `categoria` de `useSearchParams`.
+- Inicializar `catFilter` a partir da query string; ao mudar o `<select>` de categoria, atualizar a URL (`setSearchParams({ categoria })`) sem recarregar.
+- Aceitar valores conhecidos (fallback para `todos`).
 
-## TDD — ordem
+### 2.5 Superadmin
 
-Ciclo 1 (RED → GREEN mínimo):
-- `supabase/functions/_shared/approvedTemplatePayload.test.ts`: template `approved` + variáveis válidas → payload BODY correto.
-- `supabase/functions/send-whatsapp/handler.test.ts` (novo, se ainda não existe): stub Meta retornando `wamid.xxx` → mensagem fica `sent` e `external_message_id === "wamid.xxx"`.
-- `src/pages/app/MessageTemplates.useDialog.test.tsx`: clicar "Usar modelo" em template `approved` abre o dialog; em `submitted`/`rejected` o botão está desabilitado e mostra o motivo.
+`/superadmin/whatsapp` **não existe hoje** no roteador. Duas opções:
 
-Ciclos seguintes (um teste por ciclo):
-- builder bloqueia `submitted`, `rejected`, `meta_has_local_differences`, `meta_definition` ausente, `meta_body_parameter_order` vazio com `{{n}}`, variável ausente.
-- send-whatsapp bloqueia template de outra instituição, canal inativo, WABA divergente, Phone Number ID divergente, opt-out, telefone inválido (regras já existentes cobertas com teste).
-- header IMAGE usa `{ id: media_id }` e nunca `header_handle`; `MEDIA_CHANNEL_MISMATCH` quando `whatsapp_media_assets` não bate com canal.
-- webhook: `delivered` e `read` avançam status; `sent → delivered → read` não regride; `failed` não sobrescreve `read`.
+- (a) Não criar nada nesta fase; documentar como pendência futura.
+- (b) Criar apenas o esqueleto de rota que agrega páginas já existentes (diagnóstico, `repair-whatsapp-channel`, auditoria) sem novo editor.
 
-## Arquivos afetados
+Recomendo **(a)** — Fase 7 é consolidação, não nova feature. A criação institucional permanece em `/app/modelos/novo`, como já está.
 
-- Novo `supabase/functions/_shared/approvedTemplatePayload.ts` + `.test.ts`.
-- `supabase/functions/send-whatsapp/index.ts` (SELECT, delegação ao builder, novos guards).
-- Novo `supabase/functions/send-whatsapp/guards.test.ts` (Deno) — cobrindo os novos error codes.
-- `src/pages/app/MessageTemplates.tsx` (wire do dialog).
-- `src/components/app/messages/TemplateCard.tsx` (garantir `disabled` no botão do catálogo).
-- `src/lib/whatsapp.ts` (`friendlyWhatsAppError` — mensagens dos novos códigos).
-- Novo `src/pages/app/MessageTemplates.useDialog.test.tsx`.
+### 2.6 Configurações
 
-## Fora do escopo (parar antes)
+`/app/configuracoes/whatsapp` (`WhatsAppSettings.tsx`) já cobre identidade/assinatura/rodapé. Nada muda. Confirmar que **não** contém formulário de modelo.
 
-- Sem novo webhook (usa o existente).
-- Sem alteração no envio de mensagens livres (não-template).
-- Sem migração/limpeza de `meta_parameter_order`.
-- Sem tocar em fluxo AUTHENTICATION nem CAROUSEL.
+## 3. Regressão
+
+Rodar sem alterar comportamento observável em `/app/modelos*`:
+
+- `bunx vitest run` (52 testes atuais devem continuar verdes; incluir `MessageTemplates.test.tsx` com nova asserção de filtro por URL — 1 teste novo).
+- `deno test` das Edge Functions (55 atuais).
+- `bun run lint` e `bun run build`.
+
+## 4. Checklist de segurança (verificação, sem alterações se OK)
+
+- Status de modelo não é editável no `TemplateEditorForm` (campo readOnly / ausente).
+- `WHATSAPP_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` só existem em secrets — `rg` no `src/` para confirmar zero referências.
+- Instituição vem sempre de `profiles.institution` via `InstitutionIdentityProvider`, nunca de input livre.
+- RLS de `message_templates` restringe INSERT/UPDATE a admin (migration Fase 2 já aplicada).
+- `send-whatsapp` e `create-whatsapp-template` resolvem WABA e Phone Number ID no servidor a partir da instituição.
+- Mensagens de erro traduzidas via `friendlyWhatsAppError` não vazam token.
+
+## 5. Entrega
+
+Ao final, reportar:
+
+- Arquivos alterados: `src/pages/app/Content.tsx`, `src/pages/app/MessageTemplates.tsx`, `src/pages/app/MessageTemplates.test.tsx`, remoção de `src/components/app/messages/TemplatesTab.tsx`.
+- Migrations: nenhuma nova.
+- Testes criados: 1 (filtro `?categoria=` em `/app/modelos`).
+- Edge Functions envolvidas: nenhuma alterada.
+- Secrets: nenhuma nova.
+- URLs verificadas manualmente: `/app/modelos`, `/app/modelos/novo`, `/app/modelos/:id`, `/app/conteudos`, `/app/conteudos?pasta=...`, `/app/configuracoes/whatsapp`.
+- Etapas manuais Meta: nenhuma nesta fase.
+- Riscos residuais: `/superadmin/whatsapp` continua inexistente (fora do escopo desta fase); `TemplateEditorDialog.tsx` pode ser apagado só se `rg` confirmar zero usos após a limpeza do Content.
+
+Só declarar concluído se `vitest`, `deno test`, `lint` e `build` passarem.
