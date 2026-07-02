@@ -33,13 +33,15 @@ describe("templateDraft", () => {
 
   it("rejects empty body", () => {
     const r = validateTemplateDraft({ ...base, body: "" });
-    if (r.ok) throw new Error("expected validation to fail");
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
     expect(r.errors.body).toBeTruthy();
   });
 
   it("rejects invalid meta_template_name", () => {
     const r = validateTemplateDraft({ ...base, meta_template_name: "Foo Bar!" });
-    if (r.ok) throw new Error("expected validation to fail");
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
     expect(r.errors.meta_template_name).toBeTruthy();
   });
 
@@ -49,7 +51,8 @@ describe("templateDraft", () => {
       body: "Olá {nome_paciente}, dia {data_consulta}",
       variable_examples: { nome_paciente: "Maria" },
     });
-    if (r.ok) throw new Error("expected validation to fail");
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
     expect(r.errors["variable_examples.data_consulta"]).toBeTruthy();
   });
 
