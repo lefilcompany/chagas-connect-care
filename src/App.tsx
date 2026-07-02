@@ -24,7 +24,9 @@ import Segments from "./pages/app/Segments";
 import SegmentEditor from "./pages/app/SegmentEditor";
 import WhatsAppSettings from "./pages/app/WhatsAppSettings";
 import Conversas from "./pages/app/Conversas";
+import MessageTemplates from "./pages/app/MessageTemplates";
 import OnboardingForm from "./pages/public/OnboardingForm";
+import { InstitutionIdentityProvider } from "@/services/institutionIdentityProvider";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +65,14 @@ const App = () => (
               <Route path="conversas" element={<Conversas />} />
               <Route path="conteudos" element={<Content />} />
               <Route path="conteudos/campanha" element={<Campaign />} />
+              <Route
+                path="modelos"
+                element={
+                  <InstitutionIdentityProvider>
+                    <MessageTemplates />
+                  </InstitutionIdentityProvider>
+                }
+              />
               <Route path="segmentos" element={<Segments />} />
               <Route path="segmentos/novo" element={<SegmentEditor />} />
               <Route path="segmentos/:id/editar" element={<SegmentEditor />} />
