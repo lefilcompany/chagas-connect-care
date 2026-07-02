@@ -131,9 +131,9 @@ Deno.test("MP4 larger than 16MB returns 400 FILE_TOO_LARGE", async () => {
 
 Deno.test("PDF larger than 100MB returns 400 FILE_TOO_LARGE", async () => {
   const { deps } = makeDeps();
-  // Avoid allocating 100MB in the test; stub file.size instead.
-  const blob: Blob = Object.assign(new Blob([new Uint8Array(8)], { type: "application/pdf" }), {});
-  Object.defineProperty(blob, "size", { value: DEFAULT_LIMITS.DOCUMENT + 1 });
+  const blob = new Blob([new Uint8Array(DEFAULT_LIMITS.DOCUMENT + 1)], {
+    type: "application/pdf",
+  });
   const res = await createHandler(deps)(makeReq({ file: blob, fileName: "x.pdf" }));
   assertEquals(res.status, 400);
   assertEquals((await res.json()).error_code, "FILE_TOO_LARGE");
