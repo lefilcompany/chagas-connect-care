@@ -3,8 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Edit3 } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { TemplateCard } from "@/components/app/messages/TemplateCard";
+import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
 import {
   META_STATUS_LABEL,
   TEMPLATE_CATEGORIES,
@@ -42,6 +43,8 @@ export default function MessageTemplates() {
   const [typeFilter, setTypeFilter] = useState<"todos" | "internal" | "meta">("todos");
   const [statusFilter, setStatusFilter] = useState<"todos" | MetaStatus>("todos");
   const [catFilter, setCatFilter] = useState<string>("todos");
+  const [usingTpl, setUsingTpl] = useState<MessageTemplate | null>(null);
+  const [useOpen, setUseOpen] = useState(false);
 
   const institution = identity.institution ?? "";
 
@@ -178,17 +181,35 @@ export default function MessageTemplates() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((t) => {
             const isMeta = t.template_kind === "meta";
-            const disabledReason =
-              isMeta && t.meta_status !== "approved"
-                ? "Disponível apenas após aprovação da Meta."
-                : undefined;
+            let disabledReason: string | undefined;
+            if (isMeta && t.meta_status !== "approved") {
+              switch (t.meta_status) {
+                case "submitted":
+                  disabledReason = "Aguardando análise da Meta.";
+                  break;
+                case "rejected":
+                  disabledReason = "Rejeitado — ver motivo no editor.";
+                  break;
+                case "paused":
+                case "disabled":
+                  disabledReason = "Indisponível.";
+                  break;
+                default:
+                  disabledReason = "Ainda não submetido.";
+              }
+            } else if (isMeta && t.meta_has_local_differences) {
+              disabledReason = "Template diverge da versão aprovada. Sincronize antes de enviar.";
+            }
             return (
               <TemplateCard
                 key={t.id}
                 template={t}
                 variant="catalog"
                 useDisabledReason={disabledReason}
-                onUse={() => { /* wired in later phases */ }}
+                onUse={() => {
+                  setUsingTpl(t);
+                  setUseOpen(true);
+                }}
                 onEdit={identity.isAdmin ? () => navigate(`/app/modelos/${t.id}`) : undefined}
               />
             );
@@ -201,6 +222,16 @@ export default function MessageTemplates() {
           Em breve: criar e submeter modelos à Meta diretamente por esta tela.
         </p>
       )}
+
+      <UseTemplateDialog
+        open={useOpen}
+        onOpenChange={(o) => {
+          setUseOpen(o);
+          if (!o) setUsingTpl(null);
+        }}
+        template={usingTpl}
+        onGoToSegmented={(t) => navigate(`/app/conteudos/campanha?template=${t.id}`)}
+      />
     </div>
   );
 }
