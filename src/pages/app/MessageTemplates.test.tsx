@@ -2,6 +2,19 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
+
+// Avoid the real UseTemplateDialog: it queries supabase + auth on open which
+// hangs in unit tests. We only need to assert the dialog opens with the
+// selected template name.
+vi.mock("@/components/app/messages/UseTemplateDialog", () => ({
+  UseTemplateDialog: ({ open, template }: any) =>
+    open && template ? (
+      <div role="dialog" aria-label={`Usar objetivo: ${template.name}`}>
+        stub
+      </div>
+    ) : null,
+}));
+
 import MessageTemplates from "./MessageTemplates";
 import {
   InstitutionTemplateServiceContext,
