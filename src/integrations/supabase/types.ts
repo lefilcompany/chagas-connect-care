@@ -452,22 +452,35 @@ export type Database = {
           meta_buttons: Json | null
           meta_carousel_cards: Json | null
           meta_category: string | null
+          meta_creation_payload: Json | null
           meta_definition: Json | null
           meta_footer_source: string | null
           meta_footer_text: string | null
           meta_has_local_differences: boolean
+          meta_header_handle: string | null
           meta_header_parameter_order: Json | null
           meta_header_text: string | null
           meta_header_type: string | null
+          meta_idempotency_key: string | null
           meta_language: string
           meta_last_synced_at: string | null
+          meta_last_webhook_at: string | null
+          meta_parameter_format: string | null
           meta_parameter_order: Json
           meta_parent_template_id: string | null
+          meta_quality_score: Json | null
+          meta_rejection_info: Json | null
           meta_rejection_reason: string | null
           meta_status: string
+          meta_status_raw: string | null
+          meta_submitted_at: string | null
+          meta_submitted_by: string | null
+          meta_sync_pending: boolean
           meta_template_id: string | null
           meta_template_name: string | null
+          meta_variable_examples: Json | null
           meta_version: number | null
+          meta_waba_id: string | null
           name: string
           rejection_reason: string | null
           segment_id: string | null
@@ -498,22 +511,35 @@ export type Database = {
           meta_buttons?: Json | null
           meta_carousel_cards?: Json | null
           meta_category?: string | null
+          meta_creation_payload?: Json | null
           meta_definition?: Json | null
           meta_footer_source?: string | null
           meta_footer_text?: string | null
           meta_has_local_differences?: boolean
+          meta_header_handle?: string | null
           meta_header_parameter_order?: Json | null
           meta_header_text?: string | null
           meta_header_type?: string | null
+          meta_idempotency_key?: string | null
           meta_language?: string
           meta_last_synced_at?: string | null
+          meta_last_webhook_at?: string | null
+          meta_parameter_format?: string | null
           meta_parameter_order?: Json
           meta_parent_template_id?: string | null
+          meta_quality_score?: Json | null
+          meta_rejection_info?: Json | null
           meta_rejection_reason?: string | null
           meta_status?: string
+          meta_status_raw?: string | null
+          meta_submitted_at?: string | null
+          meta_submitted_by?: string | null
+          meta_sync_pending?: boolean
           meta_template_id?: string | null
           meta_template_name?: string | null
+          meta_variable_examples?: Json | null
           meta_version?: number | null
+          meta_waba_id?: string | null
           name: string
           rejection_reason?: string | null
           segment_id?: string | null
@@ -544,22 +570,35 @@ export type Database = {
           meta_buttons?: Json | null
           meta_carousel_cards?: Json | null
           meta_category?: string | null
+          meta_creation_payload?: Json | null
           meta_definition?: Json | null
           meta_footer_source?: string | null
           meta_footer_text?: string | null
           meta_has_local_differences?: boolean
+          meta_header_handle?: string | null
           meta_header_parameter_order?: Json | null
           meta_header_text?: string | null
           meta_header_type?: string | null
+          meta_idempotency_key?: string | null
           meta_language?: string
           meta_last_synced_at?: string | null
+          meta_last_webhook_at?: string | null
+          meta_parameter_format?: string | null
           meta_parameter_order?: Json
           meta_parent_template_id?: string | null
+          meta_quality_score?: Json | null
+          meta_rejection_info?: Json | null
           meta_rejection_reason?: string | null
           meta_status?: string
+          meta_status_raw?: string | null
+          meta_submitted_at?: string | null
+          meta_submitted_by?: string | null
+          meta_sync_pending?: boolean
           meta_template_id?: string | null
           meta_template_name?: string | null
+          meta_variable_examples?: Json | null
           meta_version?: number | null
+          meta_waba_id?: string | null
           name?: string
           rejection_reason?: string | null
           segment_id?: string | null
@@ -959,6 +998,57 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_admin_audit_log: {
+        Row: {
+          action: string
+          actor_role: string | null
+          after_state: Json | null
+          before_state: Json | null
+          correlation_id: string | null
+          created_at: string
+          entity: string
+          entity_id: string | null
+          error_code: string | null
+          id: string
+          institution: string | null
+          ip: unknown
+          result: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_role?: string | null
+          after_state?: Json | null
+          before_state?: Json | null
+          correlation_id?: string | null
+          created_at?: string
+          entity: string
+          entity_id?: string | null
+          error_code?: string | null
+          id?: string
+          institution?: string | null
+          ip?: unknown
+          result?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_role?: string | null
+          after_state?: Json | null
+          before_state?: Json | null
+          correlation_id?: string | null
+          created_at?: string
+          entity?: string
+          entity_id?: string | null
+          error_code?: string | null
+          id?: string
+          institution?: string | null
+          ip?: unknown
+          result?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       whatsapp_channels: {
         Row: {
           created_at: string
@@ -1155,6 +1245,42 @@ export type Database = {
           },
         ]
       }
+      whatsapp_integration_health: {
+        Row: {
+          check_key: string
+          checked_at: string
+          correlation_id: string | null
+          created_at: string
+          detail: Json | null
+          id: string
+          scope: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          check_key: string
+          checked_at?: string
+          correlation_id?: string | null
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          scope: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          check_key?: string
+          checked_at?: string
+          correlation_id?: string | null
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          scope?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       whatsapp_media_assets: {
         Row: {
           created_at: string
@@ -1314,6 +1440,95 @@ export type Database = {
           },
         ]
       }
+      whatsapp_template_events: {
+        Row: {
+          entry_timestamp: number | null
+          event: string
+          id: string
+          meta_template_id: string | null
+          payload: Json | null
+          payload_hash: string
+          processed_at: string
+        }
+        Insert: {
+          entry_timestamp?: number | null
+          event: string
+          id?: string
+          meta_template_id?: string | null
+          payload?: Json | null
+          payload_hash: string
+          processed_at?: string
+        }
+        Update: {
+          entry_timestamp?: number | null
+          event?: string
+          id?: string
+          meta_template_id?: string | null
+          payload?: Json | null
+          payload_hash?: string
+          processed_at?: string
+        }
+        Relationships: []
+      }
+      whatsapp_template_submissions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          error_code: string | null
+          error_payload: Json | null
+          id: string
+          idempotency_key: string
+          institution: string
+          local_template_id: string
+          meta_template_id: string | null
+          request_payload: Json | null
+          response_payload: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          error_payload?: Json | null
+          id?: string
+          idempotency_key: string
+          institution: string
+          local_template_id: string
+          meta_template_id?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          error_payload?: Json | null
+          id?: string
+          idempotency_key?: string
+          institution?: string
+          local_template_id?: string
+          meta_template_id?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_template_submissions_local_template_id_fkey"
+            columns: ["local_template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_unmatched_events: {
         Row: {
           created_at: string
@@ -1431,11 +1646,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       mark_expired_whatsapp_media: { Args: never; Returns: number }
       whatsapp_window_open: { Args: { _identity_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "equipe"
+      app_role: "admin" | "equipe" | "superadmin"
       message_channel: "whatsapp" | "sms"
       patient_stage: "diagnostico" | "agudo" | "cronico"
     }
@@ -1565,7 +1781,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "equipe"],
+      app_role: ["admin", "equipe", "superadmin"],
       message_channel: ["whatsapp", "sms"],
       patient_stage: ["diagnostico", "agudo", "cronico"],
     },
