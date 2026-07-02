@@ -64,6 +64,7 @@ function renderPage(opts: RenderOpts = {}) {
     updateDraft: vi.fn(async () => ({} as any)),
     submitToMeta: vi.fn(async () => ({ meta_template_id: "m", meta_status: "submitted", submitted_at: "2026-07-02T00:00:00.000Z" })),
     syncFromMeta: vi.fn(async () => ({ meta_status: "submitted", updated: 0, matched: 0 })),
+    uploadHeaderMedia: vi.fn(async () => ({ header_handle: "HDL", format: "IMAGE" as const, media_id: "m" })),
     ...opts.serviceOverride,
   };
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

@@ -54,6 +54,7 @@ function makeService(tpl: MessageTemplate, over: Partial<InstitutionTemplateServ
     updateDraft: vi.fn(),
     submitToMeta: vi.fn(),
     syncFromMeta: vi.fn(async () => ({ meta_status: "approved", updated: 1, matched: 1 })),
+    uploadHeaderMedia: vi.fn(async () => ({ header_handle: "HDL", format: "IMAGE" as const, media_id: "m" })),
     ...over,
   };
 }

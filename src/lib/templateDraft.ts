@@ -43,8 +43,17 @@ export const templateDraftSchema = z
     meta_category: z
       .enum(["UTILITY", "MARKETING", "AUTHENTICATION"])
       .default("UTILITY"),
-    meta_header_type: z.enum(["none", "text"]).default("none"),
+    meta_header_type: z
+      .enum(["none", "text", "image", "video", "document"])
+      .default("none"),
     meta_header_text: z.string().trim().max(60).default(""),
+    meta_header_handle: z.string().trim().default(""),
+    meta_header_media_id: z.string().uuid().nullable().optional().default(null),
+    meta_header_format: z
+      .enum(["IMAGE", "VIDEO", "DOCUMENT"]).nullable().optional().default(null),
+    meta_header_media_file_name: z.string().optional().default(""),
+    meta_header_media_mime: z.string().optional().default(""),
+    meta_header_media_size: z.number().int().nonnegative().optional().default(0),
     meta_footer_text: z.string().trim().max(60).default(""),
     meta_buttons: z.array(buttonSchema).max(10).default([]),
     variable_examples: z.record(z.string(), z.string()).default({}),
@@ -72,6 +81,18 @@ export const templateDraftSchema = z
             message: `Informe um exemplo para {${v}}`,
           });
         }
+      }
+      if (
+        (data.meta_header_type === "image" ||
+          data.meta_header_type === "video" ||
+          data.meta_header_type === "document") &&
+        !data.meta_header_handle
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["meta_header_handle"],
+          message: "Envie uma amostra de mídia antes de submeter o modelo.",
+        });
       }
     }
   });

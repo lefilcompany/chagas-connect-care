@@ -83,6 +83,7 @@ describe("MessageTemplateEdit", () => {
       updateDraft: vi.fn(async (id, input) => ({ ...draft, id, ...input } as any)),
       submitToMeta: vi.fn(async () => ({ meta_template_id: "m", meta_status: "submitted", submitted_at: "2026-07-02T00:00:00.000Z" })),
       syncFromMeta: vi.fn(async () => ({ meta_status: "submitted", updated: 0, matched: 0 })),
+    uploadHeaderMedia: vi.fn(async () => ({ header_handle: "HDL", format: "IMAGE" as const, media_id: "m" })),
     };
     renderAt("/app/modelos/t-1", service);
 
@@ -112,6 +113,7 @@ describe("MessageTemplateEdit", () => {
       updateDraft: vi.fn(),
       submitToMeta: vi.fn(async () => ({ meta_template_id: "m", meta_status: "submitted", submitted_at: "2026-07-02T00:00:00.000Z" })),
       syncFromMeta: vi.fn(async () => ({ meta_status: "submitted", updated: 0, matched: 0 })),
+    uploadHeaderMedia: vi.fn(async () => ({ header_handle: "HDL", format: "IMAGE" as const, media_id: "m" })),
     };
     renderAt("/app/modelos/t-2", service);
 
@@ -130,6 +132,7 @@ describe("MessageTemplateEdit", () => {
       updateDraft: vi.fn(),
       submitToMeta: vi.fn(async () => ({ meta_template_id: "m", meta_status: "submitted", submitted_at: "2026-07-02T00:00:00.000Z" })),
       syncFromMeta: vi.fn(async () => ({ meta_status: "submitted", updated: 0, matched: 0 })),
+    uploadHeaderMedia: vi.fn(async () => ({ header_handle: "HDL", format: "IMAGE" as const, media_id: "m" })),
     };
     renderAt("/app/modelos/t-1", service, {
       ...adminIdentity,

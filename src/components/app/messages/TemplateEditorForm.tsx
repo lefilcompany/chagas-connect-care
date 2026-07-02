@@ -24,6 +24,9 @@ export type EditorFormProps = {
   disabled?: boolean;
   /** Optional status badge to show at the top (read-only). */
   statusBadge?: React.ReactNode;
+  /** When provided, renders the media upload UI for image/video/document headers. */
+  onUploadHeaderMedia?: (file: File) => Promise<void> | void;
+  uploadingHeaderMedia?: boolean;
 };
 
 const EMPTY_BUTTON: Record<TemplateDraftButton["type"], TemplateDraftButton> = {
@@ -38,6 +41,8 @@ export function TemplateEditorForm({
   errors,
   disabled = false,
   statusBadge,
+  onUploadHeaderMedia,
+  uploadingHeaderMedia = false,
 }: EditorFormProps) {
   const isMeta = value.template_kind === "meta";
   const vars = useMemo(() => extractSemanticKeys(value.body), [value.body]);
@@ -192,7 +197,7 @@ export function TemplateEditorForm({
         <div className="space-y-2 rounded-lg border p-4">
           <Label>Cabeçalho</Label>
           <div className="flex gap-2">
-            {(["none", "text"] as const).map((t) => (
+            {(["none", "text", "image", "video", "document"] as const).map((t) => (
               <label
                 key={t}
                 className={`flex-1 cursor-pointer rounded-md border px-3 py-2 text-center text-sm ${
@@ -206,9 +211,25 @@ export function TemplateEditorForm({
                   name="meta_header_type"
                   className="sr-only"
                   checked={value.meta_header_type === t}
-                  onChange={() => set("meta_header_type", t)}
+                  onChange={() => {
+                    onChange({
+                      meta_header_type: t,
+                      // Clear the sample when switching away from a media header.
+                      meta_header_handle: t === "text" || t === "none" ? "" : value.meta_header_handle,
+                      meta_header_format:
+                        t === "image" ? "IMAGE" : t === "video" ? "VIDEO" : t === "document" ? "DOCUMENT" : null,
+                    });
+                  }}
                 />
-                {t === "none" ? "Nenhum" : "Texto"}
+                {t === "none"
+                  ? "Nenhum"
+                  : t === "text"
+                    ? "Texto"
+                    : t === "image"
+                      ? "Imagem"
+                      : t === "video"
+                        ? "Vídeo"
+                        : "Documento"}
               </label>
             ))}
           </div>
@@ -218,6 +239,27 @@ export function TemplateEditorForm({
               onChange={(e) => set("meta_header_text", e.target.value)}
               maxLength={60}
               placeholder="Cabeçalho curto (até 60 caracteres)"
+            />
+          )}
+          {(value.meta_header_type === "image" ||
+            value.meta_header_type === "video" ||
+            value.meta_header_type === "document") && (
+            <HeaderMediaUploader
+              type={value.meta_header_type}
+              handle={value.meta_header_handle}
+              fileName={value.meta_header_media_file_name}
+              size={value.meta_header_media_size}
+              error={errors.meta_header_handle}
+              disabled={disabled || !onUploadHeaderMedia}
+              uploading={uploadingHeaderMedia}
+              onUpload={async (file) => {
+                onChange({
+                  meta_header_media_file_name: file.name,
+                  meta_header_media_mime: file.type,
+                  meta_header_media_size: file.size,
+                });
+                await onUploadHeaderMedia?.(file);
+              }}
             />
           )}
         </div>
@@ -374,5 +416,79 @@ export function TemplateEditorForm({
         />
       </div>
     </fieldset>
+  );
+}
+
+const ACCEPT_BY_TYPE = {
+  image: "image/jpeg,image/png",
+  video: "video/mp4,video/3gpp",
+  document: "application/pdf",
+} as const;
+
+function formatBytes(n: number): string {
+  if (!n) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0;
+  let v = n;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i += 1; }
+  return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function HeaderMediaUploader({
+  type,
+  handle,
+  fileName,
+  size,
+  error,
+  disabled,
+  uploading,
+  onUpload,
+}: {
+  type: "image" | "video" | "document";
+  handle: string;
+  fileName?: string;
+  size?: number;
+  error?: string;
+  disabled: boolean;
+  uploading: boolean;
+  onUpload: (file: File) => Promise<void> | void;
+}) {
+  return (
+    <div className="space-y-2">
+      <input
+        type="file"
+        accept={ACCEPT_BY_TYPE[type]}
+        aria-label="Amostra de mídia do cabeçalho"
+        disabled={disabled || uploading}
+        onChange={async (e) => {
+          const target = e.currentTarget;
+          const file = target.files?.[0];
+          if (file) await onUpload(file);
+          // reset so the same file can be re-selected if needed
+          if (target && target.isConnected) target.value = "";
+        }}
+        className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary"
+      />
+      {uploading && <p className="text-xs text-muted-foreground">Enviando amostra…</p>}
+      {handle && (
+        <div className="rounded-md border bg-muted/40 p-2 text-xs">
+          <p><strong>Amostra enviada.</strong></p>
+          {fileName && (
+            <p className="text-muted-foreground">
+              {fileName}{size ? ` · ${formatBytes(size)}` : ""}
+            </p>
+          )}
+          <p className="mt-1 break-all text-muted-foreground">
+            handle: <code>{handle}</code>
+          </p>
+        </div>
+      )}
+      {!handle && !uploading && (
+        <p className="text-xs text-muted-foreground">
+          Selecione um arquivo real para que a Meta gere o handle da amostra.
+        </p>
+      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
   );
 }

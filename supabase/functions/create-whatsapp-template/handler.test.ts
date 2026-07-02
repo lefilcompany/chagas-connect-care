@@ -22,6 +22,7 @@ function makeTemplate(over: Partial<TemplateRow> = {}): TemplateRow {
     body: "Olá, {nome_paciente}.",
     meta_header_type: "text",
     meta_header_text: "Lembrete",
+    meta_header_handle: null,
     meta_footer_text: "Tecnova",
     meta_buttons: [],
     meta_variable_examples: { nome_paciente: "Maria" },
@@ -199,4 +200,34 @@ Deno.test("WABA missing returns 400 WABA_NOT_CONFIGURED", async () => {
   const res = await createHandler(deps)(req({ local_template_id: "tpl-1" }));
   assertEquals(res.status, 400);
   assertEquals((await res.json()).error_code, "WABA_NOT_CONFIGURED");
+});
+
+Deno.test("IMAGE header without handle returns 400 TEMPLATE_INVALID and no Meta call", async () => {
+  const tpl = makeTemplate({
+    meta_header_type: "image",
+    meta_header_text: "",
+    meta_header_handle: null,
+  });
+  const { deps, metaCalls } = makeDeps({ template: tpl });
+  const res = await createHandler(deps)(req({ local_template_id: "tpl-1" }));
+  assertEquals(res.status, 400);
+  const j = await res.json();
+  assertEquals(j.error_code, "TEMPLATE_INVALID");
+  assert(j.errors.header);
+  assertEquals(metaCalls.length, 0);
+});
+
+Deno.test("IMAGE header with handle emits HEADER component with header_handle", async () => {
+  const tpl = makeTemplate({
+    meta_header_type: "image",
+    meta_header_text: "",
+    meta_header_handle: "HDL-abc",
+  });
+  const { deps, metaCalls } = makeDeps({ template: tpl });
+  const res = await createHandler(deps)(req({ local_template_id: "tpl-1" }));
+  assertEquals(res.status, 200);
+  const payload = metaCalls[0].payload as { components: Array<Record<string, unknown>> };
+  const header = payload.components.find((c) => c.type === "HEADER");
+  assertEquals(header?.format, "IMAGE");
+  assertEquals((header?.example as { header_handle?: string[] })?.header_handle, ["HDL-abc"]);
 });

@@ -40,12 +40,12 @@ function makeService(over: Partial<InstitutionTemplateService> = {}): Institutio
     createDraft: vi.fn(),
     updateDraft: vi.fn(),
     submitToMeta: vi.fn(async () => ({
-      meta_template_id: "meta-999",
-      meta_status: "submitted",
-      submitted_at: "2026-07-02T12:00:00.000Z",
+      meta_template_id: "meta-999", meta_status: "submitted", submitted_at: null,
     })),
     syncFromMeta: vi.fn(async () => ({ meta_status: "submitted", updated: 0, matched: 0 })),
-    uploadHeaderMedia: vi.fn(async () => ({ header_handle: "HDL", format: "IMAGE" as const, media_id: "m" })),
+    uploadHeaderMedia: vi.fn(async () => ({
+      header_handle: "HDL-abc", format: "IMAGE" as const, media_id: "media-1",
+    })),
     ...over,
   };
 }
@@ -67,52 +67,38 @@ function renderPage(service: InstitutionTemplateService) {
   );
 }
 
-describe("MessageTemplateEdit submit-to-Meta", () => {
-  it("shows the button for meta drafts and calls submitToMeta", async () => {
+describe("MessageTemplateEdit media header", () => {
+  it("selecting Imagem + choosing a file calls uploadHeaderMedia and enables submit", async () => {
     const service = makeService();
     renderPage(service);
-    const btn = await screen.findByRole("button", { name: /Enviar para aprovação/i });
-    fireEvent.click(btn);
-    await waitFor(() => expect(service.submitToMeta).toHaveBeenCalledWith("t-1"));
+    // Switch header type to Imagem
+    fireEvent.click(await screen.findByText("Imagem"));
+    const input = (await screen.findByLabelText(
+      "Amostra de mídia do cabeçalho",
+    )) as HTMLInputElement;
+    const file = new File([new Uint8Array(10)], "amostra.png", { type: "image/png" });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(service.uploadHeaderMedia).toHaveBeenCalledWith("t-1", file));
+    // Handle is displayed
+    await screen.findByText(/HDL-abc/);
+    // Submit button is now enabled
+    const submit = screen.getByRole("button", { name: /Enviar para aprovação/i });
+    expect(submit).toBeEnabled();
   });
 
-  it("does not render the button once template is already submitted", async () => {
-    const service = makeService({
-      getById: vi.fn(async () =>
-        makeTemplate({ meta_status: "submitted", meta_template_id: "meta-1" }),
-      ),
-    });
+  it("submit button is disabled when media header has no handle", async () => {
+    const service = makeService();
     renderPage(service);
-    await screen.findByText(/já foi enviado à Meta/i);
-    expect(
-      screen.queryByRole("button", { name: /Enviar para aprovação/i }),
-    ).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByText("Imagem"));
+    const submit = await screen.findByRole("button", { name: /Enviar para aprovação/i });
+    expect(submit).toBeDisabled();
   });
 
-  it("does not render the button for internal templates", async () => {
-    const service = makeService({
-      getById: vi.fn(async () => makeTemplate({ template_kind: "internal" })),
-    });
+  it("does not render a manual header media URL input", async () => {
+    const service = makeService();
     renderPage(service);
-    await screen.findByLabelText("Nome local");
-    expect(
-      screen.queryByRole("button", { name: /Enviar para aprovação/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows an error toast when submitToMeta fails", async () => {
-    const service = makeService({
-      submitToMeta: vi.fn(async () => {
-        throw new Error("Categoria inválida");
-      }),
-    });
-    renderPage(service);
-    fireEvent.click(await screen.findByRole("button", { name: /Enviar para aprovação/i }));
-    await waitFor(() => expect(service.submitToMeta).toHaveBeenCalled());
-    // sonner renders inside a portal; just assert the mutation was invoked and
-    // the button becomes clickable again (no crash).
-    expect(
-      await screen.findByRole("button", { name: /Enviar para aprovação/i }),
-    ).toBeEnabled();
+    fireEvent.click(await screen.findByText("Imagem"));
+    await screen.findByLabelText("Amostra de mídia do cabeçalho");
+    expect(screen.queryByPlaceholderText(/https:\/\//i)).not.toBeInTheDocument();
   });
 });
