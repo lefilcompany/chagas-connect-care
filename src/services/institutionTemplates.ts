@@ -66,6 +66,12 @@ export interface InstitutionTemplateService {
     ctx: { institution: string; userId: string },
   ): Promise<MessageTemplate>;
   updateDraft(id: string, input: TemplateDraftInput): Promise<MessageTemplate>;
+  submitToMeta(id: string): Promise<{
+    meta_template_id: string | null;
+    meta_status: string;
+    submitted_at: string | null;
+    deduplicated?: boolean;
+  }>;
 }
 
 /** Real implementation: reads from the message_templates table scoped by RLS. */
