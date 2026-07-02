@@ -1,120 +1,189 @@
 
-# Fase 2 — Rascunho local de modelos
+# Fase 3 — Enviar rascunho textual para aprovação da Meta
 
-Fatia vertical: administrador institucional cria/edita rascunho local em página dedicada, sem tocar na Meta. Usuário comum permanece somente leitura.
+Vertical slice: admin abre um rascunho local (Fase 2) → clica **Enviar para aprovação** → Edge Function monta o payload no servidor, chama a Graph API, persiste o resultado e o status muda de “Rascunho” para “Em análise”. Sem mídia, sem webhook.
 
-## Rotas e navegação
+## Contratos (seams)
 
-- Adicionar em `src/App.tsx` dentro do `InstitutionIdentityProvider`:
-  - `/app/modelos/novo` → `MessageTemplateNew`
-  - `/app/modelos/:templateId` → `MessageTemplateEdit`
-- `MessageTemplates.tsx` ganha botão **Novo modelo** (link para `/app/modelos/novo`) visível somente quando `identity.isAdmin === true`.
-- Cada `TemplateCard` no catálogo, quando `isAdmin`, exibe ação **Editar** que navega para `/app/modelos/:id` (reuso do slot `onEdit` já existente na variante `catalog`, hoje oculto).
-- Guardas de rota: as duas páginas novas redirecionam para `/app/modelos` se `identity.loading === false && !identity.isAdmin`.
+### HTTP público (frontend → Edge Function)
+- `POST /functions/v1/create-whatsapp-template`
+- Header: `Authorization: Bearer <JWT>`
+- Body aceito **apenas**: `{ "local_template_id": "<uuid>" }`.
+- Campos ignorados/rejeitados se enviados: `institution`, `meta_status`, `components`, `name`, `waba_id`, `token`.
 
-## Extração / reuso (sem dois editores)
+Respostas:
+- `200 { ok: true, meta_template_id, meta_status: "submitted", submitted_at }`
+- `200 { ok: true, meta_template_id, meta_status, submitted_at, deduplicated: true }` (idempotência)
+- `400 { ok:false, error_code:"LOCAL_TEMPLATE_ID_REQUIRED" }`
+- `400 { ok:false, error_code:"TEMPLATE_INVALID", errors:{…} }` (BODY vazio, exemplo faltando, footer > 60, etc.)
+- `401 { ok:false, error_code:"UNAUTHORIZED" }`
+- `403 { ok:false, error_code:"FORBIDDEN" }` (não-admin ou template de outra instituição)
+- `404 { ok:false, error_code:"TEMPLATE_NOT_FOUND" }`
+- `409 { ok:false, error_code:"ALREADY_SUBMITTED", meta_status }` (status ≠ `not_submitted` e sem match de idempotência)
+- `502 { ok:false, error_code:"META_ERROR", error, meta_error }` (detalhes sanitizados)
 
-Novos arquivos, extraídos do `TemplateEditorDialog.tsx` atual sem duplicar lógica:
+### Meta Graph (Edge Function → Meta)
+`POST https://graph.facebook.com/{GRAPH_VERSION}/{WABA_ID}/message_templates` com `Bearer WHATSAPP_TOKEN`.
 
-- `src/lib/templateDraft.ts`
-  - `templateDraftSchema` (Zod): valida `name`, `template_kind`, `body`, `meta_template_name` (regex `^[a-z0-9_]+$`, min 1), `meta_language`, `meta_category`, `meta_header_type` ∈ {`none`,`text`}, `meta_header_text`, `meta_footer_text`, `meta_buttons` (quick_reply | url | phone_number), `variable_examples`, `variable_order`, `targeting_mode`, `audience_types`, `filters`, `category`, `description`.
-  - `normalizeMetaName(input)`: lowercases + strip inválidos.
-  - `assertMetaDraft(draft)`: garante corpo não vazio; garante que toda variável extraída tem exemplo preenchido; retorna erros nomeados por campo.
-- `src/hooks/useTemplateEditor.ts`
-  - `useTemplateEditor({ initial, mode })` retorna `{ form, setField, errors, submit, dirty, semanticVariables }`. Encapsula estado, validação com o schema e derivação de `variable_order` a partir do corpo.
-- `src/components/app/messages/TemplateEditorForm.tsx`
-  - Componente **puro de apresentação** (props: `state`, `onChange`, `errors`, `disabledStatus`) contendo os campos: nome, descrição, categoria/pasta, tipo (interno/meta), nome técnico Meta (com preview do slug), idioma, categoria Meta, cabeçalho (NONE/TEXT), corpo, rodapé, botões (quick_reply/url/phone_number), segmentação sugerida e exemplos de variáveis.
-  - **Sem** Select de status. Renderiza status como badge somente leitura (`Rascunho` para `not_submitted`).
-  - Reaproveita `WhatsAppPreview` e `SEMANTIC_VARIABLES`/`renderWithExamples` já existentes.
-- `TemplateEditorDialog.tsx` é reescrito para virar um wrapper fino: `<Dialog>` que usa `useTemplateEditor` + renderiza `<TemplateEditorForm/>`. Zero divergência entre diálogo e páginas.
+WABA resolvido a partir de `institution_whatsapp_settings.waba_id` da instituição do template; fallback para `WHATSAPP_WABA_ID` só se o registro não existir. Nunca aceitar WABA do cliente.
 
-## Serviço `InstitutionTemplateService`
+## Builder puro (sem I/O)
 
-Extender `src/services/institutionTemplates.ts` com três funções públicas testáveis:
+Novo módulo compartilhado `supabase/functions/_shared/metaTemplatePayload.ts` (e re-export em `src/lib/metaTemplatePayload.ts` para reuso no preview do editor).
 
-- `createDraft(input: TemplateDraftInput): Promise<MessageTemplate>`
-  - Server-side derivação: `institution = identity.institution` (obtido do provider, não confia no cliente), `created_by = auth.uid()`, `meta_status = 'not_submitted'`, `is_active = true`, `is_default = false`.
-  - Recusa se `institution` vazia.
-  - **Strip** de `meta_status` e `institution` do input antes do insert.
-- `updateDraft(id: string, input: TemplateDraftInput)`
-  - Rejeita se `meta_status !== 'not_submitted'` (leitura prévia via `getById`) — aprovados/submetidos não podem ser sobrescritos nesta fase.
-  - **Strip** de `meta_status` e `institution` do payload.
-- `getById(id: string): Promise<MessageTemplate | null>` scoped por RLS.
+Assinatura:
+```ts
+buildMetaTemplateCreationPayload(input: {
+  name: string;
+  language: string;
+  category: "UTILITY" | "MARKETING" | "AUTHENTICATION";
+  body: string;                         // com {var_semantica}
+  header?: { type: "none" | "text"; text?: string };
+  footer?: string | null;
+  buttons?: MetaButton[];
+  variableExamples: Record<string, string>;
+}): { ok: true; payload: MetaCreationPayload; order: string[] }
+ | { ok: false; errors: Record<string,string> };
+```
 
-Nenhuma chamada a `graph.facebook.com`.
+Regras:
+- Converte `{nome_paciente}` → `{{1}}` via `semanticToPositional`.
+- `parameter_format: "POSITIONAL"`.
+- Monta `components` na ordem HEADER → BODY → FOOTER → BUTTONS, omitindo os ausentes.
+- `example.body_text = [[ex1, ex2, …]]` na ordem posicional; header ganha `example.header_text`.
+- Valida: BODY não vazio, FOOTER ≤ 60, HEADER TEXT ≤ 60, cada variável do BODY tem exemplo não-vazio, nome bate `^[a-z0-9_]+$`.
+- Determinístico: mesmas entradas → mesmo JSON serializado.
+- Sem `fetch`, sem `Deno.env`, sem acesso a banco.
 
-## Persistência / RLS
+Testes: `supabase/functions/_shared/metaTemplatePayload.test.ts` (Deno), cobrindo happy path, footer/header longos, exemplos ausentes, ordem de variáveis, idempotência serial.
 
-`message_templates` já existe; nesta fase apenas endurecemos as políticas para refletir "criação/edição só admin institucional":
+## Handler testável
 
-- Migration `phase2_template_writes_admin_only`:
-  ```sql
-  DROP POLICY "Templates insert" ON public.message_templates;
-  CREATE POLICY "Templates insert admin only" ON public.message_templates
-    FOR INSERT TO authenticated
-    WITH CHECK (
-      public.has_role(auth.uid(), 'admin')
-      AND is_default = false
-      AND institution = public.get_user_institution(auth.uid())
-      AND public.get_user_institution(auth.uid()) <> ''
-      AND (created_by = auth.uid() OR created_by IS NULL)
-    );
+Split da função atual:
 
-  DROP POLICY "Templates update in institution" ON public.message_templates;
-  CREATE POLICY "Templates update admin only" ON public.message_templates
-    FOR UPDATE TO authenticated
-    USING (
-      public.has_role(auth.uid(), 'admin')
-      AND is_default = false
-      AND institution = public.get_user_institution(auth.uid())
-    )
-    WITH CHECK (
-      public.has_role(auth.uid(), 'admin')
-      AND is_default = false
-      AND institution = public.get_user_institution(auth.uid())
-    );
-  ```
-  Superadmin continua coberto pela cláusula `has_role`.
-- Nenhum GRANT novo — a tabela já tem os grants padrão.
+```
+supabase/functions/create-whatsapp-template/
+├── index.ts            # só borda: env, clients, Deno.serve → handler
+├── handler.ts          # createHandler(deps) → (req) => Response
+└── ...
+```
 
-## Status
+`handler.ts` recebe injeções:
+```ts
+createHandler({
+  loadUser(jwt): Promise<{ userId, isSuperadmin, isAdmin, institution }>;
+  loadTemplate(id): Promise<TemplateRow | null>;
+  loadWabaFor(institution): Promise<{ wabaId: string } | null>;
+  findExistingSubmission(idempotencyKey): Promise<SubmissionRecord | null>;
+  persistSubmission(id, patch): Promise<void>;
+  callMeta(wabaId, payload): Promise<{ ok; status; body }>;
+  now(): Date;
+})
+```
 
-- Removido todo Select de status do formulário.
-- Renderizado como badge somente leitura no cabeçalho da página.
-- Payloads de `createDraft`/`updateDraft` filtram `meta_status` no cliente **e** o servidor não confia (aprovado permanece via `updateDraft` bloqueando).
+Fluxo do handler:
+1. `OPTIONS` → CORS. Método ≠ POST → 405.
+2. Valida JWT (`getClaims`). Sem token → 401.
+3. Lê body JSON. Se `local_template_id` ausente → 400 `LOCAL_TEMPLATE_ID_REQUIRED`.
+4. `loadUser` → resolve papel/instituição. Não-admin nem superadmin → 403.
+5. `loadTemplate`. Faltando → 404. Se admin e `template.institution ≠ user.institution` → 403.
+6. Se `meta_status` já ≠ `not_submitted` e não bate idempotência → 409.
+7. `buildMetaTemplateCreationPayload(...)`. Falha → 400 `TEMPLATE_INVALID`.
+8. Calcula `idempotencyKey = sha256(institution + waba_id + local_template_id + JSON.stringify(payload))`.
+9. `findExistingSubmission(key)` → se existir e `ok`, retorna 200 `deduplicated: true` sem chamar Meta.
+10. `loadWabaFor(institution)` → 400 `WABA_NOT_CONFIGURED` se ausente.
+11. `callMeta` → em erro Meta persiste `meta_status: "error"` + `meta_rejection_info` e retorna 502 com `error.message` sanitizado.
+12. Sucesso → `persistSubmission` com `meta_template_id`, `meta_template_name`, `meta_language`, `meta_category`, `meta_status = STATUS_MAP[status] ?? "submitted"`, `meta_submitted_at = now`, `meta_submitted_by = userId`, `meta_waba_id`, `meta_idempotency_key`, `meta_creation_payload`, `meta_variable_examples`, `meta_definition = metaBody`, `meta_footer_text`, `meta_footer_source`, `meta_version`.
+13. Retorna 200 `{ ok:true, meta_template_id, meta_status, submitted_at }`.
 
-## TDD — ordem dos ciclos
+## Persistência
 
-Arquivos:
-- `src/pages/app/MessageTemplateNew.test.tsx`
-- `src/pages/app/MessageTemplateEdit.test.tsx`
-- `src/lib/templateDraft.test.ts`
-- `src/pages/app/MessageTemplates.test.tsx` (novos casos)
+Nenhuma migration nova — a tabela já expõe `meta_idempotency_key`, `meta_submitted_at`, `meta_submitted_by`, `meta_waba_id`, `meta_variable_examples`, `meta_creation_payload`, `meta_status`. Se algum campo `NULL` em produção quebrar o insert, ajusta via migration curta com `ALTER COLUMN … DROP NOT NULL`.
 
-Um teste por ciclo, sempre `RED → GREEN`:
+Uma segunda RLS policy (`Templates update meta submission`) autoriza a Edge Function via service role (já bypassa RLS) — nenhuma alteração de policy nova para clientes.
 
-1. **Tracer**: admin cria rascunho Meta em `/app/modelos/novo`, submete, é redirecionado para `/app/modelos` e o novo modelo aparece com badge "Rascunho" (`not_submitted`). Serviço mockado captura o payload — verificamos que `meta_status` **não** foi enviado e que `institution` veio do provider.
-2. Usuário comum navegando para `/app/modelos/novo` é redirecionado para `/app/modelos` e o botão "Novo modelo" não aparece.
-3. Nome técnico Meta inválido (`Foo Bar!`) mostra erro de validação e bloqueia submit; nome válido é normalizado para minúsculas (`foo_bar`).
-4. Corpo vazio bloqueia submit com erro em `body`.
-5. Variável `{nome_paciente}` presente sem exemplo bloqueia submit em modelo Meta.
-6. Página não expõe campo editável de status (assertiva: nenhum `combobox`/`select` com `name*=status`).
-7. `/app/modelos/:id` carrega rascunho existente via `getById` mock, permite edição e chama `updateDraft` com o id.
-8. Tentar editar modelo `approved` mostra aviso e desabilita submit; `updateDraft` não é chamado.
-9. Formulário não expõe campo de instituição; ao tentar injetar `institution` no payload (via teste), `createDraft` remove antes do insert.
+## Frontend
 
-## API externa
+### Serviço
+Estender `InstitutionTemplateService`:
+```ts
+submitToMeta(id: string): Promise<{ meta_template_id: string; meta_status: string; submitted_at: string; deduplicated?: boolean }>
+```
+Implementação real chama `supabase.functions.invoke("create-whatsapp-template", { body: { local_template_id: id } })` e faz mapping de `error_code` → `Error` legível.
 
-Nenhuma chamada Meta nesta fase. Nenhum código novo em edge functions. `TemplateEditorDialog` atual removerá qualquer botão "Enviar para Meta" (fica para Fase 3) — passa a mostrar apenas **Salvar rascunho**.
+### Página `MessageTemplateEdit`
+- Novo botão **Enviar para aprovação** (visível só quando `template_kind === "meta"` e `meta_status === "not_submitted"`).
+- Ao sucesso: `qc.invalidateQueries` do template + catálogo; `toast.success("Enviado para análise da Meta")`.
+- Depois de enviado (`meta_status ≠ not_submitted`): formulário em modo somente leitura, badge “Em análise” + `meta_template_id` + `submitted_at` formatado, botão desabilitado.
+- Erros exibem `error.message` (já sanitizado).
+
+### Página `MessageTemplates`
+- Já mostra badge de status via `TemplateCard`; nada muda além de refletir o novo status ao invalidar cache.
+
+## TDD
+
+Ordem estrita, um ciclo por vez, RED antes de GREEN.
+
+**Deno (handler + builder), arquivos em `supabase/functions/create-whatsapp-template/`:**
+
+1. `handler.happy.test.ts` — rascunho válido → 200 `submitted`, Meta chamada 1×, `persistSubmission` com `meta_status:"submitted"`, `meta_template_id`, `meta_submitted_at`. (RED primeiro.)
+2. `handler.validation.test.ts` — sem `local_template_id` → 400 `LOCAL_TEMPLATE_ID_REQUIRED`, Meta não chamada.
+3. `handler.auth.test.ts` — sem JWT → 401; não-admin → 403; admin de outra instituição → 403.
+4. `handler.notfound.test.ts` — template inexistente → 404.
+5. `handler.already.test.ts` — `meta_status` ≠ `not_submitted` e chave idempotência distinta → 409; Meta não chamada.
+6. `handler.invalid_body.test.ts` — BODY vazio ou exemplo faltando → 400 `TEMPLATE_INVALID`, Meta não chamada.
+7. `handler.meta_error.test.ts` — Meta responde 400/500 → 502 `META_ERROR` com mensagem sanitizada, persistência marca `meta_status:"error"`.
+8. `handler.status_map.test.ts` — Meta responde `PENDING` → persistência grava `submitted`.
+9. `handler.idempotency.test.ts` — duas chamadas seguidas com mesmo payload → Meta chamada 1×, segunda retorna `deduplicated:true`.
+10. `_shared/metaTemplatePayload.test.ts` — builder puro: happy path, ordem de variáveis, exemplos, footer/header longos, nome inválido, determinismo.
+
+Mocks só na fronteira (banco/HTTP). Nada de espionar funções internas.
+
+**Vitest (frontend):**
+11. `src/pages/app/MessageTemplateEdit.submit.test.tsx` — botão “Enviar para aprovação” chama `service.submitToMeta(id)` com o UUID, mostra toast de sucesso, invalida cache.
+12. Botão só aparece quando `template_kind === "meta"` e `meta_status === "not_submitted"`.
+13. Após envio bem-sucedido a UI mostra badge “Em análise”, `meta_template_id`, `submitted_at` e o botão fica desabilitado.
+14. Erro Meta (`error_code: META_ERROR`) mostra `toast.error` com a mensagem retornada.
+
+## Detalhes técnicos
+
+- `GRAPH_VERSION` continua vindo de env, com fallback `v25.0`, validado por regex.
+- Sanitização de mensagens Meta: pegar apenas `error.message` e `error.error_user_msg`; nunca vazar `error.fbtrace_id` do WABA nem `error_data.details` cruas.
+- `sha256` via `crypto.subtle.digest` (`hex`), payload normalizado com `JSON.stringify` estável (chaves ordenadas em `components`/`example`).
+- `loadWabaFor(institution)` lê `institution_whatsapp_settings` (canal ativo). Ausente → 400 explícito, não tenta env fallback quando `institution` está definido.
+- Preservar comportamento de versionamento (`parent_template_id`) fora do escopo desta fase — bloquear com 400 caso enviado.
+- `verify_jwt` fica no default (`false`); autenticação segue in-code via `getClaims`.
+- Nada de webhook, nada de sync-back. Fim explícito da fatia.
+
+## Arquivos afetados
+
+Novos:
+- `supabase/functions/_shared/metaTemplatePayload.ts`
+- `supabase/functions/_shared/metaTemplatePayload.test.ts`
+- `supabase/functions/create-whatsapp-template/handler.ts`
+- `supabase/functions/create-whatsapp-template/handler.happy.test.ts`
+- `supabase/functions/create-whatsapp-template/handler.validation.test.ts`
+- `supabase/functions/create-whatsapp-template/handler.auth.test.ts`
+- `supabase/functions/create-whatsapp-template/handler.notfound.test.ts`
+- `supabase/functions/create-whatsapp-template/handler.already.test.ts`
+- `supabase/functions/create-whatsapp-template/handler.invalid_body.test.ts`
+- `supabase/functions/create-whatsapp-template/handler.meta_error.test.ts`
+- `supabase/functions/create-whatsapp-template/handler.status_map.test.ts`
+- `supabase/functions/create-whatsapp-template/handler.idempotency.test.ts`
+- `src/pages/app/MessageTemplateEdit.submit.test.tsx`
+
+Editados:
+- `supabase/functions/create-whatsapp-template/index.ts` (vira wrapper fino sobre `handler.ts`).
+- `src/services/institutionTemplates.ts` (`submitToMeta`).
+- `src/pages/app/MessageTemplateEdit.tsx` (botão + estados de envio).
 
 ## Critérios de aceite
 
-- Rota nova cria rascunho local com id, `meta_status='not_submitted'`, `institution` derivada do usuário logado.
-- Edição de rascunho funciona; edição de aprovado é impedida (UI + `updateDraft`).
-- RLS bloqueia writes de não-admins (verificação manual via query no banco após migration).
-- Nenhuma requisição para `graph.facebook.com`.
-- `bunx vitest run` e `bunx tsgo --noEmit` verdes.
-
-## Fora de escopo (Fase 3+)
-
-- HEADER `IMAGE/VIDEO/DOCUMENT`, botões `COPY_CODE`, submissão à Meta, sincronização, versionamento.
+- Rascunho local existe antes do envio (400 se não).
+- Payload sempre montado no servidor a partir do registro local.
+- WABA usado é o da instituição do template; nunca aceita do cliente.
+- `meta_status`, `meta_template_id`, `meta_submitted_at`, `meta_submitted_by`, `meta_waba_id`, `meta_idempotency_key`, `meta_creation_payload` são persistidos.
+- Duplo clique não gera duas chamadas à Meta.
+- Erros da Meta chegam ao usuário como mensagem legível, sem dados sensíveis.
+- Todos os testes (Deno + Vitest) verdes.
+- Sem código de webhook nesta fase.
