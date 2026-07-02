@@ -1,189 +1,206 @@
 
-# Fase 3 — Enviar rascunho textual para aprovação da Meta
+# Fase 4 — Aprovação, rejeição, webhook e sincronização
 
-Vertical slice: admin abre um rascunho local (Fase 2) → clica **Enviar para aprovação** → Edge Function monta o payload no servidor, chama a Graph API, persiste o resultado e o status muda de “Rascunho” para “Em análise”. Sem mídia, sem webhook.
+Vertical slice: quando a Meta atualiza um template (APPROVED/REJECTED/PAUSED/...) o webhook público recebe o evento, valida assinatura, faz dispatch por `change.field`, casa o template correto (respeitando WABA/idioma) e atualiza o registro local. O admin ainda pode disparar uma sincronização manual (`sync-whatsapp-templates`) para recuperar eventos perdidos, e a página de detalhe reflete o novo status em tempo real via Realtime, com fallback de polling só enquanto pendente.
+
+Sem mídia. Sem novos secrets.
 
 ## Contratos (seams)
 
-### HTTP público (frontend → Edge Function)
-- `POST /functions/v1/create-whatsapp-template`
-- Header: `Authorization: Bearer <JWT>`
-- Body aceito **apenas**: `{ "local_template_id": "<uuid>" }`.
-- Campos ignorados/rejeitados se enviados: `institution`, `meta_status`, `components`, `name`, `waba_id`, `token`.
+### Webhook (Meta → nossa Edge Function)
+- `GET  /functions/v1/whatsapp-webhook?hub.mode=subscribe&hub.verify_token=...&hub.challenge=...` — permanece como hoje, retorna challenge quando `verify_token` bate.
+- `POST /functions/v1/whatsapp-webhook`
+  - `verify_jwt = false`.
+  - Requer `x-hub-signature-256`. HMAC-SHA-256 do corpo bruto com `WHATSAPP_APP_SECRET`, comparação timing-safe. Sem assinatura ou inválida → 403.
+  - `WHATSAPP_APP_SECRET` ausente → 503 (mantém comportamento atual).
+  - Sempre responde 200 depois de validado (para não gerar retry storm), exceto quando corpo não é JSON — segue devolvendo 200 (dropa silenciosamente) como hoje.
 
-Respostas:
-- `200 { ok: true, meta_template_id, meta_status: "submitted", submitted_at }`
-- `200 { ok: true, meta_template_id, meta_status, submitted_at, deduplicated: true }` (idempotência)
-- `400 { ok:false, error_code:"LOCAL_TEMPLATE_ID_REQUIRED" }`
-- `400 { ok:false, error_code:"TEMPLATE_INVALID", errors:{…} }` (BODY vazio, exemplo faltando, footer > 60, etc.)
-- `401 { ok:false, error_code:"UNAUTHORIZED" }`
-- `403 { ok:false, error_code:"FORBIDDEN" }` (não-admin ou template de outra instituição)
-- `404 { ok:false, error_code:"TEMPLATE_NOT_FOUND" }`
-- `409 { ok:false, error_code:"ALREADY_SUBMITTED", meta_status }` (status ≠ `not_submitted` e sem match de idempotência)
-- `502 { ok:false, error_code:"META_ERROR", error, meta_error }` (detalhes sanitizados)
+Novo dispatch por `change.field`, executado **antes** de qualquer acesso a `value.metadata`:
+```ts
+switch (change.field) {
+  case "message_template_status_update":
+    await handleTemplateStatusUpdate(deps, entry, change);
+    break;
+  case "messages":
+    await handleMessageEvents(deps, entry, change); // fluxo atual
+    break;
+  default:
+    await handleUnknownEvent(deps, entry, change);  // registra em whatsapp_unmatched_events
+}
+```
+
+### Sincronização manual (frontend → Edge Function)
+- `POST /functions/v1/sync-whatsapp-templates`
+- Header `Authorization: Bearer <JWT>`
+- Body **direcionado** (novo):
+  ```json
+  { "local_template_id": "<uuid>" }
+  ```
+  Alternativas aceitas:
+  - `{ "institution": "Inst A" }` — superadmin escolhe a instituição.
+  - `{ }` — admin sincroniza a própria instituição.
+- Resposta: `{ ok, matched, updated, pages, missing_meta_ids: [] }`.
+- Erros:
+  - `401 UNAUTHORIZED`, `403 FORBIDDEN` (admin tentando instituição alheia), `400 WABA_NOT_CONFIGURED`, `404 TEMPLATE_NOT_FOUND` quando `local_template_id` não existe.
 
 ### Meta Graph (Edge Function → Meta)
-`POST https://graph.facebook.com/{GRAPH_VERSION}/{WABA_ID}/message_templates` com `Bearer WHATSAPP_TOKEN`.
+- `GET https://graph.facebook.com/{GRAPH}/{WABA_ID}/message_templates?fields=id,name,language,status,category,components,rejected_reason,quality_score,parameter_format&limit=100`
+- Paginado: percorrer `paging.next` até o final (limite defensivo de 20 páginas).
+- Token: `WHATSAPP_TOKEN`. WABA resolvida a partir de `institution_whatsapp_settings.waba_id`, fallback para `WHATSAPP_WABA_ID` se não houver registro.
 
-WABA resolvido a partir de `institution_whatsapp_settings.waba_id` da instituição do template; fallback para `WHATSAPP_WABA_ID` só se o registro não existir. Nunca aceitar WABA do cliente.
+## Módulos novos (puros / testáveis)
 
-## Builder puro (sem I/O)
+### `supabase/functions/_shared/metaTemplateStatus.ts`
+- Constante `META_TEMPLATE_STATUS_MAP` já mapeada (PENDING/APPROVED/REJECTED/PAUSED/DISABLED/IN_APPEAL). Nunca traduz status desconhecido para “approved”; devolve `null` e o handler mantém o estado atual.
+- `payloadFingerprint(change)` — hash SHA-256 estável (`stableStringify` + entry timestamp) para idempotência.
 
-Novo módulo compartilhado `supabase/functions/_shared/metaTemplatePayload.ts` (e re-export em `src/lib/metaTemplatePayload.ts` para reuso no preview do editor).
-
-Assinatura:
+### `supabase/functions/whatsapp-webhook/templateStatus.ts`
+Handler puro (sem `Deno.serve`, sem `createClient` direto):
 ```ts
-buildMetaTemplateCreationPayload(input: {
-  name: string;
-  language: string;
-  category: "UTILITY" | "MARKETING" | "AUTHENTICATION";
-  body: string;                         // com {var_semantica}
-  header?: { type: "none" | "text"; text?: string };
-  footer?: string | null;
-  buttons?: MetaButton[];
-  variableExamples: Record<string, string>;
-}): { ok: true; payload: MetaCreationPayload; order: string[] }
- | { ok: false; errors: Record<string,string> };
-```
-
-Regras:
-- Converte `{nome_paciente}` → `{{1}}` via `semanticToPositional`.
-- `parameter_format: "POSITIONAL"`.
-- Monta `components` na ordem HEADER → BODY → FOOTER → BUTTONS, omitindo os ausentes.
-- `example.body_text = [[ex1, ex2, …]]` na ordem posicional; header ganha `example.header_text`.
-- Valida: BODY não vazio, FOOTER ≤ 60, HEADER TEXT ≤ 60, cada variável do BODY tem exemplo não-vazio, nome bate `^[a-z0-9_]+$`.
-- Determinístico: mesmas entradas → mesmo JSON serializado.
-- Sem `fetch`, sem `Deno.env`, sem acesso a banco.
-
-Testes: `supabase/functions/_shared/metaTemplatePayload.test.ts` (Deno), cobrindo happy path, footer/header longos, exemplos ausentes, ordem de variáveis, idempotência serial.
-
-## Handler testável
-
-Split da função atual:
-
-```
-supabase/functions/create-whatsapp-template/
-├── index.ts            # só borda: env, clients, Deno.serve → handler
-├── handler.ts          # createHandler(deps) → (req) => Response
-└── ...
-```
-
-`handler.ts` recebe injeções:
-```ts
-createHandler({
-  loadUser(jwt): Promise<{ userId, isSuperadmin, isAdmin, institution }>;
-  loadTemplate(id): Promise<TemplateRow | null>;
-  loadWabaFor(institution): Promise<{ wabaId: string } | null>;
-  findExistingSubmission(idempotencyKey): Promise<SubmissionRecord | null>;
-  persistSubmission(id, patch): Promise<void>;
-  callMeta(wabaId, payload): Promise<{ ok; status; body }>;
+createTemplateStatusHandler({
+  findEvent(hash): Promise<boolean>;
+  recordEvent({ meta_template_id, event, entry_timestamp, payload_hash, payload }): Promise<void>;
+  findTemplateByMetaId(id): Promise<TemplateMatch | null>;
+  findTemplateByWabaNameLang(waba, name, lang): Promise<TemplateMatch | null>;
+  findTemplateByInstitutionNameLang(institution, name, lang): Promise<TemplateMatch | null>;
+  resolveInstitutionByWaba(waba): Promise<string | null>;
+  updateTemplate(id, patch): Promise<void>;
   now(): Date;
-})
+})(entry, change): Promise<{ processed: boolean; reason?: string }>
 ```
+Fluxo:
+1. Extrai `waba_id = entry.id`, `event`, `message_template_id`, `message_template_name`, `message_template_language`, `reason`.
+2. Calcula `payload_hash`. Se `findEvent(hash)` → `{ processed:false, reason:"duplicate" }`.
+3. Casamento **nesta ordem**, curto-circuitando ao primeiro hit:
+   - por `meta_template_id`;
+   - por `waba_id + name + language`;
+   - por `institution resolvida pela WABA + name + language`.
+   Nunca casa só pelo nome.
+4. Sem match → registra evento (idempotência) e `{ processed:false, reason:"unmatched" }`.
+5. Guarda de integridade: se o registro casado tem `meta_language` diferente do evento, aborta com `reason:"language_mismatch"` (nunca sobrescreve). Idem para `meta_waba_id` presente e diferente do `entry.id`.
+6. `updateTemplate` com:
+   - `meta_status = MAP[event] ?? existing.meta_status` (nunca aprova por engano);
+   - `meta_status_raw = event`;
+   - `meta_rejection_reason = reason` (só quando REJECTED);
+   - `meta_rejection_info = { reason, at }` idem;
+   - `meta_last_webhook_at = entry.time * 1000`;
+   - `meta_template_id = value.message_template_id` se estava nulo;
+   - `meta_waba_id = entry.id` se estava nulo.
+7. `recordEvent(payload_hash)`. Retorna `{ processed:true }`.
 
-Fluxo do handler:
-1. `OPTIONS` → CORS. Método ≠ POST → 405.
-2. Valida JWT (`getClaims`). Sem token → 401.
-3. Lê body JSON. Se `local_template_id` ausente → 400 `LOCAL_TEMPLATE_ID_REQUIRED`.
-4. `loadUser` → resolve papel/instituição. Não-admin nem superadmin → 403.
-5. `loadTemplate`. Faltando → 404. Se admin e `template.institution ≠ user.institution` → 403.
-6. Se `meta_status` já ≠ `not_submitted` e não bate idempotência → 409.
-7. `buildMetaTemplateCreationPayload(...)`. Falha → 400 `TEMPLATE_INVALID`.
-8. Calcula `idempotencyKey = sha256(institution + waba_id + local_template_id + JSON.stringify(payload))`.
-9. `findExistingSubmission(key)` → se existir e `ok`, retorna 200 `deduplicated: true` sem chamar Meta.
-10. `loadWabaFor(institution)` → 400 `WABA_NOT_CONFIGURED` se ausente.
-11. `callMeta` → em erro Meta persiste `meta_status: "error"` + `meta_rejection_info` e retorna 502 com `error.message` sanitizado.
-12. Sucesso → `persistSubmission` com `meta_template_id`, `meta_template_name`, `meta_language`, `meta_category`, `meta_status = STATUS_MAP[status] ?? "submitted"`, `meta_submitted_at = now`, `meta_submitted_by = userId`, `meta_waba_id`, `meta_idempotency_key`, `meta_creation_payload`, `meta_variable_examples`, `meta_definition = metaBody`, `meta_footer_text`, `meta_footer_source`, `meta_version`.
-13. Retorna 200 `{ ok:true, meta_template_id, meta_status, submitted_at }`.
+### `supabase/functions/sync-whatsapp-templates/handler.ts`
+Extrai a lógica do Deno.serve atual e adiciona:
+- `resolveScope(user, body)` — retorna `{ institution, localTemplateId? }` respeitando papel.
+- `fetchAllPages(url, token)` — segue `paging.next` (máx 20).
+- `matchLocalRow(page, scope)` — usa a mesma ordem do handler do webhook.
+- Escreve `meta_status`, `meta_rejection_reason`, `meta_status_raw`, `meta_last_synced_at`, `meta_definition`, etc. Nunca sobrescreve `meta_language` divergente (mesmo warning).
+- Quando `local_template_id` é fornecido, filtra a resposta por `t.id === template.meta_template_id` (ou name+language quando ainda não temos ID).
 
 ## Persistência
 
-Nenhuma migration nova — a tabela já expõe `meta_idempotency_key`, `meta_submitted_at`, `meta_submitted_by`, `meta_waba_id`, `meta_variable_examples`, `meta_creation_payload`, `meta_status`. Se algum campo `NULL` em produção quebrar o insert, ajusta via migration curta com `ALTER COLUMN … DROP NOT NULL`.
-
-Uma segunda RLS policy (`Templates update meta submission`) autoriza a Edge Function via service role (já bypassa RLS) — nenhuma alteração de policy nova para clientes.
-
-## Frontend
-
-### Serviço
-Estender `InstitutionTemplateService`:
-```ts
-submitToMeta(id: string): Promise<{ meta_template_id: string; meta_status: string; submitted_at: string; deduplicated?: boolean }>
+Sem novas tabelas. `whatsapp_template_events` já tem `payload_hash`, `event`, `entry_timestamp` — usados como chave única. Migration curta apenas para:
+```sql
+ALTER TABLE public.whatsapp_template_events
+  ADD CONSTRAINT whatsapp_template_events_hash_unique UNIQUE (payload_hash);
 ```
-Implementação real chama `supabase.functions.invoke("create-whatsapp-template", { body: { local_template_id: id } })` e faz mapping de `error_code` → `Error` legível.
+para tornar o insert idempotente no nível do banco. E:
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.message_templates;
+ALTER TABLE public.message_templates REPLICA IDENTITY FULL;
+```
+para o Realtime da página de detalhe (RLS já filtra por institution).
 
-### Página `MessageTemplateEdit`
-- Novo botão **Enviar para aprovação** (visível só quando `template_kind === "meta"` e `meta_status === "not_submitted"`).
-- Ao sucesso: `qc.invalidateQueries` do template + catálogo; `toast.success("Enviado para análise da Meta")`.
-- Depois de enviado (`meta_status ≠ not_submitted`): formulário em modo somente leitura, badge “Em análise” + `meta_template_id` + `submitted_at` formatado, botão desabilitado.
-- Erros exibem `error.message` (já sanitizado).
+## Interface
 
-### Página `MessageTemplates`
-- Já mostra badge de status via `TemplateCard`; nada muda além de refletir o novo status ao invalidar cache.
+### `src/pages/app/MessageTemplateEdit.tsx`
+- Painel de status abaixo do form quando `meta_status !== "not_submitted"`:
+  - Badge com rótulo humano: “Em análise” / “Aprovado” / “Rejeitado” / “Pausado” / “Desativado” / “Erro”.
+  - `meta_template_id`, `meta_submitted_at`, `meta_last_synced_at`, `meta_last_webhook_at` (o mais recente rotulado como “última atualização”).
+  - Motivo da rejeição quando presente (`meta_rejection_reason || meta_rejection_info.reason`).
+  - Botão **Atualizar status** → `service.syncFromMeta(templateId)`.
+- Formulário fica readonly quando `meta_status !== "not_submitted"` (já é hoje via `isLocked`).
+- Realtime: `supabase.channel("template-detail-${id}").on("postgres_changes", { schema:"public", table:"message_templates", filter:`id=eq.${id}` }, () => qc.invalidateQueries(...))` dentro de `useEffect`; cleanup no unmount.
+- Polling só como fallback: quando `meta_status === "submitted"` e Realtime não abriu (`channel.state !== "joined"`), refetch a cada 20s até virar estado final; para automaticamente em approved/rejected/paused/disabled/error.
+
+### `InstitutionTemplateService`
+```ts
+syncFromMeta(id: string): Promise<{ meta_status: string; meta_template_id: string|null; updated: boolean }>
+```
+Chama a Edge Function `sync-whatsapp-templates` com `{ local_template_id: id }` e retorna o registro atualizado.
 
 ## TDD
 
-Ordem estrita, um ciclo por vez, RED antes de GREEN.
+Ordem estrita, RED antes de GREEN. Mocks só nas fronteiras (banco/HTTP).
 
-**Deno (handler + builder), arquivos em `supabase/functions/create-whatsapp-template/`:**
+**Deno — status handler puro (`whatsapp-webhook/templateStatus.test.ts`):**
+1. APPROVED por `meta_template_id` atualiza template → `meta_status:"approved"`, `meta_last_webhook_at` gravado.
+2. REJECTED grava `meta_rejection_reason` e `meta_status:"rejected"`.
+3. Evento duplicado (mesmo `payload_hash`) não chama `updateTemplate`.
+4. Idioma diferente entre payload e template → não atualiza, retorna `language_mismatch`.
+5. WABA diferente do `meta_waba_id` armazenado → não atualiza, retorna `waba_mismatch`.
+6. Sem `meta_template_id` mas com WABA + name + language → casa e atualiza.
+7. Só nome (sem WABA e sem match) → não atualiza, retorna `unmatched`.
+8. Status desconhecido não vira “approved”; retorna `no_status_change`.
 
-1. `handler.happy.test.ts` — rascunho válido → 200 `submitted`, Meta chamada 1×, `persistSubmission` com `meta_status:"submitted"`, `meta_template_id`, `meta_submitted_at`. (RED primeiro.)
-2. `handler.validation.test.ts` — sem `local_template_id` → 400 `LOCAL_TEMPLATE_ID_REQUIRED`, Meta não chamada.
-3. `handler.auth.test.ts` — sem JWT → 401; não-admin → 403; admin de outra instituição → 403.
-4. `handler.notfound.test.ts` — template inexistente → 404.
-5. `handler.already.test.ts` — `meta_status` ≠ `not_submitted` e chave idempotência distinta → 409; Meta não chamada.
-6. `handler.invalid_body.test.ts` — BODY vazio ou exemplo faltando → 400 `TEMPLATE_INVALID`, Meta não chamada.
-7. `handler.meta_error.test.ts` — Meta responde 400/500 → 502 `META_ERROR` com mensagem sanitizada, persistência marca `meta_status:"error"`.
-8. `handler.status_map.test.ts` — Meta responde `PENDING` → persistência grava `submitted`.
-9. `handler.idempotency.test.ts` — duas chamadas seguidas com mesmo payload → Meta chamada 1×, segunda retorna `deduplicated:true`.
-10. `_shared/metaTemplatePayload.test.ts` — builder puro: happy path, ordem de variáveis, exemplos, footer/header longos, nome inválido, determinismo.
+**Deno — dispatcher (`whatsapp-webhook/dispatch.test.ts`, novo):**
+9. `field:"message_template_status_update"` chama `handleTemplateStatusUpdate` e não toca em `handleMessageEvents`.
+10. `field:"messages"` sem `metadata.phone_number_id` ainda passa pelo dispatcher sem quebrar o status handler.
 
-Mocks só na fronteira (banco/HTTP). Nada de espionar funções internas.
+**Deno — signature (`whatsapp-webhook/signature.test.ts`, novo pequeno):**
+11. Assinatura inválida → 403 e nenhum handler é chamado.
 
-**Vitest (frontend):**
-11. `src/pages/app/MessageTemplateEdit.submit.test.tsx` — botão “Enviar para aprovação” chama `service.submitToMeta(id)` com o UUID, mostra toast de sucesso, invalida cache.
-12. Botão só aparece quando `template_kind === "meta"` e `meta_status === "not_submitted"`.
-13. Após envio bem-sucedido a UI mostra badge “Em análise”, `meta_template_id`, `submitted_at` e o botão fica desabilitado.
-14. Erro Meta (`error_code: META_ERROR`) mostra `toast.error` com a mensagem retornada.
+**Deno — sync handler (`sync-whatsapp-templates/handler.test.ts`):**
+12. `local_template_id` presente atualiza somente aquele template.
+13. Percorre `paging.next` até o fim (duas páginas).
+14. Admin de outra instituição → 403.
+15. Superadmin com `institution` alvo → 200 sincronizando aquela instituição.
+16. Sem `WHATSAPP_TOKEN` ou WABA → 500/400 apropriado.
+
+**Vitest — página de detalhe (`MessageTemplateEdit.status.test.tsx`, novo):**
+17. Renderiza badge “Em análise” + botão “Atualizar status” quando `meta_status:"submitted"`.
+18. Clique em “Atualizar status” chama `service.syncFromMeta(id)` e invalida a query.
+19. Quando `meta_status:"rejected"` mostra o `meta_rejection_reason` retornado pelo serviço.
+20. Não mostra botão “Atualizar status” em estados finais? — Sim, mostrar sempre para permitir recovery manual; teste garante que o botão continua visível também em approved/rejected.
 
 ## Detalhes técnicos
 
-- `GRAPH_VERSION` continua vindo de env, com fallback `v25.0`, validado por regex.
-- Sanitização de mensagens Meta: pegar apenas `error.message` e `error.error_user_msg`; nunca vazar `error.fbtrace_id` do WABA nem `error_data.details` cruas.
-- `sha256` via `crypto.subtle.digest` (`hex`), payload normalizado com `JSON.stringify` estável (chaves ordenadas em `components`/`example`).
-- `loadWabaFor(institution)` lê `institution_whatsapp_settings` (canal ativo). Ausente → 400 explícito, não tenta env fallback quando `institution` está definido.
-- Preservar comportamento de versionamento (`parent_template_id`) fora do escopo desta fase — bloquear com 400 caso enviado.
-- `verify_jwt` fica no default (`false`); autenticação segue in-code via `getClaims`.
-- Nada de webhook, nada de sync-back. Fim explícito da fatia.
+- `payload_hash = sha256(stableStringify({ waba: entry.id, event: value.event, id: value.message_template_id, name, language, time: entry.time }))`.
+- `meta_rejection_reason` guarda a string enviada pela Meta. `meta_rejection_info` (jsonb) mantém `{ reason, at, event }` para auditoria.
+- Nunca escrever `meta_language` do webhook sobre um valor divergente — protege contra colisão de mesmo nome em idiomas diferentes.
+- `handleUnknownEvent` grava em `whatsapp_unmatched_events` com `event_type = "template:${change.field}"` para diagnóstico.
+- Realtime: policy de leitura já permite a linha (RLS por institution). Nenhuma nova policy.
+- Polling fallback é *client-side*, `useQuery({ refetchInterval })` só quando `meta_status === "submitted"` e Realtime não conectou; para em estado final.
+- Nenhum secret novo. `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_WABA_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_GRAPH_VERSION` já configurados.
 
 ## Arquivos afetados
 
 Novos:
-- `supabase/functions/_shared/metaTemplatePayload.ts`
-- `supabase/functions/_shared/metaTemplatePayload.test.ts`
-- `supabase/functions/create-whatsapp-template/handler.ts`
-- `supabase/functions/create-whatsapp-template/handler.happy.test.ts`
-- `supabase/functions/create-whatsapp-template/handler.validation.test.ts`
-- `supabase/functions/create-whatsapp-template/handler.auth.test.ts`
-- `supabase/functions/create-whatsapp-template/handler.notfound.test.ts`
-- `supabase/functions/create-whatsapp-template/handler.already.test.ts`
-- `supabase/functions/create-whatsapp-template/handler.invalid_body.test.ts`
-- `supabase/functions/create-whatsapp-template/handler.meta_error.test.ts`
-- `supabase/functions/create-whatsapp-template/handler.status_map.test.ts`
-- `supabase/functions/create-whatsapp-template/handler.idempotency.test.ts`
-- `src/pages/app/MessageTemplateEdit.submit.test.tsx`
+- `supabase/functions/_shared/metaTemplateStatus.ts`
+- `supabase/functions/whatsapp-webhook/templateStatus.ts`
+- `supabase/functions/whatsapp-webhook/templateStatus.test.ts`
+- `supabase/functions/whatsapp-webhook/dispatch.ts`
+- `supabase/functions/whatsapp-webhook/dispatch.test.ts`
+- `supabase/functions/whatsapp-webhook/signature.test.ts`
+- `supabase/functions/sync-whatsapp-templates/handler.ts`
+- `supabase/functions/sync-whatsapp-templates/handler.test.ts`
+- `src/pages/app/MessageTemplateEdit.status.test.tsx`
+- Migration `phase4_template_events_unique_and_realtime.sql` (constraint + publication + REPLICA IDENTITY).
 
 Editados:
-- `supabase/functions/create-whatsapp-template/index.ts` (vira wrapper fino sobre `handler.ts`).
-- `src/services/institutionTemplates.ts` (`submitToMeta`).
-- `src/pages/app/MessageTemplateEdit.tsx` (botão + estados de envio).
+- `supabase/functions/whatsapp-webhook/index.ts` — passa a delegar via `dispatch(change.field)`; sem outras mudanças no fluxo de `messages`.
+- `supabase/functions/sync-whatsapp-templates/index.ts` — vira wrapper fino sobre `handler.ts`.
+- `src/services/institutionTemplates.ts` — adiciona `syncFromMeta`.
+- `src/pages/app/MessageTemplateEdit.tsx` — painel de status + Realtime + polling fallback + botão “Atualizar status”.
+- Testes existentes que mockam `InstitutionTemplateService` recebem `syncFromMeta: vi.fn(...)`.
 
 ## Critérios de aceite
 
-- Rascunho local existe antes do envio (400 se não).
-- Payload sempre montado no servidor a partir do registro local.
-- WABA usado é o da instituição do template; nunca aceita do cliente.
-- `meta_status`, `meta_template_id`, `meta_submitted_at`, `meta_submitted_by`, `meta_waba_id`, `meta_idempotency_key`, `meta_creation_payload` são persistidos.
-- Duplo clique não gera duas chamadas à Meta.
-- Erros da Meta chegam ao usuário como mensagem legível, sem dados sensíveis.
-- Todos os testes (Deno + Vitest) verdes.
-- Sem código de webhook nesta fase.
+- Webhook APPROVED atualiza `meta_status="approved"` no template correto (por `meta_template_id`).
+- Webhook REJECTED grava `meta_rejection_reason`.
+- Assinatura inválida bloqueia com 403 e nenhum handler roda.
+- Evento repetido (mesmo `payload_hash`) não reaplica update.
+- Payload com idioma ou WABA diferentes não sobrescreve o template.
+- Sync manual respeita instituição do usuário (admin) e permite superadmin escolher outra.
+- Sync percorre múltiplas páginas.
+- UI mostra Em análise / Aprovado / Rejeitado + motivo + última atualização; Realtime atualiza sem reload; polling para em estado final.
+- Nenhum código de mídia adicionado.

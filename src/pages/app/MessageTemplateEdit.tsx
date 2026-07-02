@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { qk } from "@/lib/queries";
+import { supabase } from "@/integrations/supabase/client";
 import {
   useInstitutionIdentity,
   useInstitutionTemplateService,
@@ -54,6 +55,11 @@ export default function MessageTemplateEdit() {
     queryKey: ["template-by-id", templateId],
     queryFn: () => service.getById(templateId),
     enabled: !!templateId,
+    refetchInterval: (q) => {
+      const status = (q.state.data as MessageTemplate | null)?.meta_status;
+      // Polling fallback: only while awaiting Meta review.
+      return status === "submitted" ? 20000 : false;
+    },
   });
 
   const [form, setForm] = useState<TemplateDraftInput | null>(null);
@@ -90,6 +96,41 @@ export default function MessageTemplateEdit() {
     },
     onError: (e: Error) => toast.error(e.message ?? "Falha ao enviar modelo."),
   });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => service.syncFromMeta(templateId),
+    onSuccess: () => {
+      toast.success("Status atualizado a partir da Meta.");
+      qc.invalidateQueries({ queryKey: ["template-by-id", templateId] });
+      qc.invalidateQueries({
+        queryKey: qk.institutionTemplates(identity.institution ?? ""),
+      });
+    },
+    onError: (e: Error) => toast.error(e.message ?? "Falha ao sincronizar."),
+  });
+
+  // Realtime: refresh the row whenever Meta (via the webhook) updates it.
+  useEffect(() => {
+    if (!templateId) return;
+    const channel = supabase
+      .channel(`template-detail-${templateId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "message_templates",
+          filter: `id=eq.${templateId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ["template-by-id", templateId] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [templateId, qc]);
 
   const isLocked = useMemo(
     () => !!query.data && query.data.meta_status !== "not_submitted",
@@ -188,6 +229,12 @@ export default function MessageTemplateEdit() {
         }
       />
 
+      {isLocked && <MetaStatusPanel
+        template={query.data}
+        onSync={() => syncMutation.mutate()}
+        syncing={syncMutation.isPending}
+      />}
+
       <div className="flex justify-end gap-2">
         <Button asChild variant="outline">
           <Link to="/app/modelos">Cancelar</Link>
@@ -211,5 +258,70 @@ export default function MessageTemplateEdit() {
         )}
       </div>
     </div>
+  );
+}
+
+function statusLabel(s: string | null | undefined): string {
+  switch (s) {
+    case "submitted": return "Em análise";
+    case "approved": return "Aprovado";
+    case "rejected": return "Rejeitado";
+    case "paused": return "Pausado";
+    case "disabled": return "Desativado";
+    case "error": return "Erro";
+    default: return s ?? "—";
+  }
+}
+
+function MetaStatusPanel({
+  template,
+  onSync,
+  syncing,
+}: {
+  template: MessageTemplate;
+  onSync: () => void;
+  syncing: boolean;
+}) {
+  const rec = template as unknown as {
+    meta_status?: string | null;
+    meta_template_id?: string | null;
+    meta_submitted_at?: string | null;
+    meta_last_synced_at?: string | null;
+    meta_last_webhook_at?: string | null;
+    meta_rejection_reason?: string | null;
+    meta_rejection_info?: { reason?: string | null } | null;
+  };
+  const lastUpdate =
+    rec.meta_last_webhook_at ?? rec.meta_last_synced_at ?? rec.meta_submitted_at ?? null;
+  const reason = rec.meta_rejection_reason ?? rec.meta_rejection_info?.reason ?? null;
+  return (
+    <section
+      aria-label="Status na Meta"
+      className="rounded-lg border bg-card p-4 text-sm space-y-2"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Status:</span>
+          <Badge variant="outline">{statusLabel(rec.meta_status)}</Badge>
+        </div>
+        <Button size="sm" variant="outline" onClick={onSync} disabled={syncing}>
+          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? "Sincronizando…" : "Atualizar status"}
+        </Button>
+      </div>
+      {rec.meta_template_id && (
+        <p className="text-xs text-muted-foreground">
+          ID Meta: <code>{rec.meta_template_id}</code>
+        </p>
+      )}
+      {lastUpdate && (
+        <p className="text-xs text-muted-foreground">
+          Última atualização: {new Date(lastUpdate).toLocaleString("pt-BR")}
+        </p>
+      )}
+      {rec.meta_status === "rejected" && reason && (
+        <p className="text-xs text-destructive">Motivo: {reason}</p>
+      )}
+    </section>
   );
 }

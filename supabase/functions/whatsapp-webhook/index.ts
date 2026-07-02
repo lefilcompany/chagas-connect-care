@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createTemplateStatusHandler, TemplateMatch } from "./templateStatus.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -286,6 +287,7 @@ function shouldApplyStatus(current: string | null | undefined, next: string): bo
 }
 
 Deno.serve(async (req) => {
+  // ... handler defined below the file ...
   const url = new URL(req.url);
 
   // Meta handshake
@@ -332,6 +334,23 @@ Deno.serve(async (req) => {
     for (const entry of entries) {
       const changes: any[] = Array.isArray(entry?.changes) ? entry.changes : [];
       for (const change of changes) {
+        // Dispatch by change.field BEFORE touching value.metadata (template
+        // status updates have no phone_number_id).
+        if (change?.field === "message_template_status_update") {
+          try {
+            await runTemplateStatusUpdate(admin, entry, change);
+          } catch (e) {
+            console.error("whatsapp-webhook: template status handler error", e);
+          }
+          continue;
+        }
+        if (change?.field && change.field !== "messages") {
+          await admin.from("whatsapp_unmatched_events").insert({
+            event_type: `template:${change.field}`,
+            payload: change,
+          } as any).then(() => {}, () => {});
+          continue;
+        }
         const value = change?.value ?? {};
         const phoneNumberId: string | null = value?.metadata?.phone_number_id ?? null;
         const resolved = await resolveWhatsAppChannel(admin, phoneNumberId);
@@ -591,3 +610,78 @@ Deno.serve(async (req) => {
 
   return new Response("ok", { status: 200 });
 });
+// ---------------------------------------------------------------------------
+// Template status updates (Phase 4). Wires the pure handler in
+// ./templateStatus.ts to Supabase-backed I/O. Keeps the pure module free of
+// database dependencies for testing.
+// ---------------------------------------------------------------------------
+
+const TEMPLATE_SELECT =
+  "id, institution, meta_template_id, meta_waba_id, meta_language, meta_status, meta_template_name";
+
+async function runTemplateStatusUpdate(
+  admin: ReturnType<typeof createClient>,
+  entry: any,
+  change: any,
+): Promise<void> {
+  const handler = createTemplateStatusHandler({
+    hasEvent: async (hash) => {
+      const { data } = await admin
+        .from("whatsapp_template_events")
+        .select("id")
+        .eq("payload_hash", hash)
+        .maybeSingle();
+      return !!data;
+    },
+    recordEvent: async (row) => {
+      await admin.from("whatsapp_template_events").insert(row as any);
+    },
+    findByMetaId: async (id) => {
+      const { data } = await admin
+        .from("message_templates")
+        .select(TEMPLATE_SELECT)
+        .eq("template_kind", "meta")
+        .eq("meta_template_id", id)
+        .maybeSingle();
+      return (data as TemplateMatch | null) ?? null;
+    },
+    findByWabaNameLang: async (waba, name, language) => {
+      const { data } = await admin
+        .from("message_templates")
+        .select(TEMPLATE_SELECT)
+        .eq("template_kind", "meta")
+        .eq("meta_waba_id", waba)
+        .eq("meta_template_name", name)
+        .eq("meta_language", language)
+        .maybeSingle();
+      return (data as TemplateMatch | null) ?? null;
+    },
+    findByInstitutionNameLang: async (institution, name, language) => {
+      const { data } = await admin
+        .from("message_templates")
+        .select(TEMPLATE_SELECT)
+        .eq("template_kind", "meta")
+        .eq("institution", institution)
+        .eq("meta_template_name", name)
+        .eq("meta_language", language)
+        .maybeSingle();
+      return (data as TemplateMatch | null) ?? null;
+    },
+    resolveInstitutionByWaba: async (waba) => {
+      const { data } = await admin
+        .from("institution_whatsapp_settings")
+        .select("institution")
+        .eq("waba_id", waba)
+        .maybeSingle();
+      return (data as any)?.institution ?? null;
+    },
+    updateTemplate: async (id, patch) => {
+      await admin.from("message_templates").update(patch).eq("id", id);
+    },
+    now: () => new Date(),
+  });
+  const outcome = await handler(entry, change);
+  if (!outcome.processed) {
+    console.log("template status update skipped:", outcome.reason);
+  }
+}
