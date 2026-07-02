@@ -16,7 +16,11 @@ export interface BuildInput {
   language: string;
   category: MetaCategory;
   body: string;
-  header?: { type: "none" | "text"; text?: string | null } | null;
+  header?:
+    | { type: "none" }
+    | { type: "text"; text?: string | null }
+    | { type: "image" | "video" | "document"; handle?: string | null }
+    | null;
   footer?: string | null;
   buttons?: MetaButton[] | null;
   variableExamples: Record<string, string>;
@@ -24,9 +28,13 @@ export interface BuildInput {
 
 export interface MetaComponent {
   type: "HEADER" | "BODY" | "FOOTER" | "BUTTONS";
-  format?: "TEXT";
+  format?: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
   text?: string;
-  example?: { body_text?: string[][]; header_text?: string[] };
+  example?: {
+    body_text?: string[][];
+    header_text?: string[];
+    header_handle?: string[];
+  };
   buttons?: MetaButton[];
 }
 
@@ -84,6 +92,15 @@ export function buildMetaTemplateCreationPayload(input: BuildInput): BuildResult
     const t = (header.text ?? "").trim();
     if (!t) errors.header = "Cabeçalho de texto não pode ficar vazio.";
     else if (t.length > 60) errors.header = "Cabeçalho de texto deve ter até 60 caracteres.";
+  } else if (
+    header.type === "image" ||
+    header.type === "video" ||
+    header.type === "document"
+  ) {
+    const h = (header.handle ?? "").trim();
+    if (!h) {
+      errors.header = "Envie uma amostra de mídia antes de submeter o modelo.";
+    }
   }
 
   const footer = (input.footer ?? "").trim();
@@ -103,6 +120,18 @@ export function buildMetaTemplateCreationPayload(input: BuildInput): BuildResult
   const components: MetaComponent[] = [];
   if (header.type === "text") {
     components.push({ type: "HEADER", format: "TEXT", text: (header.text ?? "").trim() });
+  } else if (
+    header.type === "image" ||
+    header.type === "video" ||
+    header.type === "document"
+  ) {
+    const format =
+      header.type === "image" ? "IMAGE" : header.type === "video" ? "VIDEO" : "DOCUMENT";
+    components.push({
+      type: "HEADER",
+      format,
+      example: { header_handle: [(header.handle ?? "").trim()] },
+    });
   }
   const bodyComp: MetaComponent = { type: "BODY", text: toPositional(body, order) };
   if (bodyExamples.length > 0) bodyComp.example = { body_text: [bodyExamples] };
