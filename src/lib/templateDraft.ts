@@ -78,12 +78,14 @@ export const templateDraftSchema = z
 
 export type TemplateDraftInput = z.infer<typeof templateDraftSchema>;
 
+export type ValidateTemplateDraftResult =
+  | { ok: true; data: TemplateDraftInput; errors?: undefined }
+  | { ok: false; data?: undefined; errors: Record<string, string> };
+
 /** Convenience: safeParse returning a flat `{ [path]: message }` map. */
 export function validateTemplateDraft(
   input: Partial<TemplateDraftInput> | Record<string, unknown>,
-):
-  | { ok: true; data: TemplateDraftInput }
-  | { ok: false; errors: Record<string, string> } {
+): ValidateTemplateDraftResult {
   const parsed = templateDraftSchema.safeParse(input);
   if (parsed.success) return { ok: true, data: parsed.data };
   const errors: Record<string, string> = {};
