@@ -546,6 +546,12 @@ function FolderDetail({
             <span className="text-xs font-normal text-muted-foreground">({sortedTemplates.length})</span>
           </h2>
           <div className="flex items-center gap-2">
+            <Link
+              to="/app/modelos"
+              className="text-xs text-muted-foreground underline-offset-4 hover:text-brand hover:underline"
+            >
+              Ver todos os modelos
+            </Link>
             <Button
               variant="outline"
               size="sm"
