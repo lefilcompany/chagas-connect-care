@@ -22,6 +22,19 @@ function templateToDraft(t: MessageTemplate): TemplateDraftInput {
   const header = (t as unknown as { meta_header?: { type?: string; text?: string } })
     .meta_header;
   const buttons = (t as unknown as { meta_buttons?: unknown[] }).meta_buttons ?? [];
+  const raw = t as unknown as {
+    meta_header_type?: string | null;
+    meta_header_text?: string | null;
+    meta_header_handle?: string | null;
+    meta_header_format?: "IMAGE" | "VIDEO" | "DOCUMENT" | null;
+    meta_header_media_id?: string | null;
+  };
+  const headerTypeRaw = raw.meta_header_type ?? header?.type ?? "none";
+  const headerType = (["none", "text", "image", "video", "document"] as const).includes(
+    headerTypeRaw as never,
+  )
+    ? (headerTypeRaw as TemplateDraftInput["meta_header_type"])
+    : "none";
   return {
     name: t.name ?? "",
     description: t.description ?? "",
@@ -32,8 +45,14 @@ function templateToDraft(t: MessageTemplate): TemplateDraftInput {
     meta_language: t.meta_language ?? "pt_BR",
     meta_category:
       (t.meta_category as "UTILITY" | "MARKETING" | "AUTHENTICATION") ?? "UTILITY",
-    meta_header_type: header?.type === "text" ? "text" : "none",
-    meta_header_text: header?.text ?? "",
+    meta_header_type: headerType,
+    meta_header_text: raw.meta_header_text ?? header?.text ?? "",
+    meta_header_handle: raw.meta_header_handle ?? "",
+    meta_header_media_id: raw.meta_header_media_id ?? null,
+    meta_header_format: raw.meta_header_format ?? null,
+    meta_header_media_file_name: "",
+    meta_header_media_mime: "",
+    meta_header_media_size: 0,
     meta_footer_text: t.meta_footer_text ?? "",
     meta_buttons: Array.isArray(buttons)
       ? (buttons as TemplateDraftInput["meta_buttons"])
@@ -107,6 +126,25 @@ export default function MessageTemplateEdit() {
       });
     },
     onError: (e: Error) => toast.error(e.message ?? "Falha ao sincronizar."),
+  });
+
+  const uploadMediaMutation = useMutation({
+    mutationFn: async (file: File) => service.uploadHeaderMedia(templateId, file),
+    onSuccess: (r) => {
+      toast.success("Amostra enviada à Meta.");
+      setForm((cur) =>
+        cur
+          ? {
+              ...cur,
+              meta_header_handle: r.header_handle,
+              meta_header_format: r.format,
+              meta_header_media_id: r.media_id,
+            }
+          : cur,
+      );
+      qc.invalidateQueries({ queryKey: ["template-by-id", templateId] });
+    },
+    onError: (e: Error) => toast.error(e.message ?? "Falha ao enviar amostra."),
   });
 
   // Realtime: refresh the row whenever Meta (via the webhook) updates it.
@@ -222,6 +260,10 @@ export default function MessageTemplateEdit() {
         onChange={handleChange}
         errors={errors}
         disabled={isLocked}
+        onUploadHeaderMedia={async (file) => {
+          await uploadMediaMutation.mutateAsync(file);
+        }}
+        uploadingHeaderMedia={uploadMediaMutation.isPending}
         statusBadge={
           <Badge variant="outline">
             {query.data.meta_status === "not_submitted" ? "Rascunho" : query.data.meta_status}
@@ -250,7 +292,13 @@ export default function MessageTemplateEdit() {
           <Button
             variant="default"
             onClick={() => submitMutation.mutate()}
-            disabled={submitMutation.isPending}
+            disabled={
+              submitMutation.isPending ||
+              ((form.meta_header_type === "image" ||
+                form.meta_header_type === "video" ||
+                form.meta_header_type === "document") &&
+                !form.meta_header_handle)
+            }
           >
             <Send className="h-4 w-4" />
             {submitMutation.isPending ? "Enviando…" : "Enviar para aprovação"}
