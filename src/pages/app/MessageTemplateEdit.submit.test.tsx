@@ -40,11 +40,11 @@ function makeService(over: Partial<InstitutionTemplateService> = {}): Institutio
     createDraft: vi.fn(),
     updateDraft: vi.fn(),
     submitToMeta: vi.fn(async () => ({
-    syncFromMeta: vi.fn(async () => ({ meta_status: "submitted", updated: 0, matched: 0 })),
       meta_template_id: "meta-999",
       meta_status: "submitted",
       submitted_at: "2026-07-02T12:00:00.000Z",
     })),
+    syncFromMeta: vi.fn(async () => ({ meta_status: "submitted", updated: 0, matched: 0 })),
     ...over,
   };
 }
