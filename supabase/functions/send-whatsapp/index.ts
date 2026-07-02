@@ -1,3 +1,5 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import {
   resolveInstitutionBranding,
   resolveSignatureText,
@@ -6,14 +8,15 @@ import {
   brandingSnapshot,
   type InstitutionWhatsAppSettings,
 } from "../_shared/institution-branding.ts";
-import { withEdgeHandler, jsonResponse, jsonError } from "../_shared/http.ts";
-import { requireAuth } from "../_shared/auth.ts";
 
 const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
 const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
 const WHATSAPP_TEST_MODE = (Deno.env.get("WHATSAPP_TEST_MODE") ?? "").toLowerCase() === "true";
 const WHATSAPP_TEST_TEMPLATE_NAME = Deno.env.get("WHATSAPP_TEST_TEMPLATE_NAME") ?? "hello_world";
 const WHATSAPP_TEST_TEMPLATE_LANGUAGE = Deno.env.get("WHATSAPP_TEST_TEMPLATE_LANGUAGE") ?? "en_US";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
 const RAW_WHATSAPP_GRAPH_VERSION = Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? "v25.0";
 const WHATSAPP_GRAPH_VERSION = /^v\d+\.\d+$/.test(RAW_WHATSAPP_GRAPH_VERSION)
@@ -22,9 +25,12 @@ const WHATSAPP_GRAPH_VERSION = /^v\d+\.\d+$/.test(RAW_WHATSAPP_GRAPH_VERSION)
 
 const META_API = `https://graph.facebook.com/${WHATSAPP_GRAPH_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
 
-// Legacy alias so existing call sites (`json(status, body)`) route through
-// the shared response builder without touching every internal handler.
-const json = jsonResponse;
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 function normalizeBRPhone(input: string): string | null {
   const digits = (input ?? "").replace(/\D/g, "");
@@ -79,26 +85,31 @@ function validateWhatsAppConfig(rawPhone: string):
 
 type SendBody = { message_id?: string };
 
-Deno.serve(withEdgeHandler(async (req) => {
-  if (req.method !== "POST") {
-    return jsonError(405, "INVALID_INPUT", "Method not allowed");
-  }
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json(405, { error: "Method not allowed" });
 
-  // Auth via shared helper — returns structured 401 on failure.
-  const ctx = await requireAuth(req);
-  if (ctx instanceof Response) return ctx;
-  const authClient = ctx.userClient;
-  const admin = ctx.serviceClient;
+  // Auth: require valid JWT from app
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "Unauthorized" });
+  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const token = authHeader.replace("Bearer ", "");
+  const { data: claims, error: authErr } = await authClient.auth.getClaims(token);
+  if (authErr || !claims?.claims) return json(401, { error: "Unauthorized" });
 
   let body: SendBody;
   try {
     body = await req.json();
   } catch {
-    return jsonError(400, "INVALID_INPUT", "Invalid JSON");
+    return json(400, { error: "Invalid JSON" });
   }
   if (!body.message_id || typeof body.message_id !== "string") {
-    return jsonError(400, "INVALID_INPUT", "message_id is required");
+    return json(400, { error: "message_id is required" });
   }
+
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   // Authorization: fetch through the caller's RLS-scoped client to ensure
   // the user has access to this message (same institution / owner).
@@ -108,7 +119,7 @@ Deno.serve(withEdgeHandler(async (req) => {
     .eq("id", body.message_id)
     .maybeSingle();
   if (authzErr || !authorized) {
-    return jsonError(403, "FORBIDDEN", "Access denied to this message.");
+    return json(403, { error: "Forbidden" });
   }
 
   // Fetch the message with admin client for full field access
@@ -238,7 +249,7 @@ Deno.serve(withEdgeHandler(async (req) => {
   if (!WHATSAPP_TEST_MODE && (msg as any).template_id) {
     const { data: tpl } = await admin
       .from("message_templates")
-      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_body_parameter_order, meta_parameter_format, meta_has_local_differences, meta_definition, meta_header_type, meta_header_text, meta_footer_text, meta_buttons, meta_authentication_config")
+      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text, meta_footer_text, meta_buttons, meta_authentication_config")
       .eq("id", (msg as any).template_id)
       .maybeSingle();
     tplRow = tpl;
@@ -249,20 +260,6 @@ Deno.serve(withEdgeHandler(async (req) => {
           last_error: "Template não aprovado pela Meta",
         }).eq("id", msg.id);
         return json(200, { ok: false, error_code: "TEMPLATE_NOT_APPROVED", error: "Este template não está aprovado pela Meta." });
-      }
-      if ((tpl as any).meta_has_local_differences === true) {
-        await admin.from("messages").update({
-          status: "failed", failed_at: new Date().toISOString(),
-          last_error: "Template divergente da definição aprovada na Meta",
-        }).eq("id", msg.id);
-        return json(200, { ok: false, error_code: "TEMPLATE_DIVERGENT", error: "Este template diverge da versão aprovada na Meta. Ressincronize antes de enviar." });
-      }
-      if (!(tpl as any).meta_definition) {
-        await admin.from("messages").update({
-          status: "failed", failed_at: new Date().toISOString(),
-          last_error: "Definição sincronizada da Meta ausente para o template",
-        }).eq("id", msg.id);
-        return json(200, { ok: false, error_code: "TEMPLATE_DEFINITION_MISSING", error: "Sincronize o template com a Meta antes de enviá-lo." });
       }
       if (!tpl.meta_template_name) {
         await admin.from("messages").update({
@@ -525,10 +522,8 @@ Deno.serve(withEdgeHandler(async (req) => {
       usedTemplateLanguage = tplRow.meta_language || "pt_BR";
       // Skip the generic template build path below.
     } else {
-    const order = Array.isArray((tplRow as any).meta_body_parameter_order)
-      ? ((tplRow as any).meta_body_parameter_order as string[])
-      : Array.isArray((tplRow as any).meta_parameter_order)
-      ? ((tplRow as any).meta_parameter_order as string[])
+    const order = Array.isArray(tplRow.meta_parameter_order)
+      ? (tplRow.meta_parameter_order as string[])
       : [];
     // Detect placeholders that should never reach the Meta API
     const placeholderRe = /\{[a-zA-Z0-9_]+\}/;
@@ -1290,4 +1285,4 @@ Deno.serve(withEdgeHandler(async (req) => {
     template_name: usedTemplateName,
     template_language: usedTemplateLanguage,
   });
-}));
+});

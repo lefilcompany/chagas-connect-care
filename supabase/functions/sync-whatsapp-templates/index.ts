@@ -1,6 +1,20 @@
-import { withEdgeHandler, jsonOk, jsonError } from "../_shared/http.ts";
-import { requireAuth } from "../_shared/auth.ts";
-import { resolveChannel, graphUrl } from "../_shared/resolve-channel.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
+const WHATSAPP_WABA_ID = Deno.env.get("WHATSAPP_WABA_ID") ?? "";
+const RAW_VER = Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? "v25.0";
+const WHATSAPP_GRAPH_VERSION = /^v\d+\.\d+$/.test(RAW_VER) ? RAW_VER : "v25.0";
+
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 const STATUS_MAP: Record<string, string> = {
   APPROVED: "approved",
@@ -45,117 +59,79 @@ function parseComponents(components: unknown) {
   return { headerType, headerText, bodyText, footerText, buttons, carouselCards, authConfig };
 }
 
-Deno.serve(withEdgeHandler(async (req) => {
-  if (req.method !== "POST") {
-    return jsonError(405, "INVALID_INPUT", "Method not allowed");
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json(405, { error: "Method not allowed" });
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "Unauthorized" });
+
+  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const token = authHeader.replace("Bearer ", "");
+  const { data: claims, error: authErr } = await authClient.auth.getClaims(token);
+  if (authErr || !claims?.claims) return json(401, { error: "Unauthorized" });
+
+  const userId = claims.claims.sub as string;
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  const { data: roleRow } = await admin
+    .from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+  if (!roleRow) return json(403, { error: "Forbidden" });
+
+  if (!WHATSAPP_TOKEN || !WHATSAPP_WABA_ID) {
+    return json(500, { error: "WHATSAPP_TOKEN or WHATSAPP_WABA_ID missing" });
   }
 
-  const ctx = await requireAuth(req);
-  if (ctx instanceof Response) return ctx;
-  if (!ctx.isAdmin && !ctx.isSuperadmin) {
-    return jsonError(403, "FORBIDDEN", "Requires admin or superadmin role.");
+  const url = `https://graph.facebook.com/${WHATSAPP_GRAPH_VERSION}/${WHATSAPP_WABA_ID}` +
+    `/message_templates?fields=name,language,status,category,id,rejected_reason,quality_score,components&limit=200`;
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` } });
+  } catch (e) {
+    return json(502, { ok: false, error: e instanceof Error ? e.message : String(e) });
   }
-  const admin = ctx.serviceClient;
-
-  // Superadmins may target any institution via ?institution= query param.
-  const url = new URL(req.url);
-  const requestedInstitution = url.searchParams.get("institution");
-  const targetInstitution: string =
-    (requestedInstitution && ctx.isSuperadmin ? requestedInstitution : "") ||
-    (Deno.env.get("WHATSAPP_DEFAULT_INSTITUTION") ?? "").trim() ||
-    ctx.institution ||
-    "";
-
-  const channel = await resolveChannel(admin, targetInstitution || null);
-  if (channel instanceof Response) return channel;
-  if (!channel.wabaId) {
-    return jsonError(400, "CHANNEL_MISCONFIGURED", "WABA id is not configured for this channel.");
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return json(200, { ok: false, error: (body as any)?.error?.message ?? "Meta sync failed" });
   }
 
-  // ---- Paginated fetch of ALL templates on the WABA. -------------------
-  const items: any[] = [];
-  let next: string | null = graphUrl(
-    `${channel.wabaId}/message_templates?fields=name,language,status,category,id,rejected_reason,quality_score,components,parameter_format&limit=100`,
-  );
-  let pageGuard = 0;
-  while (next && pageGuard++ < 50) {
-    let res: Response;
-    try {
-      res = await fetch(next, { headers: { Authorization: `Bearer ${channel.token}` } });
-    } catch (e) {
-      return jsonError(502, "META_API_ERROR", e instanceof Error ? e.message : String(e), {
-        error_code: "NETWORK_ERROR",
-      });
-    }
-    const body: any = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = body?.error ?? {};
-      return jsonError(200, "META_API_ERROR", err.message ?? "Meta sync failed", {
-        error_code: "META_SYNC_FAILED",
-        meta_error: {
-          code: err.code ?? null,
-          error_subcode: err.error_subcode ?? null,
-          message: err.message ?? null,
-          fbtrace_id: err.fbtrace_id ?? null,
-          http_status: res.status,
-        },
-      });
-    }
-    if (Array.isArray(body?.data)) items.push(...body.data);
-    next = body?.paging?.next ?? null;
-  }
-
+  const items: any[] = Array.isArray((body as any)?.data) ? (body as any).data : [];
   const nowIso = new Date().toISOString();
   let updated = 0;
-  let created = 0;
+  let unmapped = 0;
 
   for (const t of items) {
     const status = STATUS_MAP[String(t?.status ?? "").toUpperCase()] ?? "submitted";
     const parsed = parseComponents(t?.components);
-    const metaTemplateId = t?.id != null ? String(t.id) : null;
-    const name: string = t?.name ?? "";
-    const language: string = t?.language ?? "pt_BR";
 
-    // Match by meta_template_id first (stable), then by (institution, name, language).
-    let existing: any = null;
-    if (metaTemplateId) {
-      const { data } = await admin
-        .from("message_templates")
-        .select("id, meta_footer_text, meta_definition, meta_body_parameter_order, body_patient, body_contact, body_segment, institution")
-        .eq("meta_template_id", metaTemplateId)
-        .maybeSingle();
-      existing = data;
-    }
-    if (!existing && name && targetInstitution) {
-      const { data } = await admin
-        .from("message_templates")
-        .select("id, meta_footer_text, meta_definition, meta_body_parameter_order, body_patient, body_contact, body_segment, institution")
-        .eq("template_kind", "meta")
-        .eq("institution", targetInstitution)
-        .eq("meta_template_name", name)
-        .eq("meta_language", language)
-        .maybeSingle();
-      existing = data;
+    const { data: existing } = await admin
+      .from("message_templates")
+      .select("id, meta_footer_text, body_patient, body_contact, body_segment")
+      .eq("template_kind", "meta")
+      .eq("meta_template_name", t?.name)
+      .maybeSingle();
+
+    if (!existing) {
+      unmapped++;
+      continue;
     }
 
-    // Compute divergence (structured): local footer/body vs Meta.
-    const localBody = existing
-      ? (existing.body_patient ?? existing.body_contact ?? existing.body_segment ?? null)
-      : null;
-    const footerDifferent = existing
-      ? (existing.meta_footer_text ?? null) !== (parsed.footerText ?? null)
-      : false;
+    // Determine local-vs-meta divergence (footer + body).
+    const ex: any = existing;
+    const localBody = ex.body_patient ?? ex.body_contact ?? ex.body_segment ?? null;
+    const footerDifferent =
+      (ex.meta_footer_text ?? null) !== (parsed.footerText ?? null);
     const bodyDifferent =
-      existing && parsed.bodyText != null && localBody != null && parsed.bodyText !== localBody;
+      parsed.bodyText != null && localBody != null && parsed.bodyText !== localBody;
 
-    const commonPatch: Record<string, unknown> = {
-      meta_template_id: metaTemplateId,
-      meta_template_name: name,
-      meta_language: language,
+    const patch: Record<string, unknown> = {
+      meta_template_id: t?.id ?? null,
+      meta_language: t?.language ?? "pt_BR",
       meta_category: t?.category ?? null,
       meta_status: status,
       meta_rejection_reason: t?.rejected_reason ?? null,
-      meta_rejection_info: t?.rejected_reason ? { reason: t.rejected_reason } : null,
       meta_last_synced_at: nowIso,
       meta_definition: t ?? null,
       meta_header_type: parsed.headerType,
@@ -165,27 +141,11 @@ Deno.serve(withEdgeHandler(async (req) => {
       meta_buttons: parsed.buttons,
       meta_carousel_cards: parsed.carouselCards,
       meta_authentication_config: parsed.authConfig,
-      meta_parameter_format: t?.parameter_format
-        ? String(t.parameter_format).toUpperCase()
-        : null,
-      meta_has_local_differences: !!(footerDifferent || bodyDifferent),
+      meta_has_local_differences: footerDifferent || bodyDifferent,
     };
-
-    if (existing) {
-      await admin.from("message_templates").update(commonPatch).eq("id", existing.id);
-      updated++;
-    } else if (targetInstitution) {
-      // Create a local skeleton so admins can see + adopt this Meta template.
-      await admin.from("message_templates").insert({
-        institution: targetInstitution,
-        template_kind: "meta",
-        name: name,
-        objective: "custom",
-        ...commonPatch,
-      } as any);
-      created++;
-    }
+    await admin.from("message_templates").update(patch).eq("id", ex.id);
+    updated++;
   }
 
-  return jsonOk({ count: items.length, updated, created, institution: targetInstitution });
-}));
+  return json(200, { ok: true, count: items.length, updated, unmapped });
+});

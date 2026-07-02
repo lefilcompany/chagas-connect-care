@@ -1,5 +1,4 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { jsonError, jsonOk, withEdgeHandler } from "../_shared/http.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -197,113 +196,6 @@ async function stampWebhookActivity(
 }
 
 const OPT_OUT_KEYWORDS = ["PARAR", "SAIR", "CANCELAR", "NAO QUERO", "NÃO QUERO", "REMOVER", "STOP"];
-
-// Meta template status → local persisted status.
-const TEMPLATE_STATUS_MAP: Record<string, string> = {
-  APPROVED: "approved",
-  REJECTED: "rejected",
-  PENDING: "submitted",
-  IN_APPEAL: "submitted",
-  PAUSED: "paused",
-  DISABLED: "disabled",
-  FLAGGED: "flagged",
-  ARCHIVED: "archived",
-  UNARCHIVED: "approved",
-  DELETED: "disabled",
-  PENDING_DELETION: "disabled",
-  REINSTATED: "approved",
-  LOCKED: "disabled",
-  LIMIT_EXCEEDED: "paused",
-};
-
-async function sha256Hex(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/**
- * Handle `message_template_status_update` events. Independent from
- * metadata.phone_number_id — resolves by meta_template_id first, then
- * falls back to (WABA → institution, name, language).
- */
-async function handleTemplateStatusUpdate(
-  admin: ReturnType<typeof createClient>,
-  entry: any,
-  change: any,
-): Promise<void> {
-  const value = change?.value ?? {};
-  const wabaId: string | null = entry?.id ?? null;
-  const metaTemplateId: string | null =
-    value?.message_template_id != null ? String(value.message_template_id) : null;
-  const name: string | null = value?.message_template_name ?? null;
-  const language: string | null = value?.message_template_language ?? null;
-  const event: string = String(value?.event ?? "").toUpperCase();
-  const reason: string | null = value?.reason ?? null;
-  const entryTs: number = Number(entry?.time ?? Math.floor(Date.now() / 1000));
-
-  const payloadHash = await sha256Hex(JSON.stringify({ v: value, t: entryTs }));
-
-  // Idempotency: skip if we already processed this exact event.
-  const { error: dupErr } = await admin
-    .from("whatsapp_template_events")
-    .insert({
-      meta_template_id: metaTemplateId,
-      event,
-      entry_timestamp: entryTs,
-      payload_hash: payloadHash,
-      payload: value,
-    } as any);
-  if (dupErr && (dupErr as any).code === "23505") return; // unique violation → already processed
-
-  // Find local row: prefer meta_template_id.
-  let localRow: any = null;
-  if (metaTemplateId) {
-    const { data } = await admin
-      .from("message_templates")
-      .select("id, meta_status")
-      .eq("meta_template_id", metaTemplateId)
-      .maybeSingle();
-    localRow = data;
-  }
-  if (!localRow && name && language) {
-    // Fallback: try (name, language) — narrow by institution when WABA maps to a channel.
-    let institution: string | null = null;
-    if (wabaId) {
-      const { data: ch } = await admin
-        .from("whatsapp_channels")
-        .select("institution")
-        .eq("waba_id", wabaId)
-        .limit(1)
-        .maybeSingle();
-      institution = (ch as any)?.institution ?? null;
-    }
-    let q = admin
-      .from("message_templates")
-      .select("id, meta_status")
-      .eq("template_kind", "meta")
-      .eq("meta_template_name", name)
-      .eq("meta_language", language);
-    if (institution) q = q.eq("institution", institution);
-    const { data } = await q.maybeSingle();
-    localRow = data;
-  }
-  if (!localRow) return;
-
-  const nextStatus = TEMPLATE_STATUS_MAP[event] ?? "submitted";
-  const patch: Record<string, unknown> = {
-    meta_status: nextStatus,
-    meta_last_synced_at: new Date().toISOString(),
-  };
-  if (event === "REJECTED") {
-    patch.meta_rejection_reason = reason;
-    patch.meta_rejection_info = value;
-  }
-  if (metaTemplateId) patch.meta_template_id = metaTemplateId;
-
-  await admin.from("message_templates").update(patch).eq("id", (localRow as any).id);
-}
-
-/** Extract candidate keywords from inbound WhatsApp text. */
 function isOptOutText(t: string): boolean {
   const norm = (t ?? "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return OPT_OUT_KEYWORDS.some((k) => norm === k.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
@@ -393,25 +285,7 @@ function shouldApplyStatus(current: string | null | undefined, next: string): bo
   return nxt > cur;
 }
 
-/**
- * Meta WhatsApp Cloud webhook.
- *
- * Response contract:
- *  - GET  (handshake): returns the raw `hub.challenge` string as `text/plain`
- *    with HTTP 200 when `hub.verify_token` matches. Meta requires the exact
- *    challenge body, so this endpoint does NOT wrap the handshake in JSON.
- *    On verification failure returns the standardized JSON error contract.
- *  - POST (events)  : validates the `x-hub-signature-256` HMAC-SHA256 against
- *    `WHATSAPP_APP_SECRET` over the raw body. Invalid signatures short-circuit
- *    with a structured `WEBHOOK_SIGNATURE_INVALID` 403. On success the handler
- *    always replies `{ ok: true }` (HTTP 200) after processing so Meta never
- *    retries — internal per-event failures are logged and audited via
- *    `stampWebhookActivity` but never surfaced to Meta.
- *  - Any other method returns `METHOD_NOT_ALLOWED` (405).
- *
- * `withEdgeHandler` provides CORS + a last-resort structured 500 fallback.
- */
-const handler = withEdgeHandler(async (req) => {
+Deno.serve(async (req) => {
   const url = new URL(req.url);
 
   // Meta handshake
@@ -420,25 +294,13 @@ const handler = withEdgeHandler(async (req) => {
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
     if (mode === "subscribe" && token && token === VERIFY_TOKEN) {
-      // Meta expects the raw challenge string back; do NOT wrap in JSON.
-      return new Response(challenge ?? "", {
-        status: 200,
-        headers: { "Content-Type": "text/plain" },
-      });
+      return new Response(challenge ?? "", { status: 200 });
     }
-    return jsonError(
-      403,
-      "WEBHOOK_VERIFICATION_FAILED",
-      "Handshake do webhook rejeitado: hub.mode ou hub.verify_token inválido.",
-    );
+    return new Response("Forbidden", { status: 403 });
   }
 
   if (req.method !== "POST") {
-    return jsonError(
-      405,
-      "METHOD_NOT_ALLOWED",
-      `Método ${req.method} não permitido para o webhook do WhatsApp.`,
-    );
+    return new Response("Method not allowed", { status: 405 });
   }
 
   // Read raw body for signature verification
@@ -447,31 +309,20 @@ const handler = withEdgeHandler(async (req) => {
   // Fail closed: WHATSAPP_APP_SECRET must be configured to verify Meta payloads
   if (!APP_SECRET) {
     console.error("whatsapp-webhook: WHATSAPP_APP_SECRET not configured; rejecting POST");
-    return jsonError(
-      503,
-      "WEBHOOK_MISCONFIGURED",
-      "WHATSAPP_APP_SECRET não configurado; assinaturas Meta não podem ser verificadas.",
-    );
+    return new Response("Server misconfigured", { status: 503 });
   }
 
   const sigHeader = req.headers.get("x-hub-signature-256") ?? "";
   const valid = await verifyMetaSignature(rawBody, sigHeader);
   if (!valid) {
-    return jsonError(
-      403,
-      "WEBHOOK_SIGNATURE_INVALID",
-      "Assinatura x-hub-signature-256 ausente ou inválida.",
-    );
+    return new Response("Forbidden", { status: 403 });
   }
 
   let payload: any;
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    // Malformed JSON after a valid signature — ack so Meta stops retrying,
-    // but flag the structured error for auditability.
-    console.warn("whatsapp-webhook: signed payload was not valid JSON");
-    return jsonOk({ processed: false, reason: "invalid_json" });
+    return new Response("ok", { status: 200 });
   }
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -482,18 +333,6 @@ const handler = withEdgeHandler(async (req) => {
       const changes: any[] = Array.isArray(entry?.changes) ? entry.changes : [];
       for (const change of changes) {
         const value = change?.value ?? {};
-        const field: string = String(change?.field ?? "");
-
-        // Template status updates arrive without metadata.phone_number_id.
-        if (field === "message_template_status_update") {
-          try {
-            await handleTemplateStatusUpdate(admin, entry, change);
-          } catch (e) {
-            console.error("template_status_update handler error", e);
-          }
-          continue;
-        }
-
         const phoneNumberId: string | null = value?.metadata?.phone_number_id ?? null;
         const resolved = await resolveWhatsAppChannel(admin, phoneNumberId);
         const channel: ResolvedChannel | null =
@@ -750,8 +589,5 @@ const handler = withEdgeHandler(async (req) => {
     console.error("whatsapp-webhook error:", e);
   }
 
-  // Always ack 200 to Meta after a signed payload is processed so retries stop.
-  return jsonOk({ processed: true });
+  return new Response("ok", { status: 200 });
 });
-
-Deno.serve(handler);

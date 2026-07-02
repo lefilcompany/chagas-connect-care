@@ -84,7 +84,7 @@ export const AppLayout = () => {
           <button className="lg:hidden" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {nav.map((n: any) => (
+          {nav.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}

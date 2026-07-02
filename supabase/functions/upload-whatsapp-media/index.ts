@@ -1,6 +1,14 @@
-import { withEdgeHandler, jsonOk, jsonError } from "../_shared/http.ts";
-import { requireAuth } from "../_shared/auth.ts";
-import { resolveChannel, graphUrl } from "../_shared/resolve-channel.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+
+const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
+const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
+const RAW_GRAPH_VERSION = Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? "v25.0";
+const GRAPH_VERSION = /^v\d+\.\d+$/.test(RAW_GRAPH_VERSION) ? RAW_GRAPH_VERSION : "v25.0";
 
 const BUCKET = "whatsapp-media";
 
@@ -34,6 +42,13 @@ const FORBIDDEN_EXTENSIONS = [
   "exe", "bat", "cmd", "com", "scr", "ps1", "sh", "js", "jar", "msi", "dll", "vbs", "apk",
 ];
 
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 function mediaKindFromMime(mime: string): keyof typeof LIMITS | null {
   for (const [kind, list] of Object.entries(ALLOWED_MIMES) as Array<[keyof typeof LIMITS, string[]]>) {
     if (list.includes(mime)) return kind;
@@ -53,50 +68,77 @@ function hasForbiddenExtension(filename: string | null): boolean {
   return parts.slice(-2).some((ext) => FORBIDDEN_EXTENSIONS.includes(ext));
 }
 
-Deno.serve(withEdgeHandler(async (req) => {
-  if (req.method !== "POST") {
-    return jsonError(405, "INVALID_INPUT", "Method not allowed");
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json(405, { error: "Method not allowed" });
+
+  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+    return json(500, {
+      ok: false,
+      error_code: "MISSING_TOKEN",
+      error: "Credenciais do WhatsApp não configuradas no servidor.",
+    });
   }
 
-  const ctx = await requireAuth(req);
-  if (ctx instanceof Response) return ctx;
-  const userId = ctx.userId;
-  const admin = ctx.serviceClient;
-  const institution = ctx.institution ?? "";
+  // Auth
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "Unauthorized" });
+  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const token = authHeader.replace("Bearer ", "");
+  const { data: claims, error: authErr } = await authClient.auth.getClaims(token);
+  if (authErr || !claims?.claims?.sub) return json(401, { error: "Unauthorized" });
+  const userId = claims.claims.sub as string;
+
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  // Resolve institution from profile
+  const { data: prof } = await admin
+    .from("profiles")
+    .select("institution")
+    .eq("id", userId)
+    .maybeSingle();
+  const institution = (prof as any)?.institution ?? "";
   if (!institution) {
-    return jsonError(403, "INSTITUTION_REQUIRED", "Usuário sem instituição vinculada.");
+    return json(403, { ok: false, error: "Usuário sem instituição vinculada." });
   }
-
-  const channel = await resolveChannel(admin, institution);
-  if (channel instanceof Response) return channel;
 
   // Parse multipart
   let form: FormData;
   try {
     form = await req.formData();
   } catch {
-    return jsonError(400, "INVALID_INPUT", "Esperado multipart/form-data com campo 'file'.");
+    return json(400, { ok: false, error: "Esperado multipart/form-data com campo 'file'." });
   }
   const file = form.get("file");
   if (!(file instanceof File)) {
-    return jsonError(400, "INVALID_INPUT", "Campo 'file' ausente.");
+    return json(400, { ok: false, error: "Campo 'file' ausente." });
   }
 
   const mime = file.type || "application/octet-stream";
   const kind = mediaKindFromMime(mime);
   if (!kind) {
-    return jsonError(400, "MEDIA_MIME_NOT_ALLOWED", `Tipo de arquivo não permitido: ${mime}`);
+    return json(400, {
+      ok: false,
+      error_code: "MEDIA_MIME_NOT_ALLOWED",
+      error: `Tipo de arquivo não permitido: ${mime}`,
+    });
   }
   if (hasForbiddenExtension(file.name)) {
-    return jsonError(400, "MEDIA_MIME_NOT_ALLOWED", "Extensão de arquivo bloqueada por segurança.");
+    return json(400, {
+      ok: false,
+      error_code: "MEDIA_MIME_NOT_ALLOWED",
+      error: "Extensão de arquivo bloqueada por segurança.",
+    });
   }
   const size = file.size;
   if (size > LIMITS[kind]) {
-    return jsonError(
-      400,
-      "MEDIA_TOO_LARGE",
-      `Arquivo excede o limite de ${Math.round(LIMITS[kind] / 1024 / 1024)}MB para ${kind}.`,
-    );
+    return json(400, {
+      ok: false,
+      error_code: "MEDIA_TOO_LARGE",
+      error: `Arquivo excede o limite de ${Math.round(LIMITS[kind] / 1024 / 1024)}MB para ${kind}.`,
+    });
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -113,7 +155,8 @@ Deno.serve(withEdgeHandler(async (req) => {
     .limit(1)
     .maybeSingle();
   if (existing && (existing as any).meta_media_id) {
-    return jsonOk({
+    return json(200, {
+      ok: true,
       media_asset_id: (existing as any).id,
       meta_media_id: (existing as any).meta_media_id,
       reused: true,
@@ -139,7 +182,11 @@ Deno.serve(withEdgeHandler(async (req) => {
     .from(BUCKET)
     .upload(storagePath, bytes, { contentType: mime, upsert: true });
   if (storeErr) {
-    return jsonError(500, "MEDIA_UPLOAD_FAILED", `Falha ao salvar arquivo: ${storeErr.message}`);
+    return json(500, {
+      ok: false,
+      error_code: "MEDIA_UPLOAD_FAILED",
+      error: `Falha ao salvar arquivo: ${storeErr.message}`,
+    });
   }
 
   // Insert asset row (status pending) before Meta upload
@@ -161,11 +208,11 @@ Deno.serve(withEdgeHandler(async (req) => {
     .select("id")
     .maybeSingle();
   if (assetErr || !asset?.id) {
-    return jsonError(
-      500,
-      "MEDIA_UPLOAD_FAILED",
-      `Falha ao registrar asset: ${assetErr?.message ?? "desconhecido"}`,
-    );
+    return json(500, {
+      ok: false,
+      error_code: "MEDIA_UPLOAD_FAILED",
+      error: `Falha ao registrar asset: ${assetErr?.message ?? "desconhecido"}`,
+    });
   }
 
   // Upload to Meta: POST /{phone_id}/media (multipart with `messaging_product`)
@@ -175,10 +222,10 @@ Deno.serve(withEdgeHandler(async (req) => {
   metaForm.append("file", new Blob([bytes], { type: mime }), file.name || `${kind}.bin`);
 
   const metaRes = await fetch(
-    graphUrl(`${channel.phoneNumberId}/media`),
+    `https://graph.facebook.com/${GRAPH_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/media`,
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${channel.token}` },
+      headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` },
       body: metaForm,
     },
   );
@@ -192,7 +239,10 @@ Deno.serve(withEdgeHandler(async (req) => {
       .eq("id", (asset as any).id);
     const errMsg =
       (metaJson as any)?.error?.message ?? `Meta API error (${metaRes.status})`;
-    return jsonError(200, "MEDIA_UPLOAD_FAILED", errMsg, {
+    return json(200, {
+      ok: false,
+      error_code: "MEDIA_UPLOAD_FAILED",
+      error: errMsg,
       meta_error: (metaJson as any)?.error ?? null,
     });
   }
@@ -210,7 +260,8 @@ Deno.serve(withEdgeHandler(async (req) => {
     } as any)
     .eq("id", (asset as any).id);
 
-  return jsonOk({
+  return json(200, {
+    ok: true,
     media_asset_id: (asset as any).id,
     meta_media_id: mediaId,
     media_type: kind,
@@ -219,4 +270,4 @@ Deno.serve(withEdgeHandler(async (req) => {
     expires_at: expiresAt,
     reused: false,
   });
-}));
+});
