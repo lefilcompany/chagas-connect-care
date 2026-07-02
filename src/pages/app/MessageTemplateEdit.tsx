@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { qk } from "@/lib/queries";
+import { supabase } from "@/integrations/supabase/client";
 import {
   useInstitutionIdentity,
   useInstitutionTemplateService,
@@ -54,6 +55,11 @@ export default function MessageTemplateEdit() {
     queryKey: ["template-by-id", templateId],
     queryFn: () => service.getById(templateId),
     enabled: !!templateId,
+    refetchInterval: (q) => {
+      const status = (q.state.data as MessageTemplate | null)?.meta_status;
+      // Polling fallback: only while awaiting Meta review.
+      return status === "submitted" ? 20000 : false;
+    },
   });
 
   const [form, setForm] = useState<TemplateDraftInput | null>(null);
@@ -90,6 +96,41 @@ export default function MessageTemplateEdit() {
     },
     onError: (e: Error) => toast.error(e.message ?? "Falha ao enviar modelo."),
   });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => service.syncFromMeta(templateId),
+    onSuccess: () => {
+      toast.success("Status atualizado a partir da Meta.");
+      qc.invalidateQueries({ queryKey: ["template-by-id", templateId] });
+      qc.invalidateQueries({
+        queryKey: qk.institutionTemplates(identity.institution ?? ""),
+      });
+    },
+    onError: (e: Error) => toast.error(e.message ?? "Falha ao sincronizar."),
+  });
+
+  // Realtime: refresh the row whenever Meta (via the webhook) updates it.
+  useEffect(() => {
+    if (!templateId) return;
+    const channel = supabase
+      .channel(`template-detail-${templateId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "message_templates",
+          filter: `id=eq.${templateId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ["template-by-id", templateId] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [templateId, qc]);
 
   const isLocked = useMemo(
     () => !!query.data && query.data.meta_status !== "not_submitted",
