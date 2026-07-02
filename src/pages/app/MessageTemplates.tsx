@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Plus } from "lucide-react";
@@ -38,13 +38,29 @@ export default function MessageTemplates() {
   const identity = useInstitutionIdentity();
   const service = useInstitutionTemplateService();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const knownCategories = new Set(TEMPLATE_CATEGORIES.map((c) => c.value));
+  const initialCategoria = searchParams.get("categoria") ?? "todos";
+  const initialCatFilter =
+    initialCategoria === "todos" || knownCategories.has(initialCategoria)
+      ? initialCategoria
+      : "todos";
 
   const [q, setQ] = useState("");
   const [typeFilter, setTypeFilter] = useState<"todos" | "internal" | "meta">("todos");
   const [statusFilter, setStatusFilter] = useState<"todos" | MetaStatus>("todos");
-  const [catFilter, setCatFilter] = useState<string>("todos");
+  const [catFilter, setCatFilter] = useState<string>(initialCatFilter);
   const [usingTpl, setUsingTpl] = useState<MessageTemplate | null>(null);
   const [useOpen, setUseOpen] = useState(false);
+
+  const updateCatFilter = (value: string) => {
+    setCatFilter(value);
+    const next = new URLSearchParams(searchParams);
+    if (value === "todos") next.delete("categoria");
+    else next.set("categoria", value);
+    setSearchParams(next, { replace: true });
+  };
 
   const institution = identity.institution ?? "";
 
@@ -135,7 +151,7 @@ export default function MessageTemplates() {
             id="tpl-cat"
             aria-label="Categoria"
             value={catFilter}
-            onChange={(e) => setCatFilter(e.target.value)}
+            onChange={(e) => updateCatFilter(e.target.value)}
             className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="todos">Todas as categorias</option>
