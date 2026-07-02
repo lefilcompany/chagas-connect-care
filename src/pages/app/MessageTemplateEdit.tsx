@@ -11,7 +11,6 @@ import {
   useInstitutionTemplateService,
 } from "@/services/institutionTemplates";
 import {
-  templateDraftSchema,
   validateTemplateDraft,
   type TemplateDraftInput,
 } from "@/lib/templateDraft";
@@ -22,23 +21,27 @@ function templateToDraft(t: MessageTemplate): TemplateDraftInput {
   const header = (t as unknown as { meta_header?: { type?: string; text?: string } })
     .meta_header;
   const buttons = (t as unknown as { meta_buttons?: unknown[] }).meta_buttons ?? [];
-  return templateDraftSchema.parse({
-    name: t.name,
+  return {
+    name: t.name ?? "",
     description: t.description ?? "",
-    category: t.category ?? "geral",
-    template_kind: t.template_kind ?? "meta",
+    category: t.category || "geral",
+    template_kind: (t.template_kind ?? "meta") as "internal" | "meta",
     body: t.body ?? "",
     meta_template_name: t.meta_template_name ?? "",
     meta_language: t.meta_language ?? "pt_BR",
-    meta_category: (t.meta_category as "UTILITY" | "MARKETING" | "AUTHENTICATION") ?? "UTILITY",
-    meta_header_type: (header?.type === "text" ? "text" : "none"),
+    meta_category:
+      (t.meta_category as "UTILITY" | "MARKETING" | "AUTHENTICATION") ?? "UTILITY",
+    meta_header_type: header?.type === "text" ? "text" : "none",
     meta_header_text: header?.text ?? "",
     meta_footer_text: t.meta_footer_text ?? "",
-    meta_buttons: Array.isArray(buttons) ? (buttons as TemplateDraftInput["meta_buttons"]) : [],
+    meta_buttons: Array.isArray(buttons)
+      ? (buttons as TemplateDraftInput["meta_buttons"])
+      : [],
     variable_examples: {},
-    targeting_mode: t.targeting_mode ?? "all",
-    audience_types: (t.audience_types as string[]) ?? [],
-  } as Partial<TemplateDraftInput>);
+    targeting_mode: (t.targeting_mode ?? "all") as TemplateDraftInput["targeting_mode"],
+    audience_types: ((t.audience_types as string[]) ?? []) as string[],
+  };
+}
 }
 
 export default function MessageTemplateEdit() {

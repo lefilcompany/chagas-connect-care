@@ -12,18 +12,28 @@ import {
   useInstitutionTemplateService,
 } from "@/services/institutionTemplates";
 import {
-  templateDraftSchema,
   validateTemplateDraft,
   type TemplateDraftInput,
 } from "@/lib/templateDraft";
 import { TemplateEditorForm } from "@/components/app/messages/TemplateEditorForm";
 
-const emptyDraft = (): TemplateDraftInput =>
-  templateDraftSchema.parse({
-    name: "",
-    template_kind: "meta",
-    body: "",
-  } as Partial<TemplateDraftInput>);
+const emptyDraft = (): TemplateDraftInput => ({
+  name: "",
+  description: "",
+  category: "geral",
+  template_kind: "meta",
+  body: "",
+  meta_template_name: "",
+  meta_language: "pt_BR",
+  meta_category: "UTILITY",
+  meta_header_type: "none",
+  meta_header_text: "",
+  meta_footer_text: "",
+  meta_buttons: [],
+  variable_examples: {},
+  targeting_mode: "all",
+  audience_types: [],
+});
 
 export default function MessageTemplateNew() {
   const identity = useInstitutionIdentity();
