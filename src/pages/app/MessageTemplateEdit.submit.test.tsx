@@ -102,7 +102,6 @@ describe("MessageTemplateEdit submit-to-Meta", () => {
   it("shows an error toast when submitToMeta fails", async () => {
     const service = makeService({
       submitToMeta: vi.fn(async () => {
-      syncFromMeta: vi.fn(async () => ({ meta_status: "submitted", updated: 0, matched: 0 })),
         throw new Error("Categoria inválida");
       }),
     });
