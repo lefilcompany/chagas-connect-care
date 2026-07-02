@@ -31,8 +31,6 @@ import {
 } from "@/lib/segments";
 import { TemplateCard } from "@/components/app/messages/TemplateCard";
 import type { MessageTemplate } from "@/lib/templates";
-import { useAuth } from "@/lib/auth";
-import { useNavigate } from "react-router-dom";
 import { useFolders, FALLBACK_FOLDER as FB_FOLDER, type FolderDef } from "@/hooks/useFolders";
 import { NewFolderDialog } from "@/components/app/content/NewFolderDialog";
 import {
