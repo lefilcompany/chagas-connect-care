@@ -160,14 +160,18 @@ export default function MessageTemplateEdit() {
               Modelos enviados ou aprovados pela Meta não podem ser sobrescritos. Crie uma
               nova versão em uma próxima etapa.
             </p>
-            {query.data.meta_template_id && (
-              <p className="text-xs">
-                ID Meta: <code>{query.data.meta_template_id}</code>
-                {query.data.meta_submitted_at ? (
-                  <> · Enviado em {new Date(query.data.meta_submitted_at).toLocaleString("pt-BR")}</>
-                ) : null}
-              </p>
-            )}
+            {query.data.meta_template_id && (() => {
+              const submittedAt = (query.data as unknown as { meta_submitted_at?: string | null })
+                .meta_submitted_at;
+              return (
+                <p className="text-xs">
+                  ID Meta: <code>{query.data.meta_template_id}</code>
+                  {submittedAt ? (
+                    <> · Enviado em {new Date(submittedAt).toLocaleString("pt-BR")}</>
+                  ) : null}
+                </p>
+              );
+            })()}
           </div>
         </div>
       )}
