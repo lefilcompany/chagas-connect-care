@@ -112,7 +112,6 @@ export function TemplateCard({
         />
       </div>
 
-      <div className="flex items-center gap-1.5 pt-4">
       <div className="flex flex-col gap-2 pt-4">
         {isCatalog && (
           <div className="text-[11px] text-muted-foreground">
