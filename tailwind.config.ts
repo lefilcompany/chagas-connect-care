@@ -23,6 +23,7 @@ export default {
           DEFAULT: "hsl(var(--brand))",
           foreground: "hsl(var(--brand-foreground))",
         },
+        buttonHoverForeground: "hsl(var(--button-hover-foreground))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

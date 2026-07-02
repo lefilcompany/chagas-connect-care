@@ -21,6 +21,8 @@ All colors MUST be HSL.
     --brand: 120 3% 30%; /* #4A504A */
     --brand-foreground: 0 0% 100%;
 
+    --button-hover-foreground: 120 3% 30%; /* #4A504A */
+
     --primary: 7 68% 69%; /* #E7877C */
     --primary-foreground: 0 0% 100%;
 
