@@ -461,10 +461,11 @@ function HeaderMediaUploader({
         aria-label="Amostra de mídia do cabeçalho"
         disabled={disabled || uploading}
         onChange={async (e) => {
-          const file = e.currentTarget.files?.[0];
+          const target = e.currentTarget;
+          const file = target.files?.[0];
           if (file) await onUpload(file);
           // reset so the same file can be re-selected if needed
-          e.currentTarget.value = "";
+          if (target && target.isConnected) target.value = "";
         }}
         className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary"
       />
