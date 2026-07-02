@@ -46,8 +46,25 @@ export function draftToRow(draft: TemplateDraftInput): Record<string, unknown> {
     (row as Record<string, unknown>).meta_header = {
       type: draft.meta_header_type,
       text: draft.meta_header_text,
+      handle: draft.meta_header_handle ?? "",
+      format: draft.meta_header_format ?? null,
     };
+    (row as Record<string, unknown>).meta_header_type = draft.meta_header_type;
+    (row as Record<string, unknown>).meta_header_text = draft.meta_header_text || null;
     (row as Record<string, unknown>).meta_buttons = draft.meta_buttons;
+    if (
+      draft.meta_header_type === "image" ||
+      draft.meta_header_type === "video" ||
+      draft.meta_header_type === "document"
+    ) {
+      (row as Record<string, unknown>).meta_header_format = draft.meta_header_format ?? null;
+      (row as Record<string, unknown>).meta_header_handle = draft.meta_header_handle || null;
+      (row as Record<string, unknown>).meta_header_media_id = draft.meta_header_media_id ?? null;
+    } else {
+      (row as Record<string, unknown>).meta_header_format = null;
+      (row as Record<string, unknown>).meta_header_handle = null;
+      (row as Record<string, unknown>).meta_header_media_id = null;
+    }
   }
   void clean;
   return row;
@@ -76,6 +93,14 @@ export interface InstitutionTemplateService {
     meta_status: string;
     updated: number;
     matched: number;
+  }>;
+  uploadHeaderMedia(
+    id: string,
+    file: File,
+  ): Promise<{
+    header_handle: string;
+    format: "IMAGE" | "VIDEO" | "DOCUMENT";
+    media_id: string;
   }>;
 }
 
@@ -182,6 +207,34 @@ export const supabaseInstitutionTemplates: InstitutionTemplateService = {
       meta_status: fresh?.meta_status ?? "submitted",
       updated: resp.updated ?? 0,
       matched: resp.matched ?? 0,
+    };
+  },
+  async uploadHeaderMedia(id, file) {
+    if (!id) throw new Error("Modelo inválido.");
+    if (!file) throw new Error("Selecione um arquivo.");
+    const form = new FormData();
+    form.append("file", file);
+    form.append("local_template_id", id);
+    const { data, error } = await supabase.functions.invoke(
+      "upload-whatsapp-template-media",
+      { body: form },
+    );
+    if (error) throw new Error(error.message ?? "Falha ao enviar a amostra.");
+    const resp = (data ?? {}) as {
+      ok?: boolean;
+      error?: string;
+      error_code?: string;
+      header_handle?: string;
+      format?: "IMAGE" | "VIDEO" | "DOCUMENT";
+      media_id?: string;
+    };
+    if (!resp.ok || !resp.header_handle || !resp.format || !resp.media_id) {
+      throw new Error(resp.error ?? resp.error_code ?? "Falha ao enviar a amostra.");
+    }
+    return {
+      header_handle: resp.header_handle,
+      format: resp.format,
+      media_id: resp.media_id,
     };
   },
 };
