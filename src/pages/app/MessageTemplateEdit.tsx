@@ -229,6 +229,12 @@ export default function MessageTemplateEdit() {
         }
       />
 
+      {isLocked && <MetaStatusPanel
+        template={query.data}
+        onSync={() => syncMutation.mutate()}
+        syncing={syncMutation.isPending}
+      />}
+
       <div className="flex justify-end gap-2">
         <Button asChild variant="outline">
           <Link to="/app/modelos">Cancelar</Link>
