@@ -71,4 +71,25 @@ describe("templateDraft", () => {
     expect("meta_status" in shape).toBe(false);
     expect("institution" in shape).toBe(false);
   });
+
+  it("requires meta_header_handle when header type is image/video/document", () => {
+    const r = validateTemplateDraft({
+      ...base,
+      meta_header_type: "image",
+      meta_header_handle: "",
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors.meta_header_handle).toBeTruthy();
+  });
+
+  it("accepts image header with a handle", () => {
+    const r = validateTemplateDraft({
+      ...base,
+      meta_header_type: "image",
+      meta_header_handle: "HDL-abc",
+      meta_header_format: "IMAGE",
+    });
+    expect(r.ok).toBe(true);
+  });
 });
