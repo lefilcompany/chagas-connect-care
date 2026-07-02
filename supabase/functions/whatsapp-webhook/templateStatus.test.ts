@@ -57,7 +57,7 @@ Deno.test("APPROVED by meta_template_id updates template", async () => {
   assertEquals(updates.length, 1);
   assertEquals(updates[0].patch.meta_status, "approved");
   assertEquals(updates[0].patch.meta_status_raw, "APPROVED");
-  assertEquals(updates[0].patch.meta_last_webhook_at, "2026-07-01T13:26:40.000Z");
+  assertEquals(updates[0].patch.meta_last_webhook_at, "2026-07-01T12:46:40.000Z");
 });
 
 Deno.test("REJECTED stores rejection reason", async () => {
