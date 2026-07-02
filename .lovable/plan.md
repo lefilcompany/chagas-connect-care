@@ -1,206 +1,142 @@
+# FASE 5 — Cabeçalho com mídia (IMAGE / VIDEO / DOCUMENT)
 
-# Fase 4 — Aprovação, rejeição, webhook e sincronização
+Fatia vertical: admin institucional escolhe um arquivo local, sistema faz upload resumível para a Meta, guarda o `header_handle` da amostra, e a submissão do template passa esse handle no bloco HEADER. Nada de URL manual, nada de mídia real de envio.
 
-Vertical slice: quando a Meta atualiza um template (APPROVED/REJECTED/PAUSED/...) o webhook público recebe o evento, valida assinatura, faz dispatch por `change.field`, casa o template correto (respeitando WABA/idioma) e atualiza o registro local. O admin ainda pode disparar uma sincronização manual (`sync-whatsapp-templates`) para recuperar eventos perdidos, e a página de detalhe reflete o novo status em tempo real via Realtime, com fallback de polling só enquanto pendente.
+## 1. Banco (uma migração)
 
-Sem mídia. Sem novos secrets.
+Nova tabela `whatsapp_template_header_media` (amostras institucionais para criação de template):
 
-## Contratos (seams)
-
-### Webhook (Meta → nossa Edge Function)
-- `GET  /functions/v1/whatsapp-webhook?hub.mode=subscribe&hub.verify_token=...&hub.challenge=...` — permanece como hoje, retorna challenge quando `verify_token` bate.
-- `POST /functions/v1/whatsapp-webhook`
-  - `verify_jwt = false`.
-  - Requer `x-hub-signature-256`. HMAC-SHA-256 do corpo bruto com `WHATSAPP_APP_SECRET`, comparação timing-safe. Sem assinatura ou inválida → 403.
-  - `WHATSAPP_APP_SECRET` ausente → 503 (mantém comportamento atual).
-  - Sempre responde 200 depois de validado (para não gerar retry storm), exceto quando corpo não é JSON — segue devolvendo 200 (dropa silenciosamente) como hoje.
-
-Novo dispatch por `change.field`, executado **antes** de qualquer acesso a `value.metadata`:
-```ts
-switch (change.field) {
-  case "message_template_status_update":
-    await handleTemplateStatusUpdate(deps, entry, change);
-    break;
-  case "messages":
-    await handleMessageEvents(deps, entry, change); // fluxo atual
-    break;
-  default:
-    await handleUnknownEvent(deps, entry, change);  // registra em whatsapp_unmatched_events
-}
+```
+id uuid pk
+local_template_id uuid not null references message_templates(id) on delete cascade
+institution text not null
+format text not null check (format in ('IMAGE','VIDEO','DOCUMENT'))
+mime_type text not null
+file_size bigint not null
+file_name text
+header_handle text not null
+uploaded_by uuid not null references auth.users(id)
+created_at timestamptz default now()
 ```
 
-### Sincronização manual (frontend → Edge Function)
-- `POST /functions/v1/sync-whatsapp-templates`
-- Header `Authorization: Bearer <JWT>`
-- Body **direcionado** (novo):
-  ```json
-  { "local_template_id": "<uuid>" }
-  ```
-  Alternativas aceitas:
-  - `{ "institution": "Inst A" }` — superadmin escolhe a instituição.
-  - `{ }` — admin sincroniza a própria instituição.
-- Resposta: `{ ok, matched, updated, pages, missing_meta_ids: [] }`.
-- Erros:
-  - `401 UNAUTHORIZED`, `403 FORBIDDEN` (admin tentando instituição alheia), `400 WABA_NOT_CONFIGURED`, `404 TEMPLATE_NOT_FOUND` quando `local_template_id` não existe.
+Grants:
+- `GRANT SELECT, INSERT, DELETE ON ... TO authenticated`
+- `GRANT ALL ... TO service_role`
 
-### Meta Graph (Edge Function → Meta)
-- `GET https://graph.facebook.com/{GRAPH}/{WABA_ID}/message_templates?fields=id,name,language,status,category,components,rejected_reason,quality_score,parameter_format&limit=100`
-- Paginado: percorrer `paging.next` até o final (limite defensivo de 20 páginas).
-- Token: `WHATSAPP_TOKEN`. WABA resolvida a partir de `institution_whatsapp_settings.waba_id`, fallback para `WHATSAPP_WABA_ID` se não houver registro.
+RLS: leitura/insert/delete restritos a admin institucional cuja `get_user_institution(auth.uid()) = institution`.
 
-## Módulos novos (puros / testáveis)
+Colunas novas em `message_templates`:
+- `meta_header_format text` (`IMAGE`|`VIDEO`|`DOCUMENT`|null)
+- `meta_header_handle text` — handle da amostra atual
+- `meta_header_media_id uuid references whatsapp_template_header_media(id)`
 
-### `supabase/functions/_shared/metaTemplateStatus.ts`
-- Constante `META_TEMPLATE_STATUS_MAP` já mapeada (PENDING/APPROVED/REJECTED/PAUSED/DISABLED/IN_APPEAL). Nunca traduz status desconhecido para “approved”; devolve `null` e o handler mantém o estado atual.
-- `payloadFingerprint(change)` — hash SHA-256 estável (`stableStringify` + entry timestamp) para idempotência.
+Ampliar o CHECK/enum de `meta_header_type` para aceitar `image | video | document` além de `none | text`.
 
-### `supabase/functions/whatsapp-webhook/templateStatus.ts`
-Handler puro (sem `Deno.serve`, sem `createClient` direto):
-```ts
-createTemplateStatusHandler({
-  findEvent(hash): Promise<boolean>;
-  recordEvent({ meta_template_id, event, entry_timestamp, payload_hash, payload }): Promise<void>;
-  findTemplateByMetaId(id): Promise<TemplateMatch | null>;
-  findTemplateByWabaNameLang(waba, name, lang): Promise<TemplateMatch | null>;
-  findTemplateByInstitutionNameLang(institution, name, lang): Promise<TemplateMatch | null>;
-  resolveInstitutionByWaba(waba): Promise<string | null>;
-  updateTemplate(id, patch): Promise<void>;
-  now(): Date;
-})(entry, change): Promise<{ processed: boolean; reason?: string }>
-```
+Remover uso (não a coluna) de `meta_header_media_url` — deixa de ser exposta no formulário e ignorada pelo backend de criação.
+
+## 2. Nova Edge Function: `upload-whatsapp-template-media`
+
+`supabase/functions/upload-whatsapp-template-media/{index.ts,handler.ts,handler.test.ts}`, `verify_jwt=false` (validação em código, como as outras).
+
 Fluxo:
-1. Extrai `waba_id = entry.id`, `event`, `message_template_id`, `message_template_name`, `message_template_language`, `reason`.
-2. Calcula `payload_hash`. Se `findEvent(hash)` → `{ processed:false, reason:"duplicate" }`.
-3. Casamento **nesta ordem**, curto-circuitando ao primeiro hit:
-   - por `meta_template_id`;
-   - por `waba_id + name + language`;
-   - por `institution resolvida pela WABA + name + language`.
-   Nunca casa só pelo nome.
-4. Sem match → registra evento (idempotência) e `{ processed:false, reason:"unmatched" }`.
-5. Guarda de integridade: se o registro casado tem `meta_language` diferente do evento, aborta com `reason:"language_mismatch"` (nunca sobrescreve). Idem para `meta_waba_id` presente e diferente do `entry.id`.
-6. `updateTemplate` com:
-   - `meta_status = MAP[event] ?? existing.meta_status` (nunca aprova por engano);
-   - `meta_status_raw = event`;
-   - `meta_rejection_reason = reason` (só quando REJECTED);
-   - `meta_rejection_info = { reason, at }` idem;
-   - `meta_last_webhook_at = entry.time * 1000`;
-   - `meta_template_id = value.message_template_id` se estava nulo;
-   - `meta_waba_id = entry.id` se estava nulo.
-7. `recordEvent(payload_hash)`. Retorna `{ processed:true }`.
+1. Valida JWT → resolve `user_id`, `institution`, checa role admin institucional.
+2. Lê `multipart/form-data`: `file` (Blob) + `local_template_id`.
+3. Carrega o template; recusa se instituição diferente ou se status ≠ `draft`.
+4. Deriva `format` a partir do MIME:
+   - `image/jpeg`,`image/png` → IMAGE, limite 5 MB
+   - `video/mp4`,`video/3gpp` → VIDEO, limite 16 MB
+   - `application/pdf` → DOCUMENT, limite 100 MB
+   - qualquer outro MIME → 400 `INVALID_MIME`
+5. Se `file.size > limite` → 400 `FILE_TOO_LARGE`.
+6. Chamada 1 (sessão):
+   `POST graph.facebook.com/{GRAPH_VERSION}/{META_APP_ID}/uploads?file_name=...&file_length=...&file_type=...`
+   Header `Authorization: Bearer {WHATSAPP_TOKEN}`.
+   Erro → 502 `UPLOAD_SESSION_FAILED` com mensagem real da Meta.
+7. Chamada 2 (bytes):
+   `POST graph.facebook.com/{GRAPH_VERSION}/{session_id}`
+   Headers: `Authorization: OAuth {WHATSAPP_TOKEN}`, `file_offset: 0`, `Content-Type: <mime>`.
+   Body: bytes brutos.
+   Erro → 502 `UPLOAD_BYTES_FAILED`.
+8. Persistir linha em `whatsapp_template_header_media` (service role), e atualizar `message_templates`: `meta_header_type='image|video|document'`, `meta_header_format`, `meta_header_handle`, `meta_header_media_id`.
+9. Retorno: `{ ok: true, header_handle, format, media_id }`.
 
-### `supabase/functions/sync-whatsapp-templates/handler.ts`
-Extrai a lógica do Deno.serve atual e adiciona:
-- `resolveScope(user, body)` — retorna `{ institution, localTemplateId? }` respeitando papel.
-- `fetchAllPages(url, token)` — segue `paging.next` (máx 20).
-- `matchLocalRow(page, scope)` — usa a mesma ordem do handler do webhook.
-- Escreve `meta_status`, `meta_rejection_reason`, `meta_status_raw`, `meta_last_synced_at`, `meta_definition`, etc. Nunca sobrescreve `meta_language` divergente (mesmo warning).
-- Quando `local_template_id` é fornecido, filtra a resposta por `t.id === template.meta_template_id` (ou name+language quando ainda não temos ID).
+Nunca aceitar handle vindo do cliente. Nenhum acesso ao endpoint `/messages`.
 
-## Persistência
+## 3. Ajuste em `create-whatsapp-template/handler.ts` + `_shared/metaTemplatePayload.ts`
 
-Sem novas tabelas. `whatsapp_template_events` já tem `payload_hash`, `event`, `entry_timestamp` — usados como chave única. Migration curta apenas para:
-```sql
-ALTER TABLE public.whatsapp_template_events
-  ADD CONSTRAINT whatsapp_template_events_hash_unique UNIQUE (payload_hash);
-```
-para tornar o insert idempotente no nível do banco. E:
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.message_templates;
-ALTER TABLE public.message_templates REPLICA IDENTITY FULL;
-```
-para o Realtime da página de detalhe (RLS já filtra por institution).
+- Se `meta_header_type` ∈ {image, video, document}: exige `meta_header_handle` no registro. Ausente → 400 `MISSING_HEADER_HANDLE`.
+- Bloco HEADER passa a emitir:
+  ```json
+  { "type":"HEADER","format":"IMAGE|VIDEO|DOCUMENT","example":{"header_handle":["<handle>"]} }
+  ```
+- HEADER de texto e ausência de header permanecem inalterados.
+- Idempotência: incluir `header_handle` no `stableStringify` do payload (já será, pois vai na saída).
 
-## Interface
+## 4. Schema / formulário
 
-### `src/pages/app/MessageTemplateEdit.tsx`
-- Painel de status abaixo do form quando `meta_status !== "not_submitted"`:
-  - Badge com rótulo humano: “Em análise” / “Aprovado” / “Rejeitado” / “Pausado” / “Desativado” / “Erro”.
-  - `meta_template_id`, `meta_submitted_at`, `meta_last_synced_at`, `meta_last_webhook_at` (o mais recente rotulado como “última atualização”).
-  - Motivo da rejeição quando presente (`meta_rejection_reason || meta_rejection_info.reason`).
-  - Botão **Atualizar status** → `service.syncFromMeta(templateId)`.
-- Formulário fica readonly quando `meta_status !== "not_submitted"` (já é hoje via `isLocked`).
-- Realtime: `supabase.channel("template-detail-${id}").on("postgres_changes", { schema:"public", table:"message_templates", filter:`id=eq.${id}` }, () => qc.invalidateQueries(...))` dentro de `useEffect`; cleanup no unmount.
-- Polling só como fallback: quando `meta_status === "submitted"` e Realtime não abriu (`channel.state !== "joined"`), refetch a cada 20s até virar estado final; para automaticamente em approved/rejected/paused/disabled/error.
+`src/lib/templateDraft.ts`:
+- `meta_header_type` passa a aceitar `"none" | "text" | "image" | "video" | "document"`.
+- Novos campos opcionais no rascunho: `meta_header_format`, `meta_header_handle`, `meta_header_media_id`, `meta_header_media_file_name`, `meta_header_media_mime`, `meta_header_media_size`.
+- Remover `meta_header_media_url` da forma pública (schema + defaults). Backend deixa de ler.
 
-### `InstitutionTemplateService`
-```ts
-syncFromMeta(id: string): Promise<{ meta_status: string; meta_template_id: string|null; updated: boolean }>
-```
-Chama a Edge Function `sync-whatsapp-templates` com `{ local_template_id: id }` e retorna o registro atualizado.
+`src/components/app/messages/TemplateEditorForm.tsx`:
+- Adicionar opções radio `Imagem | Vídeo | Documento` além de `Nenhum | Texto`.
+- Quando selecionado um tipo de mídia: renderizar `<input type="file" accept="...">` real com accept correto por tipo, botão “Enviar amostra”, exibir nome/tamanho/handle atual.
+- Mensagens de erro de MIME/tamanho vindas do backend exibidas no formulário.
+- Sem campo de URL manual.
+- Enquanto `header_handle` ausente e tipo=mídia, botão “Enviar para aprovação” fica desabilitado.
 
-## TDD
+`TemplateEditorDialog.tsx` (legacy) recebe as mesmas mudanças por reuso do form.
 
-Ordem estrita, RED antes de GREEN. Mocks só nas fronteiras (banco/HTTP).
+## 5. Serviço
 
-**Deno — status handler puro (`whatsapp-webhook/templateStatus.test.ts`):**
-1. APPROVED por `meta_template_id` atualiza template → `meta_status:"approved"`, `meta_last_webhook_at` gravado.
-2. REJECTED grava `meta_rejection_reason` e `meta_status:"rejected"`.
-3. Evento duplicado (mesmo `payload_hash`) não chama `updateTemplate`.
-4. Idioma diferente entre payload e template → não atualiza, retorna `language_mismatch`.
-5. WABA diferente do `meta_waba_id` armazenado → não atualiza, retorna `waba_mismatch`.
-6. Sem `meta_template_id` mas com WABA + name + language → casa e atualiza.
-7. Só nome (sem WABA e sem match) → não atualiza, retorna `unmatched`.
-8. Status desconhecido não vira “approved”; retorna `no_status_change`.
+`src/services/institutionTemplates.ts`:
+- `uploadHeaderMedia(templateId, file)` → `POST` via `supabase.functions.invoke('upload-whatsapp-template-media', { body: FormData })` (sem setar Content-Type manualmente). Retorna `{ header_handle, format, media_id }` e invalida a query do template.
+- Ajustar `submitToMeta` apenas para propagar erros de header ausente.
 
-**Deno — dispatcher (`whatsapp-webhook/dispatch.test.ts`, novo):**
-9. `field:"message_template_status_update"` chama `handleTemplateStatusUpdate` e não toca em `handleMessageEvents`.
-10. `field:"messages"` sem `metadata.phone_number_id` ainda passa pelo dispatcher sem quebrar o status handler.
+## 6. Testes (TDD, vertical)
 
-**Deno — signature (`whatsapp-webhook/signature.test.ts`, novo pequeno):**
-11. Assinatura inválida → 403 e nenhum handler é chamado.
+Ordem dos ciclos RED→GREEN, um por vez.
 
-**Deno — sync handler (`sync-whatsapp-templates/handler.test.ts`):**
-12. `local_template_id` presente atualiza somente aquele template.
-13. Percorre `paging.next` até o fim (duas páginas).
-14. Admin de outra instituição → 403.
-15. Superadmin com `institution` alvo → 200 sincronizando aquela instituição.
-16. Sem `WHATSAPP_TOKEN` ou WABA → 500/400 apropriado.
+Deno (`upload-whatsapp-template-media/handler.test.ts`), com fetch stub para Graph:
 
-**Vitest — página de detalhe (`MessageTemplateEdit.status.test.tsx`, novo):**
-17. Renderiza badge “Em análise” + botão “Atualizar status” quando `meta_status:"submitted"`.
-18. Clique em “Atualizar status” chama `service.syncFromMeta(id)` e invalida a query.
-19. Quando `meta_status:"rejected"` mostra o `meta_rejection_reason` retornado pelo serviço.
-20. Não mostra botão “Atualizar status” em estados finais? — Sim, mostrar sempre para permitir recovery manual; teste garante que o botão continua visível também em approved/rejected.
+1. Admin da instituição envia PNG 1 MB para template próprio em draft → chama endpoint `/uploads`, envia bytes, persiste linha e devolve `header_handle`. Template fica com `meta_header_type=image` e handle salvo.
+2. MIME não permitido (`image/gif`) → 400 `INVALID_MIME`, nenhum fetch para Graph.
+3. `image/png` > 5 MB → 400 `FILE_TOO_LARGE`.
+4. `video/mp4` > 16 MB → 400 `FILE_TOO_LARGE`.
+5. `application/pdf` > 100 MB → 400 `FILE_TOO_LARGE`.
+6. Template de outra instituição → 403 `FORBIDDEN`.
+7. Sessão da Meta falha (chamada 1 retorna 500) → 502 `UPLOAD_SESSION_FAILED` com detalhe.
+8. Envio dos bytes falha (chamada 2 retorna 500) → 502 `UPLOAD_BYTES_FAILED`.
+9. Corpo sem `file` → 400 `MISSING_FILE`.
+
+Deno (`create-whatsapp-template/handler.test.ts`) — novo caso:
+
+10. Template com `meta_header_type=image` sem `meta_header_handle` → 400 `MISSING_HEADER_HANDLE`, sem fetch para Meta.
+11. Template com handle válido → payload enviado contém `components[0]={type:HEADER,format:IMAGE,example:{header_handle:[handle]}}`.
+
+Vitest (novo `MessageTemplateEdit.mediaHeader.test.tsx`):
+
+12. Selecionar tipo Imagem + escolher arquivo → chama service.uploadHeaderMedia, exibe handle, e libera botão Enviar para aprovação.
+13. Antes do upload, botão Enviar para aprovação fica desabilitado quando tipo=mídia.
+14. Campo de URL manual não existe no DOM.
+
+Cada teste implementa apenas o mínimo antes do próximo (nada de escrever todos os testes de uma vez).
+
+## 7. Critérios de aceite (auto-checklist)
+
+- input `type=file` real, com `accept` correto por tipo.
+- upload resumível real usa `META_APP_ID` + `WHATSAPP_TOKEN`.
+- handle persistido em `whatsapp_template_header_media` e no template.
+- criação de template usa o handle no bloco HEADER.
+- endpoint de envio (`send-whatsapp`) não é tocado nesta fase.
+- lint, build e todos os testes (Deno + Vitest) passam.
+- Parar antes do envio do modelo aprovado.
 
 ## Detalhes técnicos
 
-- `payload_hash = sha256(stableStringify({ waba: entry.id, event: value.event, id: value.message_template_id, name, language, time: entry.time }))`.
-- `meta_rejection_reason` guarda a string enviada pela Meta. `meta_rejection_info` (jsonb) mantém `{ reason, at, event }` para auditoria.
-- Nunca escrever `meta_language` do webhook sobre um valor divergente — protege contra colisão de mesmo nome em idiomas diferentes.
-- `handleUnknownEvent` grava em `whatsapp_unmatched_events` com `event_type = "template:${change.field}"` para diagnóstico.
-- Realtime: policy de leitura já permite a linha (RLS por institution). Nenhuma nova policy.
-- Polling fallback é *client-side*, `useQuery({ refetchInterval })` só quando `meta_status === "submitted"` e Realtime não conectou; para em estado final.
-- Nenhum secret novo. `WHATSAPP_APP_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_WABA_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_GRAPH_VERSION` já configurados.
-
-## Arquivos afetados
-
-Novos:
-- `supabase/functions/_shared/metaTemplateStatus.ts`
-- `supabase/functions/whatsapp-webhook/templateStatus.ts`
-- `supabase/functions/whatsapp-webhook/templateStatus.test.ts`
-- `supabase/functions/whatsapp-webhook/dispatch.ts`
-- `supabase/functions/whatsapp-webhook/dispatch.test.ts`
-- `supabase/functions/whatsapp-webhook/signature.test.ts`
-- `supabase/functions/sync-whatsapp-templates/handler.ts`
-- `supabase/functions/sync-whatsapp-templates/handler.test.ts`
-- `src/pages/app/MessageTemplateEdit.status.test.tsx`
-- Migration `phase4_template_events_unique_and_realtime.sql` (constraint + publication + REPLICA IDENTITY).
-
-Editados:
-- `supabase/functions/whatsapp-webhook/index.ts` — passa a delegar via `dispatch(change.field)`; sem outras mudanças no fluxo de `messages`.
-- `supabase/functions/sync-whatsapp-templates/index.ts` — vira wrapper fino sobre `handler.ts`.
-- `src/services/institutionTemplates.ts` — adiciona `syncFromMeta`.
-- `src/pages/app/MessageTemplateEdit.tsx` — painel de status + Realtime + polling fallback + botão “Atualizar status”.
-- Testes existentes que mockam `InstitutionTemplateService` recebem `syncFromMeta: vi.fn(...)`.
-
-## Critérios de aceite
-
-- Webhook APPROVED atualiza `meta_status="approved"` no template correto (por `meta_template_id`).
-- Webhook REJECTED grava `meta_rejection_reason`.
-- Assinatura inválida bloqueia com 403 e nenhum handler roda.
-- Evento repetido (mesmo `payload_hash`) não reaplica update.
-- Payload com idioma ou WABA diferentes não sobrescreve o template.
-- Sync manual respeita instituição do usuário (admin) e permite superadmin escolher outra.
-- Sync percorre múltiplas páginas.
-- UI mostra Em análise / Aprovado / Rejeitado + motivo + última atualização; Realtime atualiza sem reload; polling para em estado final.
-- Nenhum código de mídia adicionado.
+- Secrets já presentes: `META_APP_ID`, `WHATSAPP_TOKEN`, `WHATSAPP_GRAPH_VERSION`.
+- Validar `META_APP_ID` no boot da função; ausente → 500 `MISSING_APP_ID`.
+- `handler.ts` puro (recebe `fetch` e `supabase` por DI) para permitir testes sem rede.
+- Sanitizar mensagem de erro da Meta antes de devolver ao cliente (reaproveitar util existente).
+- `handler.test.ts` usa `import "https://deno.land/std@0.224.0/dotenv/load.ts"` e consome todos os response bodies.
