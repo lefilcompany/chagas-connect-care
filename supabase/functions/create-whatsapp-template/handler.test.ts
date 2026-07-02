@@ -43,8 +43,10 @@ function makeDeps(o: Overrides = {}) {
       (async () => o.user ?? {
         userId: "u-1", isSuperadmin: false, isAdmin: true, institution: "Inst A",
       }),
-    loadTemplate: o.loadTemplate ?? (async () => o.template ?? makeTemplate()),
-    loadWabaFor: o.loadWabaFor ?? (async () => o.waba ?? { wabaId: "WABA-A" }),
+    loadTemplate: o.loadTemplate ??
+      (async () => ("template" in o ? (o.template ?? null) : makeTemplate())),
+    loadWabaFor: o.loadWabaFor ??
+      (async () => ("waba" in o ? o.waba ?? null : { wabaId: "WABA-A" })),
     findByIdempotencyKey: o.findByIdempotencyKey ?? (async () => o.existing ?? null),
     persistSubmission: o.persistSubmission ?? (async (id, patch) => {
       persisted.push({ id, patch });
