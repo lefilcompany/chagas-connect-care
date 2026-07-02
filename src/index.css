@@ -10,42 +10,42 @@ All colors MUST be HSL.
   :root {
     /* Brand: Chagas Cuidado Digital */
     --background: 0 0% 100%;
-    --foreground: 0 0% 23%; /* #3B3B3B */
+    --foreground: 120 3% 30%; /* derived from #4A504A */
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 23%;
+    --card-foreground: 120 3% 30%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 23%;
+    --popover-foreground: 120 3% 30%;
 
-    --brand: 174 35% 18%; /* #1E3E3B verde escuro */
+    --brand: 120 3% 30%; /* #4A504A */
     --brand-foreground: 0 0% 100%;
 
-    --primary: 168 45% 84%; /* #C5E4DC verde claro */
-    --primary-foreground: 174 35% 18%;
+    --primary: 7 68% 69%; /* #E7877C */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 168 45% 96%;
-    --secondary-foreground: 174 35% 18%;
+    --secondary: 120 3% 30%; /* #4A504A */
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 168 30% 97%;
+    --muted: 0 0% 97%;
     --muted-foreground: 0 0% 40%;
 
-    --accent: 168 45% 84%;
-    --accent-foreground: 174 35% 18%;
+    --accent: 7 68% 69%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 168 25% 90%;
-    --input: 168 25% 90%;
-    --ring: 174 35% 18%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 7 68% 69%;
 
     --radius: 0.875rem;
 
-    --gradient-soft: linear-gradient(180deg, hsl(168 60% 97%) 0%, hsl(0 0% 100%) 100%);
-    --gradient-brand: linear-gradient(135deg, hsl(174 35% 18%) 0%, hsl(174 35% 26%) 100%);
-    --shadow-soft: 0 10px 30px -12px hsl(174 35% 18% / 0.15);
-    --shadow-card: 0 4px 20px -8px hsl(174 35% 18% / 0.10);
+    --gradient-soft: linear-gradient(180deg, hsl(7 68% 97%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-brand: linear-gradient(135deg, hsl(7 68% 69%) 0%, hsl(7 68% 60%) 100%);
+    --shadow-soft: 0 10px 30px -12px hsl(120 3% 30% / 0.15);
+    --shadow-card: 0 4px 20px -8px hsl(120 3% 30% / 0.10);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     --sidebar-background: 0 0% 98%;
