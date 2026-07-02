@@ -66,6 +66,12 @@ export interface InstitutionTemplateService {
     ctx: { institution: string; userId: string },
   ): Promise<MessageTemplate>;
   updateDraft(id: string, input: TemplateDraftInput): Promise<MessageTemplate>;
+  submitToMeta(id: string): Promise<{
+    meta_template_id: string | null;
+    meta_status: string;
+    submitted_at: string | null;
+    deduplicated?: boolean;
+  }>;
 }
 
 /** Real implementation: reads from the message_templates table scoped by RLS. */
@@ -126,6 +132,30 @@ export const supabaseInstitutionTemplates: InstitutionTemplateService = {
       .single();
     if (error) throw error;
     return data as unknown as MessageTemplate;
+  },
+  async submitToMeta(id) {
+    if (!id) throw new Error("Modelo inválido.");
+    const { data, error } = await supabase.functions.invoke(
+      "create-whatsapp-template",
+      { body: { local_template_id: id } },
+    );
+    if (error) throw new Error(error.message ?? "Falha ao enviar modelo à Meta.");
+    const resp = (data ?? {}) as {
+      ok?: boolean;
+      error?: string;
+      error_code?: string;
+      meta_template_id?: string | null;
+      meta_status?: string;
+      submitted_at?: string | null;
+      deduplicated?: boolean;
+    };
+    if (!resp.ok) throw new Error(resp.error ?? resp.error_code ?? "Falha ao enviar modelo.");
+    return {
+      meta_template_id: resp.meta_template_id ?? null,
+      meta_status: resp.meta_status ?? "submitted",
+      submitted_at: resp.submitted_at ?? null,
+      deduplicated: resp.deduplicated,
+    };
   },
 };
 

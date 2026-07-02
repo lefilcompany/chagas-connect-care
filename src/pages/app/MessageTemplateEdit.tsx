@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Save, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Save, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { qk } from "@/lib/queries";
@@ -75,6 +75,22 @@ export default function MessageTemplateEdit() {
     onError: (e: Error) => toast.error(e.message ?? "Falha ao atualizar rascunho."),
   });
 
+  const submitMutation = useMutation({
+    mutationFn: async () => service.submitToMeta(templateId),
+    onSuccess: (r) => {
+      toast.success(
+        r.deduplicated
+          ? "Modelo já havia sido enviado; status atualizado."
+          : "Enviado para análise da Meta.",
+      );
+      qc.invalidateQueries({
+        queryKey: qk.institutionTemplates(identity.institution ?? ""),
+      });
+      qc.invalidateQueries({ queryKey: ["template-by-id", templateId] });
+    },
+    onError: (e: Error) => toast.error(e.message ?? "Falha ao enviar modelo."),
+  });
+
   const isLocked = useMemo(
     () => !!query.data && query.data.meta_status !== "not_submitted",
     [query.data],
@@ -139,10 +155,24 @@ export default function MessageTemplateEdit() {
           className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm text-amber-900 dark:text-amber-200"
         >
           <ShieldCheck className="mt-0.5 h-4 w-4" />
-          <p>
-            Modelos enviados ou aprovados pela Meta não podem ser sobrescritos. Crie uma nova
-            versão em uma próxima etapa.
-          </p>
+          <div className="space-y-1">
+            <p>
+              Modelos enviados ou aprovados pela Meta não podem ser sobrescritos. Crie uma
+              nova versão em uma próxima etapa.
+            </p>
+            {query.data.meta_template_id && (() => {
+              const submittedAt = (query.data as unknown as { meta_submitted_at?: string | null })
+                .meta_submitted_at;
+              return (
+                <p className="text-xs">
+                  ID Meta: <code>{query.data.meta_template_id}</code>
+                  {submittedAt ? (
+                    <> · Enviado em {new Date(submittedAt).toLocaleString("pt-BR")}</>
+                  ) : null}
+                </p>
+              );
+            })()}
+          </div>
         </div>
       )}
 
@@ -169,6 +199,16 @@ export default function MessageTemplateEdit() {
           <Save className="h-4 w-4" />
           {updateMutation.isPending ? "Salvando…" : "Salvar rascunho"}
         </Button>
+        {query.data.template_kind === "meta" && !isLocked && (
+          <Button
+            variant="default"
+            onClick={() => submitMutation.mutate()}
+            disabled={submitMutation.isPending}
+          >
+            <Send className="h-4 w-4" />
+            {submitMutation.isPending ? "Enviando…" : "Enviar para aprovação"}
+          </Button>
+        )}
       </div>
     </div>
   );
