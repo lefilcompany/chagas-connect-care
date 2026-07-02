@@ -81,9 +81,10 @@ function renderPage(opts: RenderOpts = {}) {
     ...opts.serviceOverride,
   };
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const initialEntries = (opts as RenderOpts & { initialEntries?: string[] }).initialEntries ?? ["/"];
   const utils = render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>
         <InstitutionIdentityContext.Provider value={identity}>
           <InstitutionTemplateServiceContext.Provider value={service}>
             <MessageTemplates />
@@ -202,5 +203,19 @@ describe("MessageTemplates page", () => {
     await waitFor(() =>
       expect(screen.getByText("Recuperado")).toBeInTheDocument(),
     );
+  });
+
+  it("pre-filters by category from the ?categoria= URL param", async () => {
+    renderPage({
+      templates: [
+        makeTemplate({ id: "1", name: "Consulta A", category: "consulta" }),
+        makeTemplate({ id: "2", name: "Remédio B", category: "medicacao" }),
+      ],
+      // @ts-expect-error extra prop consumed by the test helper
+      initialEntries: ["/app/modelos?categoria=consulta"],
+    });
+    expect(await screen.findByText("Consulta A")).toBeInTheDocument();
+    expect(screen.queryByText("Remédio B")).not.toBeInTheDocument();
+    expect((screen.getByLabelText("Categoria") as HTMLSelectElement).value).toBe("consulta");
   });
 });

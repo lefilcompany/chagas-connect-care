@@ -29,12 +29,8 @@ import {
   emptyFilters, resolveRecipients, resolveContentTargeting, TargetingMode,
   AUDIENCE_LABELS, ALL_AUDIENCES,
 } from "@/lib/segments";
-import { TemplateCard, StartBlankCard } from "@/components/app/messages/TemplateCard";
-import { TemplateEditorDialog } from "@/components/app/messages/TemplateEditorDialog";
-import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
+import { TemplateCard } from "@/components/app/messages/TemplateCard";
 import type { MessageTemplate } from "@/lib/templates";
-import { useAuth } from "@/lib/auth";
-import { useNavigate } from "react-router-dom";
 import { useFolders, FALLBACK_FOLDER as FB_FOLDER, type FolderDef } from "@/hooks/useFolders";
 import { NewFolderDialog } from "@/components/app/content/NewFolderDialog";
 import {
@@ -469,54 +465,8 @@ function FolderDetail({
   sendItem: ContentRow | null;
   setSendItem: (c: ContentRow | null) => void;
 }) {
-  const { user } = useAuth();
-  const qc = useQueryClient();
-  const navigate = useNavigate();
   const Icon = folder.icon;
-
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editingTpl, setEditingTpl] = useState<MessageTemplate | null>(null);
-  const [useOpen, setUseOpen] = useState(false);
-  const [usingTpl, setUsingTpl] = useState<MessageTemplate | null>(null);
-
-  const duplicateTpl = async (t: MessageTemplate) => {
-    let institution = "";
-    if (user) {
-      const { data } = await supabase.from("profiles").select("institution").eq("id", user.id).maybeSingle();
-      institution = data?.institution ?? "";
-    }
-    const { error } = await supabase.from("message_templates").insert({
-      name: `${t.name} (cópia)`,
-      description: t.description,
-      category: t.category,
-      body: t.body,
-      body_patient: t.body_patient ?? t.body,
-      body_contact: t.body_contact ?? null,
-      body_segment: t.body_segment ?? null,
-      variables: t.variables,
-      template_kind: "internal",
-      meta_language: t.meta_language,
-      channel: "whatsapp",
-      targeting_mode: t.targeting_mode,
-      audience_types: t.audience_types,
-      filters: t.filters,
-      created_by: user!.id,
-      institution,
-      is_default: false,
-    } as any);
-    if (error) return toast.error(error.message);
-    toast.success("Objetivo duplicado");
-    qc.invalidateQueries({ queryKey: qk.templates });
-  };
-
-  const sortedTemplates = useMemo(() => {
-    return [...templates].sort((a, b) => {
-      const ad = a.is_default ? 1 : 0;
-      const bd = b.is_default ? 1 : 0;
-      if (ad !== bd) return bd - ad;
-      return a.name.localeCompare(b.name);
-    });
-  }, [templates]);
+  const templatesHref = `/app/modelos?categoria=${encodeURIComponent(folder.value)}`;
 
   return (
     <div className="space-y-6">
@@ -538,63 +488,29 @@ function FolderDetail({
         </div>
       </header>
 
-      {/* Templates section */}
+      {/* Templates link card — full editing lives in /app/modelos */}
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-display text-lg font-bold text-brand inline-flex items-center gap-2">
-            Objetivos de mensagem
-            <span className="text-xs font-normal text-muted-foreground">({sortedTemplates.length})</span>
-          </h2>
-          <div className="flex items-center gap-2">
-            <Link
-              to="/app/modelos"
-              className="text-xs text-muted-foreground underline-offset-4 hover:text-brand hover:underline"
-            >
-              Ver todos os modelos
-            </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setEditingTpl(null); setEditorOpen(true); }}
-            >
-              <Plus className="h-4 w-4" /> Novo objetivo
-            </Button>
+        <h2 className="font-display text-lg font-bold text-brand inline-flex items-center gap-2">
+          Modelos de mensagem
+          <span className="text-xs font-normal text-muted-foreground">({templates.length})</span>
+        </h2>
+        <Link
+          to={templatesHref}
+          className="group flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-brand">
+              Ver {templates.length} modelo{templates.length === 1 ? "" : "s"} desta categoria
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              A criação, edição e envio de modelos agora acontece em <strong>Modelos</strong>.
+            </p>
           </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <StartBlankCard onClick={() => { setEditingTpl(null); setEditorOpen(true); }} />
-          {sortedTemplates.map((t) => (
-            <TemplateCard
-              key={t.id}
-              template={t}
-              onUse={() => { setUsingTpl(t); setUseOpen(true); }}
-              onEdit={() => { setEditingTpl(t); setEditorOpen(true); }}
-              onDuplicate={() => duplicateTpl(t)}
-            />
-          ))}
-        </div>
-        {sortedTemplates.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-            Nenhum objetivo nesta pasta ainda. Clique em <strong className="text-brand">Novo objetivo</strong> para criar.
-          </div>
-        )}
+          <span className="inline-flex items-center gap-1 text-sm font-medium text-brand shrink-0">
+            Abrir <ArrowRight className="h-4 w-4" />
+          </span>
+        </Link>
       </section>
-
-      {/* Educational content section */}
-      {/* Template dialogs */}
-      <TemplateEditorDialog
-        open={editorOpen}
-        onOpenChange={(o) => { setEditorOpen(o); if (!o) setEditingTpl(null); }}
-        editing={editingTpl}
-        defaultCategory={folder.value}
-        onSavedUse={(t) => { setUsingTpl(t); setUseOpen(true); }}
-      />
-      <UseTemplateDialog
-        open={useOpen}
-        onOpenChange={(o) => { setUseOpen(o); if (!o) setUsingTpl(null); }}
-        template={usingTpl}
-        onGoToSegmented={(t) => navigate(`/app/conteudos/campanha?template=${t.id}`)}
-      />
 
       {/* Content dialogs */}
       <ContentFormDialog
