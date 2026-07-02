@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
   if (!WHATSAPP_TEST_MODE && (msg as any).template_id) {
     const { data: tpl } = await admin
       .from("message_templates")
-      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_parameter_order, meta_header_type, meta_header_text, meta_footer_text, meta_buttons, meta_authentication_config")
+      .select("template_kind, meta_category, meta_template_name, meta_language, meta_status, meta_body_parameter_order, meta_header_type, meta_header_text, meta_footer_text, meta_buttons, meta_authentication_config, meta_has_local_differences, meta_definition, meta_waba_id, institution")
       .eq("id", (msg as any).template_id)
       .maybeSingle();
     tplRow = tpl;
@@ -267,6 +267,66 @@ Deno.serve(async (req) => {
           last_error: "Template sem nome configurado",
         }).eq("id", msg.id);
         return json(200, { ok: false, error_code: "TEMPLATE_NAME_MISSING", error: "Template sem nome configurado." });
+      }
+      if ((tpl as any).meta_has_local_differences === true) {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: "Template diverge da versão aprovada pela Meta",
+        }).eq("id", msg.id);
+        return json(200, { ok: false, error_code: "TEMPLATE_LOCAL_DIFFERENCES", error: "Template diverge da versão aprovada. Sincronize antes de enviar." });
+      }
+      if (!(tpl as any).meta_definition || !Array.isArray(((tpl as any).meta_definition ?? {}).components)) {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: "Definição sincronizada da Meta ausente",
+        }).eq("id", msg.id);
+        return json(200, { ok: false, error_code: "TEMPLATE_DEFINITION_MISSING", error: "Definição sincronizada da Meta ausente para este template." });
+      }
+      if (!(tpl as any).meta_language) {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: "Idioma do template ausente",
+        }).eq("id", msg.id);
+        return json(200, { ok: false, error_code: "TEMPLATE_LANGUAGE_MISSING", error: "Idioma do template Meta ausente." });
+      }
+      if ((tpl as any).institution && institution && (tpl as any).institution !== institution) {
+        await admin.from("messages").update({
+          status: "failed", failed_at: new Date().toISOString(),
+          last_error: "Template pertence a outra instituição",
+        }).eq("id", msg.id);
+        return json(200, { ok: false, error_code: "TEMPLATE_INSTITUTION_MISMATCH", error: "Este template pertence a outra instituição." });
+      }
+      // WABA mismatch guard (only when both sides are populated).
+      const tplWaba = (tpl as any).meta_waba_id as string | null;
+      if (tplWaba && institution) {
+        const { data: chan } = await admin
+          .from("whatsapp_channels")
+          .select("waba_id, phone_number_id, status")
+          .eq("institution", institution)
+          .maybeSingle();
+        if (chan) {
+          if ((chan as any).status && !["connected", "active", "ok"].includes(String((chan as any).status).toLowerCase()) && String((chan as any).status).toLowerCase() !== "unknown") {
+            await admin.from("messages").update({
+              status: "failed", failed_at: new Date().toISOString(),
+              last_error: `Canal WhatsApp inativo (${(chan as any).status})`,
+            }).eq("id", msg.id);
+            return json(200, { ok: false, error_code: "WHATSAPP_CHANNEL_INACTIVE", error: "Canal WhatsApp da instituição não está ativo." });
+          }
+          if ((chan as any).waba_id && (chan as any).waba_id !== tplWaba) {
+            await admin.from("messages").update({
+              status: "failed", failed_at: new Date().toISOString(),
+              last_error: "WABA do template não corresponde ao canal",
+            }).eq("id", msg.id);
+            return json(200, { ok: false, error_code: "WHATSAPP_WABA_MISMATCH", error: "O WABA do template não corresponde ao canal da instituição." });
+          }
+          if ((chan as any).phone_number_id && WHATSAPP_PHONE_NUMBER_ID && (chan as any).phone_number_id !== WHATSAPP_PHONE_NUMBER_ID) {
+            await admin.from("messages").update({
+              status: "failed", failed_at: new Date().toISOString(),
+              last_error: "Phone Number ID do canal difere do configurado",
+            }).eq("id", msg.id);
+            return json(200, { ok: false, error_code: "WHATSAPP_PHONE_NUMBER_MISMATCH", error: "O Phone Number ID do canal difere do configurado no envio." });
+          }
+        }
       }
       willSendTemplate = true;
     }
@@ -522,8 +582,8 @@ Deno.serve(async (req) => {
       usedTemplateLanguage = tplRow.meta_language || "pt_BR";
       // Skip the generic template build path below.
     } else {
-    const order = Array.isArray(tplRow.meta_parameter_order)
-      ? (tplRow.meta_parameter_order as string[])
+    const order = Array.isArray(tplRow.meta_body_parameter_order)
+      ? (tplRow.meta_body_parameter_order as string[])
       : [];
     // Detect placeholders that should never reach the Meta API
     const placeholderRe = /\{[a-zA-Z0-9_]+\}/;

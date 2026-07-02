@@ -1,142 +1,103 @@
-# FASE 5 — Cabeçalho com mídia (IMAGE / VIDEO / DOCUMENT)
 
-Fatia vertical: admin institucional escolhe um arquivo local, sistema faz upload resumível para a Meta, guarda o `header_handle` da amostra, e a submissão do template passa esse handle no bloco HEADER. Nada de URL manual, nada de mídia real de envio.
+# Fase 6 — Utilização e envio de template aprovado
 
-## 1. Banco (uma migração)
+Fatia vertical: usuário abre `/app/modelos`, aciona "Usar modelo" em um template `approved`, preenche variáveis, envia, e vê o WAMID salvo com status `sent`. Modelos fora de `approved` são bloqueados em UI e backend.
 
-Nova tabela `whatsapp_template_header_media` (amostras institucionais para criação de template):
+## O que já existe (reutilizar)
 
+- `UseTemplateDialog` completo (destinatário / variáveis / preview / envio).
+- `queueAndSendFromTemplate` → insere `messages` em `queued` e chama `send-whatsapp`.
+- `send-whatsapp/index.ts` já valida `meta_status === approved`, `meta_template_name`, opt-out, e persiste o WAMID retornado pela Meta (fluxo `sent` → webhook `delivered`/`read`).
+- Coluna `meta_body_parameter_order` já existe em `message_templates` (grava no editor); coluna legada `meta_parameter_order` ainda é lida no backend.
+- `TemplateCard` catálogo com prop `onUse` e `useDisabledReason` já suporta os textos por status.
+
+## Lacunas cobertas nesta fase
+
+1. `/app/modelos` não abre o dialog — `onUse` está vazio.
+2. Backend lê a coluna legada `meta_parameter_order`; precisa passar a usar exclusivamente `meta_body_parameter_order`.
+3. Faltam guards: `meta_has_local_differences`, `meta_definition` ausente, `meta_language` ausente, template de outra instituição, canal inativo, WABA divergente, Phone Number ID divergente.
+4. Não há builder puro reutilizável nem testável isoladamente.
+5. Media de header não valida que o `meta_media_id` pertence ao canal/WABA corrente.
+
+## Entregas
+
+### 1. Builder puro `buildApprovedTemplateMessage`
+
+Novo arquivo `supabase/functions/_shared/approvedTemplatePayload.ts` exportando:
+
+```ts
+buildApprovedTemplateMessage(input): { ok: true; payload } | { ok: false; errorCode; error }
 ```
-id uuid pk
-local_template_id uuid not null references message_templates(id) on delete cascade
-institution text not null
-format text not null check (format in ('IMAGE','VIDEO','DOCUMENT'))
-mime_type text not null
-file_size bigint not null
-file_name text
-header_handle text not null
-uploaded_by uuid not null references auth.users(id)
-created_at timestamptz default now()
-```
 
-Grants:
-- `GRANT SELECT, INSERT, DELETE ON ... TO authenticated`
-- `GRANT ALL ... TO service_role`
+Entrada:
+- `template` sincronizado (`meta_template_name`, `meta_language`, `meta_status`, `meta_has_local_differences`, `meta_definition`, `meta_header_type`, `meta_body_parameter_order`, `meta_buttons`, `meta_carousel_cards`, `institution`, `waba_id`).
+- `to` (E.164 já normalizado).
+- `variables` semânticas (`Record<string,string>`).
+- `header` opcional (`{ format, media_id }` para IMAGE/VIDEO/DOCUMENT; nunca aceita `header_handle`).
+- `buttons` runtime já normalizados.
 
-RLS: leitura/insert/delete restritos a admin institucional cuja `get_user_institution(auth.uid()) = institution`.
+Regras internas:
+- Rejeita se `meta_status !== "approved"` → `TEMPLATE_NOT_APPROVED`.
+- Rejeita se `meta_has_local_differences === true` → `TEMPLATE_LOCAL_DIFFERENCES`.
+- Rejeita se `meta_definition` ausente → `TEMPLATE_DEFINITION_MISSING`.
+- Rejeita se `meta_template_name` ausente → `TEMPLATE_NAME_MISSING`.
+- Rejeita se `meta_language` ausente → `TEMPLATE_LANGUAGE_MISSING`.
+- Usa exclusivamente `meta_body_parameter_order` para BODY; se `{{n}}` existe e a ordem está vazia → `TEMPLATE_PARAMETER_ORDER_MISSING`. Variável ausente/placeholder → `TEMPLATE_PARAMETER_MISSING`.
+- Para header IMAGE/VIDEO/DOCUMENT usa `{ id: media_id }` (nunca `header_handle`). Sem `media_id` → `MEDIA_NOT_UPLOADED`.
+- Não faz `fetch`; recebe tudo já resolvido.
 
-Colunas novas em `message_templates`:
-- `meta_header_format text` (`IMAGE`|`VIDEO`|`DOCUMENT`|null)
-- `meta_header_handle text` — handle da amostra atual
-- `meta_header_media_id uuid references whatsapp_template_header_media(id)`
+### 2. Refactor de `send-whatsapp/index.ts`
 
-Ampliar o CHECK/enum de `meta_header_type` para aceitar `image | video | document` além de `none | text`.
+- Alterar o `SELECT` do template para incluir `meta_language, meta_has_local_differences, meta_definition, meta_body_parameter_order, waba_id, institution` e remover leitura de `meta_parameter_order`.
+- Delegar montagem do payload de template (não-auth, não-carrossel) para o builder novo. Manter os fluxos AUTHENTICATION e CAROUSEL onde estão (fora do escopo da fatia).
+- Adicionar guards antes da chamada Meta:
+  - `template.institution !== msg.institution` → `TEMPLATE_INSTITUTION_MISMATCH`.
+  - canal (`institution_whatsapp_settings`) inativo → `WHATSAPP_CHANNEL_INACTIVE`.
+  - `template.waba_id` divergente do canal → `WHATSAPP_WABA_MISMATCH`.
+  - `PHONE_NUMBER_ID` do canal divergente do secreto/resolvido → `WHATSAPP_PHONE_NUMBER_MISMATCH`.
+- Para header de mídia, validar que `whatsapp_media_assets.institution` e `channel_id` combinam com o canal usado; senão `MEDIA_CHANNEL_MISMATCH`.
+- Persistir `external_message_id` (WAMID) já é feito — cobrir por teste.
 
-Remover uso (não a coluna) de `meta_header_media_url` — deixa de ser exposta no formulário e ignorada pelo backend de criação.
+### 3. Frontend
 
-## 2. Nova Edge Function: `upload-whatsapp-template-media`
+- `MessageTemplates.tsx`: passar a abrir `UseTemplateDialog` no `onUse` (`useState<MessageTemplate | null>` + estado `useOpen`, seguindo padrão de `Content.tsx`). Botão só aparece para `template_kind === "internal"` ou `template_kind === "meta" && meta_status === "approved"`; para os demais status `useDisabledReason` continua exibido, mostrando:
+  - `submitted` → "Aguardando análise da Meta."
+  - `rejected` → "Rejeitado — ver motivo no editor."
+  - `paused` / `disabled` → "Indisponível."
+  - `not_submitted` → "Ainda não submetido."
+- `TemplateCard` catálogo: passar a esconder o botão "Usar modelo" quando `disabledReason` está setado (hoje ele fica visível cinza — manter comportamento visual, apenas garantir `disabled`).
+- Nenhuma mudança em `UseTemplateDialog` além de propagar novos `error_code` que o backend passar a retornar (já são exibidos por `friendlyWhatsAppError`, adicionar as novas chaves ali).
 
-`supabase/functions/upload-whatsapp-template-media/{index.ts,handler.ts,handler.test.ts}`, `verify_jwt=false` (validação em código, como as outras).
+### 4. Migração de dados (não schema)
 
-Fluxo:
-1. Valida JWT → resolve `user_id`, `institution`, checa role admin institucional.
-2. Lê `multipart/form-data`: `file` (Blob) + `local_template_id`.
-3. Carrega o template; recusa se instituição diferente ou se status ≠ `draft`.
-4. Deriva `format` a partir do MIME:
-   - `image/jpeg`,`image/png` → IMAGE, limite 5 MB
-   - `video/mp4`,`video/3gpp` → VIDEO, limite 16 MB
-   - `application/pdf` → DOCUMENT, limite 100 MB
-   - qualquer outro MIME → 400 `INVALID_MIME`
-5. Se `file.size > limite` → 400 `FILE_TOO_LARGE`.
-6. Chamada 1 (sessão):
-   `POST graph.facebook.com/{GRAPH_VERSION}/{META_APP_ID}/uploads?file_name=...&file_length=...&file_type=...`
-   Header `Authorization: Bearer {WHATSAPP_TOKEN}`.
-   Erro → 502 `UPLOAD_SESSION_FAILED` com mensagem real da Meta.
-7. Chamada 2 (bytes):
-   `POST graph.facebook.com/{GRAPH_VERSION}/{session_id}`
-   Headers: `Authorization: OAuth {WHATSAPP_TOKEN}`, `file_offset: 0`, `Content-Type: <mime>`.
-   Body: bytes brutos.
-   Erro → 502 `UPLOAD_BYTES_FAILED`.
-8. Persistir linha em `whatsapp_template_header_media` (service role), e atualizar `message_templates`: `meta_header_type='image|video|document'`, `meta_header_format`, `meta_header_handle`, `meta_header_media_id`.
-9. Retorno: `{ ok: true, header_handle, format, media_id }`.
+- Nada de DDL nesta fase. Apenas parar de ler `meta_parameter_order` no backend. Coluna legada permanece no banco (limpeza é fora de escopo).
 
-Nunca aceitar handle vindo do cliente. Nenhum acesso ao endpoint `/messages`.
+## TDD — ordem
 
-## 3. Ajuste em `create-whatsapp-template/handler.ts` + `_shared/metaTemplatePayload.ts`
+Ciclo 1 (RED → GREEN mínimo):
+- `supabase/functions/_shared/approvedTemplatePayload.test.ts`: template `approved` + variáveis válidas → payload BODY correto.
+- `supabase/functions/send-whatsapp/handler.test.ts` (novo, se ainda não existe): stub Meta retornando `wamid.xxx` → mensagem fica `sent` e `external_message_id === "wamid.xxx"`.
+- `src/pages/app/MessageTemplates.useDialog.test.tsx`: clicar "Usar modelo" em template `approved` abre o dialog; em `submitted`/`rejected` o botão está desabilitado e mostra o motivo.
 
-- Se `meta_header_type` ∈ {image, video, document}: exige `meta_header_handle` no registro. Ausente → 400 `MISSING_HEADER_HANDLE`.
-- Bloco HEADER passa a emitir:
-  ```json
-  { "type":"HEADER","format":"IMAGE|VIDEO|DOCUMENT","example":{"header_handle":["<handle>"]} }
-  ```
-- HEADER de texto e ausência de header permanecem inalterados.
-- Idempotência: incluir `header_handle` no `stableStringify` do payload (já será, pois vai na saída).
+Ciclos seguintes (um teste por ciclo):
+- builder bloqueia `submitted`, `rejected`, `meta_has_local_differences`, `meta_definition` ausente, `meta_body_parameter_order` vazio com `{{n}}`, variável ausente.
+- send-whatsapp bloqueia template de outra instituição, canal inativo, WABA divergente, Phone Number ID divergente, opt-out, telefone inválido (regras já existentes cobertas com teste).
+- header IMAGE usa `{ id: media_id }` e nunca `header_handle`; `MEDIA_CHANNEL_MISMATCH` quando `whatsapp_media_assets` não bate com canal.
+- webhook: `delivered` e `read` avançam status; `sent → delivered → read` não regride; `failed` não sobrescreve `read`.
 
-## 4. Schema / formulário
+## Arquivos afetados
 
-`src/lib/templateDraft.ts`:
-- `meta_header_type` passa a aceitar `"none" | "text" | "image" | "video" | "document"`.
-- Novos campos opcionais no rascunho: `meta_header_format`, `meta_header_handle`, `meta_header_media_id`, `meta_header_media_file_name`, `meta_header_media_mime`, `meta_header_media_size`.
-- Remover `meta_header_media_url` da forma pública (schema + defaults). Backend deixa de ler.
+- Novo `supabase/functions/_shared/approvedTemplatePayload.ts` + `.test.ts`.
+- `supabase/functions/send-whatsapp/index.ts` (SELECT, delegação ao builder, novos guards).
+- Novo `supabase/functions/send-whatsapp/guards.test.ts` (Deno) — cobrindo os novos error codes.
+- `src/pages/app/MessageTemplates.tsx` (wire do dialog).
+- `src/components/app/messages/TemplateCard.tsx` (garantir `disabled` no botão do catálogo).
+- `src/lib/whatsapp.ts` (`friendlyWhatsAppError` — mensagens dos novos códigos).
+- Novo `src/pages/app/MessageTemplates.useDialog.test.tsx`.
 
-`src/components/app/messages/TemplateEditorForm.tsx`:
-- Adicionar opções radio `Imagem | Vídeo | Documento` além de `Nenhum | Texto`.
-- Quando selecionado um tipo de mídia: renderizar `<input type="file" accept="...">` real com accept correto por tipo, botão “Enviar amostra”, exibir nome/tamanho/handle atual.
-- Mensagens de erro de MIME/tamanho vindas do backend exibidas no formulário.
-- Sem campo de URL manual.
-- Enquanto `header_handle` ausente e tipo=mídia, botão “Enviar para aprovação” fica desabilitado.
+## Fora do escopo (parar antes)
 
-`TemplateEditorDialog.tsx` (legacy) recebe as mesmas mudanças por reuso do form.
-
-## 5. Serviço
-
-`src/services/institutionTemplates.ts`:
-- `uploadHeaderMedia(templateId, file)` → `POST` via `supabase.functions.invoke('upload-whatsapp-template-media', { body: FormData })` (sem setar Content-Type manualmente). Retorna `{ header_handle, format, media_id }` e invalida a query do template.
-- Ajustar `submitToMeta` apenas para propagar erros de header ausente.
-
-## 6. Testes (TDD, vertical)
-
-Ordem dos ciclos RED→GREEN, um por vez.
-
-Deno (`upload-whatsapp-template-media/handler.test.ts`), com fetch stub para Graph:
-
-1. Admin da instituição envia PNG 1 MB para template próprio em draft → chama endpoint `/uploads`, envia bytes, persiste linha e devolve `header_handle`. Template fica com `meta_header_type=image` e handle salvo.
-2. MIME não permitido (`image/gif`) → 400 `INVALID_MIME`, nenhum fetch para Graph.
-3. `image/png` > 5 MB → 400 `FILE_TOO_LARGE`.
-4. `video/mp4` > 16 MB → 400 `FILE_TOO_LARGE`.
-5. `application/pdf` > 100 MB → 400 `FILE_TOO_LARGE`.
-6. Template de outra instituição → 403 `FORBIDDEN`.
-7. Sessão da Meta falha (chamada 1 retorna 500) → 502 `UPLOAD_SESSION_FAILED` com detalhe.
-8. Envio dos bytes falha (chamada 2 retorna 500) → 502 `UPLOAD_BYTES_FAILED`.
-9. Corpo sem `file` → 400 `MISSING_FILE`.
-
-Deno (`create-whatsapp-template/handler.test.ts`) — novo caso:
-
-10. Template com `meta_header_type=image` sem `meta_header_handle` → 400 `MISSING_HEADER_HANDLE`, sem fetch para Meta.
-11. Template com handle válido → payload enviado contém `components[0]={type:HEADER,format:IMAGE,example:{header_handle:[handle]}}`.
-
-Vitest (novo `MessageTemplateEdit.mediaHeader.test.tsx`):
-
-12. Selecionar tipo Imagem + escolher arquivo → chama service.uploadHeaderMedia, exibe handle, e libera botão Enviar para aprovação.
-13. Antes do upload, botão Enviar para aprovação fica desabilitado quando tipo=mídia.
-14. Campo de URL manual não existe no DOM.
-
-Cada teste implementa apenas o mínimo antes do próximo (nada de escrever todos os testes de uma vez).
-
-## 7. Critérios de aceite (auto-checklist)
-
-- input `type=file` real, com `accept` correto por tipo.
-- upload resumível real usa `META_APP_ID` + `WHATSAPP_TOKEN`.
-- handle persistido em `whatsapp_template_header_media` e no template.
-- criação de template usa o handle no bloco HEADER.
-- endpoint de envio (`send-whatsapp`) não é tocado nesta fase.
-- lint, build e todos os testes (Deno + Vitest) passam.
-- Parar antes do envio do modelo aprovado.
-
-## Detalhes técnicos
-
-- Secrets já presentes: `META_APP_ID`, `WHATSAPP_TOKEN`, `WHATSAPP_GRAPH_VERSION`.
-- Validar `META_APP_ID` no boot da função; ausente → 500 `MISSING_APP_ID`.
-- `handler.ts` puro (recebe `fetch` e `supabase` por DI) para permitir testes sem rede.
-- Sanitizar mensagem de erro da Meta antes de devolver ao cliente (reaproveitar util existente).
-- `handler.test.ts` usa `import "https://deno.land/std@0.224.0/dotenv/load.ts"` e consome todos os response bodies.
+- Sem novo webhook (usa o existente).
+- Sem alteração no envio de mensagens livres (não-template).
+- Sem migração/limpeza de `meta_parameter_order`.
+- Sem tocar em fluxo AUTHENTICATION nem CAROUSEL.

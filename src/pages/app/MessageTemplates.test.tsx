@@ -138,6 +138,26 @@ describe("MessageTemplates page", () => {
     expect(button).toBeDisabled();
   });
 
+  it("opens the Use Template dialog when clicking 'Usar modelo' on an approved template", async () => {
+    renderPage({
+      templates: [makeTemplate({ name: "Modelo Charlie", meta_status: "approved" })],
+    });
+    const button = await screen.findByRole("button", { name: /Usar modelo Modelo Charlie/ });
+    fireEvent.click(button);
+    expect(
+      await screen.findByRole("dialog", { name: /Usar objetivo: Modelo Charlie/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a distinct disabled reason for rejected templates", async () => {
+    renderPage({
+      templates: [makeTemplate({ name: "Modelo Delta", meta_status: "rejected" })],
+    });
+    const button = await screen.findByRole("button", { name: /Usar modelo Modelo Delta/ });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("title", expect.stringMatching(/Rejeitado/i));
+  });
+
   it("shows the admin management hint only for admins", async () => {
     const { unmount } = renderPage({
       templates: [makeTemplate()],
