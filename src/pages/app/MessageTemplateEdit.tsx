@@ -42,7 +42,6 @@ function templateToDraft(t: MessageTemplate): TemplateDraftInput {
     audience_types: ((t.audience_types as string[]) ?? []) as string[],
   };
 }
-}
 
 export default function MessageTemplateEdit() {
   const { templateId = "" } = useParams();
