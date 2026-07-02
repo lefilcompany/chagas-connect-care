@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
+import { Search, Plus, Edit3 } from "lucide-react";
 import { TemplateCard } from "@/components/app/messages/TemplateCard";
 import {
   META_STATUS_LABEL,
@@ -35,6 +36,7 @@ const STATUS_OPTIONS: { value: "todos" | MetaStatus; label: string }[] = [
 export default function MessageTemplates() {
   const identity = useInstitutionIdentity();
   const service = useInstitutionTemplateService();
+  const navigate = useNavigate();
 
   const [q, setQ] = useState("");
   const [typeFilter, setTypeFilter] = useState<"todos" | "internal" | "meta">("todos");
@@ -67,12 +69,21 @@ export default function MessageTemplates() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="font-display text-2xl font-bold text-brand">Modelos de mensagem</h1>
-        <p className="text-sm text-muted-foreground max-w-2xl">
-          Consulte todos os modelos de mensagem disponíveis para sua instituição, entenda o
-          status de análise de cada um e utilize os aprovados nas suas campanhas.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="font-display text-2xl font-bold text-brand">Modelos de mensagem</h1>
+          <p className="text-sm text-muted-foreground max-w-2xl">
+            Consulte todos os modelos de mensagem disponíveis para sua instituição, entenda o
+            status de análise de cada um e utilize os aprovados nas suas campanhas.
+          </p>
+        </div>
+        {identity.isAdmin && (
+          <Button asChild>
+            <Link to="/app/modelos/novo" aria-label="Novo modelo">
+              <Plus className="h-4 w-4" /> Novo modelo
+            </Link>
+          </Button>
+        )}
       </header>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -178,6 +189,7 @@ export default function MessageTemplates() {
                 variant="catalog"
                 useDisabledReason={disabledReason}
                 onUse={() => { /* wired in later phases */ }}
+                onEdit={identity.isAdmin ? () => navigate(`/app/modelos/${t.id}`) : undefined}
               />
             );
           })}

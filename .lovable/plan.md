@@ -1,116 +1,120 @@
-# Fase 1 — Catálogo institucional de modelos (somente leitura)
 
-Fatia vertical: rota `/app/modelos` que lista os modelos da instituição do usuário autenticado, com filtros e ações condicionais, sem criação/edição/submissão.
+# Fase 2 — Rascunho local de modelos
 
-## Escopo
+Fatia vertical: administrador institucional cria/edita rascunho local em página dedicada, sem tocar na Meta. Usuário comum permanece somente leitura.
 
-- Nova rota SPA + item de menu entre "Conteúdos" e "Segmentos".
-- Nova página + serviço com resolução de instituição por usuário.
-- Reuso máximo de componentes existentes (`TemplateCard`, `WhatsAppPreview`, `META_STATUS_LABEL`).
-- Testes RTL comportamentais dirigindo a UI através do serviço substituível.
+## Rotas e navegação
 
-## Arquivos criados
+- Adicionar em `src/App.tsx` dentro do `InstitutionIdentityProvider`:
+  - `/app/modelos/novo` → `MessageTemplateNew`
+  - `/app/modelos/:templateId` → `MessageTemplateEdit`
+- `MessageTemplates.tsx` ganha botão **Novo modelo** (link para `/app/modelos/novo`) visível somente quando `identity.isAdmin === true`.
+- Cada `TemplateCard` no catálogo, quando `isAdmin`, exibe ação **Editar** que navega para `/app/modelos/:id` (reuso do slot `onEdit` já existente na variante `catalog`, hoje oculto).
+- Guardas de rota: as duas páginas novas redirecionam para `/app/modelos` se `identity.loading === false && !identity.isAdmin`.
 
-```text
-src/services/institutionTemplates.ts          # InstitutionTemplateService + implementação supabase
-src/pages/app/MessageTemplates.tsx            # <MessageTemplatesPage />
-src/pages/app/MessageTemplates.test.tsx       # testes comportamentais RTL
-```
+## Extração / reuso (sem dois editores)
 
-## Arquivos alterados
+Novos arquivos, extraídos do `TemplateEditorDialog.tsx` atual sem duplicar lógica:
 
-- `src/App.tsx` — registrar rota `path="modelos" element={<MessageTemplates />}` dentro de `/app`.
-- `src/components/app/AppLayout.tsx` — inserir item de menu "Modelos" (icone `FileText`) entre "Conteúdos" e "Segmentos".
-- `src/lib/queries.ts` — adicionar `qk.institutionTemplates(institution)` **e** rota de prefetch `/app/modelos`. Manter `qk.templates` intocado (uso legado).
-- `src/pages/app/Content.tsx` — na seção "Objetivos de mensagem" (linha ~544) adicionar link discreto `Ver todos os modelos` → `/app/modelos`. Não remover nada.
+- `src/lib/templateDraft.ts`
+  - `templateDraftSchema` (Zod): valida `name`, `template_kind`, `body`, `meta_template_name` (regex `^[a-z0-9_]+$`, min 1), `meta_language`, `meta_category`, `meta_header_type` ∈ {`none`,`text`}, `meta_header_text`, `meta_footer_text`, `meta_buttons` (quick_reply | url | phone_number), `variable_examples`, `variable_order`, `targeting_mode`, `audience_types`, `filters`, `category`, `description`.
+  - `normalizeMetaName(input)`: lowercases + strip inválidos.
+  - `assertMetaDraft(draft)`: garante corpo não vazio; garante que toda variável extraída tem exemplo preenchido; retorna erros nomeados por campo.
+- `src/hooks/useTemplateEditor.ts`
+  - `useTemplateEditor({ initial, mode })` retorna `{ form, setField, errors, submit, dirty, semanticVariables }`. Encapsula estado, validação com o schema e derivação de `variable_order` a partir do corpo.
+- `src/components/app/messages/TemplateEditorForm.tsx`
+  - Componente **puro de apresentação** (props: `state`, `onChange`, `errors`, `disabledStatus`) contendo os campos: nome, descrição, categoria/pasta, tipo (interno/meta), nome técnico Meta (com preview do slug), idioma, categoria Meta, cabeçalho (NONE/TEXT), corpo, rodapé, botões (quick_reply/url/phone_number), segmentação sugerida e exemplos de variáveis.
+  - **Sem** Select de status. Renderiza status como badge somente leitura (`Rascunho` para `not_submitted`).
+  - Reaproveita `WhatsAppPreview` e `SEMANTIC_VARIABLES`/`renderWithExamples` já existentes.
+- `TemplateEditorDialog.tsx` é reescrito para virar um wrapper fino: `<Dialog>` que usa `useTemplateEditor` + renderiza `<TemplateEditorForm/>`. Zero divergência entre diálogo e páginas.
 
-Nenhum arquivo é excluído.
+## Serviço `InstitutionTemplateService`
 
-## Interface pública do serviço
+Extender `src/services/institutionTemplates.ts` com três funções públicas testáveis:
 
-```ts
-// src/services/institutionTemplates.ts
-export interface InstitutionTemplateService {
-  list(institution: string): Promise<MessageTemplate[]>;
-}
+- `createDraft(input: TemplateDraftInput): Promise<MessageTemplate>`
+  - Server-side derivação: `institution = identity.institution` (obtido do provider, não confia no cliente), `created_by = auth.uid()`, `meta_status = 'not_submitted'`, `is_active = true`, `is_default = false`.
+  - Recusa se `institution` vazia.
+  - **Strip** de `meta_status` e `institution` do input antes do insert.
+- `updateDraft(id: string, input: TemplateDraftInput)`
+  - Rejeita se `meta_status !== 'not_submitted'` (leitura prévia via `getById`) — aprovados/submetidos não podem ser sobrescritos nesta fase.
+  - **Strip** de `meta_status` e `institution` do payload.
+- `getById(id: string): Promise<MessageTemplate | null>` scoped por RLS.
 
-export const supabaseInstitutionTemplates: InstitutionTemplateService = { … };
+Nenhuma chamada a `graph.facebook.com`.
 
-// Contexto React para permitir override em testes sem tocar em React Query.
-export const InstitutionTemplateServiceContext =
-  React.createContext<InstitutionTemplateService>(supabaseInstitutionTemplates);
-export const useInstitutionTemplateService = () => useContext(...);
-```
+## Persistência / RLS
 
-Métodos de criação/edição/submissão ficam para fases seguintes.
+`message_templates` já existe; nesta fase apenas endurecemos as políticas para refletir "criação/edição só admin institucional":
 
-## Query key
+- Migration `phase2_template_writes_admin_only`:
+  ```sql
+  DROP POLICY "Templates insert" ON public.message_templates;
+  CREATE POLICY "Templates insert admin only" ON public.message_templates
+    FOR INSERT TO authenticated
+    WITH CHECK (
+      public.has_role(auth.uid(), 'admin')
+      AND is_default = false
+      AND institution = public.get_user_institution(auth.uid())
+      AND public.get_user_institution(auth.uid()) <> ''
+      AND (created_by = auth.uid() OR created_by IS NULL)
+    );
 
-```ts
-qk.institutionTemplates = (institution: string) =>
-  ["institution-templates", institution] as const;
-```
+  DROP POLICY "Templates update in institution" ON public.message_templates;
+  CREATE POLICY "Templates update admin only" ON public.message_templates
+    FOR UPDATE TO authenticated
+    USING (
+      public.has_role(auth.uid(), 'admin')
+      AND is_default = false
+      AND institution = public.get_user_institution(auth.uid())
+    )
+    WITH CHECK (
+      public.has_role(auth.uid(), 'admin')
+      AND is_default = false
+      AND institution = public.get_user_institution(auth.uid())
+    );
+  ```
+  Superadmin continua coberto pela cláusula `has_role`.
+- Nenhum GRANT novo — a tabela já tem os grants padrão.
 
-Sem colisão com `["message-templates"]`.
+## Status
 
-## Página `/app/modelos`
+- Removido todo Select de status do formulário.
+- Renderizado como badge somente leitura no cabeçalho da página.
+- Payloads de `createDraft`/`updateDraft` filtram `meta_status` no cliente **e** o servidor não confia (aprovado permanece via `updateDraft` bloqueando).
 
-Estrutura:
+## TDD — ordem dos ciclos
 
-1. Cabeçalho: `<h1>Modelos de mensagem</h1>` + parágrafo explicativo.
-2. Barra de filtros:
-   - `Input` de busca (nome/descrição).
-   - `Select` **Tipo**: Todos / Interno / Meta.
-   - `Select` **Status**: Todos + os 6 status humanos (`META_STATUS_LABEL`).
-   - `Select` **Categoria**: baseado em `TEMPLATE_CATEGORIES`.
-3. Grid responsivo de `<TemplateCard variant="catalog" />`.
-   - Ajuste mínimo em `TemplateCard`: aceitar prop opcional `variant?: "editor" | "catalog"`. Quando `catalog`, oculta botões `Editar`, `Duplicar`, `Nova versão`; mantém apenas `Usar modelo` e desabilita quando `template_kind === "meta" && meta_status !== "approved"` (interno = sempre permitido).
-   - Sem duplicação do componente.
-4. Última sincronização exibida em cada card via `template.last_synced_at` (adicionar linha `<time>` no `TemplateCard` quando estiver em modo `catalog`).
-5. Badge de divergência já existe (`meta_has_local_differences`).
-6. Estado vazio: mensagem "Nenhum modelo encontrado" + sugestão de limpar filtros.
-7. Estado de erro: mensagem + `<Button onClick={refetch}>Tentar novamente</Button>`.
-8. Rodapé sutil: se usuário for admin, `<p className="text-xs">Em breve: criar e submeter modelos por aqui.</p>` (satisfaz "admin visualiza indicação futura de gerenciamento" sem criar botão sem função).
+Arquivos:
+- `src/pages/app/MessageTemplateNew.test.tsx`
+- `src/pages/app/MessageTemplateEdit.test.tsx`
+- `src/lib/templateDraft.test.ts`
+- `src/pages/app/MessageTemplates.test.tsx` (novos casos)
 
-Consulta: `useQuery({ queryKey: qk.institutionTemplates(institution), queryFn: () => service.list(institution), enabled: !!institution })`. Instituição vem via `select institution from profiles where id = auth.uid()`.
+Um teste por ciclo, sempre `RED → GREEN`:
 
-## Ciclo TDD
+1. **Tracer**: admin cria rascunho Meta em `/app/modelos/novo`, submete, é redirecionado para `/app/modelos` e o novo modelo aparece com badge "Rascunho" (`not_submitted`). Serviço mockado captura o payload — verificamos que `meta_status` **não** foi enviado e que `institution` veio do provider.
+2. Usuário comum navegando para `/app/modelos/novo` é redirecionado para `/app/modelos` e o botão "Novo modelo" não aparece.
+3. Nome técnico Meta inválido (`Foo Bar!`) mostra erro de validação e bloqueia submit; nome válido é normalizado para minúsculas (`foo_bar`).
+4. Corpo vazio bloqueia submit com erro em `body`.
+5. Variável `{nome_paciente}` presente sem exemplo bloqueia submit em modelo Meta.
+6. Página não expõe campo editável de status (assertiva: nenhum `combobox`/`select` com `name*=status`).
+7. `/app/modelos/:id` carrega rascunho existente via `getById` mock, permite edição e chama `updateDraft` com o id.
+8. Tentar editar modelo `approved` mostra aviso e desabilita submit; `updateDraft` não é chamado.
+9. Formulário não expõe campo de instituição; ao tentar injetar `institution` no payload (via teste), `createDraft` remove antes do insert.
 
-Modo vertical (um teste → uma implementação → repetir). Cada ciclo roda `npm test -- src/pages/app/MessageTemplates.test.tsx`.
+## API externa
 
-Ordem dos ciclos:
+Nenhuma chamada Meta nesta fase. Nenhum código novo em edge functions. `TemplateEditorDialog` atual removerá qualquer botão "Enviar para Meta" (fica para Fase 3) — passa a mostrar apenas **Salvar rascunho**.
 
-1. **RED1 → GREEN1** — Usuário autenticado vê os nomes dos modelos da própria instituição. Registrar rota, page, service fake, primeira renderização.
-2. Busca por nome filtra a lista.
-3. Filtro de status oculta modelos fora do status escolhido.
-4. Modelo aprovado (Meta) mostra ação "Usar modelo".
-5. Modelo Meta não aprovado não expõe ação "Usar modelo" (mostra tooltip/`disabled`).
-6. Admin vê o rodapé com indicação futura de gerenciamento; usuário comum não vê.
-7. Lista vazia mostra mensagem compreensível.
-8. Erro de carregamento mostra "Tentar novamente" e re-chama o serviço.
+## Critérios de aceite
 
-Cada teste renderiza `<MemoryRouter initialEntries={["/app/modelos"]}>` com `QueryClientProvider` real e `InstitutionTemplateServiceContext.Provider` com implementação in-memory. Auth é substituída por wrapper que monkey-patcha `useAuth` via `vi.mock("@/lib/auth", ...)` — permitido porque é fronteira externa (Supabase), não estado interno do componente.
+- Rota nova cria rascunho local com id, `meta_status='not_submitted'`, `institution` derivada do usuário logado.
+- Edição de rascunho funciona; edição de aprovado é impedida (UI + `updateDraft`).
+- RLS bloqueia writes de não-admins (verificação manual via query no banco após migration).
+- Nenhuma requisição para `graph.facebook.com`.
+- `bunx vitest run` e `bunx tsgo --noEmit` verdes.
 
-Assertions apenas por texto visível / `getByRole` / `queryByRole`. Nenhum teste inspeciona hooks, estado, número de chamadas ou estrutura interna.
+## Fora de escopo (Fase 3+)
 
-## Compatibilidade e não-regressão
-
-- Seção "Objetivos de mensagem" de `/app/conteudos` permanece funcional.
-- Rota antiga de templates dentro de `/app/mensagens` permanece.
-- Sem migrations, sem edge functions novas, sem RLS novas.
-
-## Riscos
-
-- `TemplateCard` já é usado em 2 lugares; adicionar prop `variant` opcional com default `"editor"` mantém retrocompatibilidade.
-- Instituição vazia (usuário ainda sem `profiles.institution`) → serviço retorna `[]` e página mostra estado vazio.
-- Realtime não é escopo desta fase (dados institucionais são estáveis e `staleTime` já é 5 min).
-
-## Comandos de verificação
-
-```bash
-npm test -- src/pages/app/MessageTemplates.test.tsx
-npm run lint
-npm run build
-```
-
-Encerrar após esta fatia. Fase 2 (criação de rascunho + editor) fica para o próximo pedido.
+- HEADER `IMAGE/VIDEO/DOCUMENT`, botões `COPY_CODE`, submissão à Meta, sincronização, versionamento.

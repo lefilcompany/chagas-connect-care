@@ -25,6 +25,8 @@ import SegmentEditor from "./pages/app/SegmentEditor";
 import WhatsAppSettings from "./pages/app/WhatsAppSettings";
 import Conversas from "./pages/app/Conversas";
 import MessageTemplates from "./pages/app/MessageTemplates";
+import MessageTemplateNew from "./pages/app/MessageTemplateNew";
+import MessageTemplateEdit from "./pages/app/MessageTemplateEdit";
 import OnboardingForm from "./pages/public/OnboardingForm";
 import { InstitutionIdentityProvider } from "@/services/institutionIdentityProvider";
 
@@ -70,6 +72,22 @@ const App = () => (
                 element={
                   <InstitutionIdentityProvider>
                     <MessageTemplates />
+                  </InstitutionIdentityProvider>
+                }
+              />
+              <Route
+                path="modelos/novo"
+                element={
+                  <InstitutionIdentityProvider>
+                    <MessageTemplateNew />
+                  </InstitutionIdentityProvider>
+                }
+              />
+              <Route
+                path="modelos/:templateId"
+                element={
+                  <InstitutionIdentityProvider>
+                    <MessageTemplateEdit />
                   </InstitutionIdentityProvider>
                 }
               />
