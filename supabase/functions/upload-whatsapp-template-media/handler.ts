@@ -119,8 +119,8 @@ export function createHandler(deps: HandlerDeps, limits: LimitsByFormat = DEFAUL
       return json(400, { ok: false, error_code: "LOCAL_TEMPLATE_ID_REQUIRED" });
     }
 
-    const file = form.get("file");
-    if (!(file instanceof File) && !(file instanceof Blob)) {
+    const file = form.get("file") as (File | Blob | string | null);
+    if (!(file instanceof Blob)) {
       return json(400, { ok: false, error_code: "MISSING_FILE" });
     }
 
