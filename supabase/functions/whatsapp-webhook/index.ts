@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createTemplateStatusHandler, TemplateMatch } from "./templateStatus.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -332,6 +333,23 @@ Deno.serve(async (req) => {
     for (const entry of entries) {
       const changes: any[] = Array.isArray(entry?.changes) ? entry.changes : [];
       for (const change of changes) {
+        // Dispatch by change.field BEFORE touching value.metadata (template
+        // status updates have no phone_number_id).
+        if (change?.field === "message_template_status_update") {
+          try {
+            await runTemplateStatusUpdate(admin, entry, change);
+          } catch (e) {
+            console.error("whatsapp-webhook: template status handler error", e);
+          }
+          continue;
+        }
+        if (change?.field && change.field !== "messages") {
+          await admin.from("whatsapp_unmatched_events").insert({
+            event_type: `template:${change.field}`,
+            payload: change,
+          } as any).then(() => {}, () => {});
+          continue;
+        }
         const value = change?.value ?? {};
         const phoneNumberId: string | null = value?.metadata?.phone_number_id ?? null;
         const resolved = await resolveWhatsAppChannel(admin, phoneNumberId);
