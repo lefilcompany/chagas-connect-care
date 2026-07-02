@@ -33,14 +33,14 @@ describe("templateDraft", () => {
 
   it("rejects empty body", () => {
     const r = validateTemplateDraft({ ...base, body: "" });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.errors.body).toBeTruthy();
+    if (r.ok) throw new Error("expected validation to fail");
+    expect(r.errors.body).toBeTruthy();
   });
 
   it("rejects invalid meta_template_name", () => {
     const r = validateTemplateDraft({ ...base, meta_template_name: "Foo Bar!" });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.errors.meta_template_name).toBeTruthy();
+    if (r.ok) throw new Error("expected validation to fail");
+    expect(r.errors.meta_template_name).toBeTruthy();
   });
 
   it("requires an example for each variable in the body", () => {
@@ -49,8 +49,8 @@ describe("templateDraft", () => {
       body: "Olá {nome_paciente}, dia {data_consulta}",
       variable_examples: { nome_paciente: "Maria" },
     });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.errors["variable_examples.data_consulta"]).toBeTruthy();
+    if (r.ok) throw new Error("expected validation to fail");
+    expect(r.errors["variable_examples.data_consulta"]).toBeTruthy();
   });
 
   it("does not require meta_template_name for internal templates", () => {

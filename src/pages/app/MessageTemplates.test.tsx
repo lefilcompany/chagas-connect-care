@@ -59,6 +59,9 @@ function renderPage(opts: RenderOpts = {}) {
     list: vi.fn(async (institution: string) =>
       templates.filter((t) => t.institution === institution),
     ),
+    getById: vi.fn(async () => null),
+    createDraft: vi.fn(async () => ({} as any)),
+    updateDraft: vi.fn(async () => ({} as any)),
     ...opts.serviceOverride,
   };
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
