@@ -457,7 +457,9 @@ export type Database = {
           meta_footer_source: string | null
           meta_footer_text: string | null
           meta_has_local_differences: boolean
+          meta_header_format: string | null
           meta_header_handle: string | null
+          meta_header_media_id: string | null
           meta_header_parameter_order: Json | null
           meta_header_text: string | null
           meta_header_type: string | null
@@ -516,7 +518,9 @@ export type Database = {
           meta_footer_source?: string | null
           meta_footer_text?: string | null
           meta_has_local_differences?: boolean
+          meta_header_format?: string | null
           meta_header_handle?: string | null
+          meta_header_media_id?: string | null
           meta_header_parameter_order?: Json | null
           meta_header_text?: string | null
           meta_header_type?: string | null
@@ -575,7 +579,9 @@ export type Database = {
           meta_footer_source?: string | null
           meta_footer_text?: string | null
           meta_has_local_differences?: boolean
+          meta_header_format?: string | null
           meta_header_handle?: string | null
+          meta_header_media_id?: string | null
           meta_header_parameter_order?: Json | null
           meta_header_text?: string | null
           meta_header_type?: string | null
@@ -608,6 +614,13 @@ export type Database = {
           variables?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "message_templates_meta_header_media_id_fkey"
+            columns: ["meta_header_media_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_template_header_media"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "message_templates_meta_parent_template_id_fkey"
             columns: ["meta_parent_template_id"]
@@ -1469,6 +1482,53 @@ export type Database = {
           processed_at?: string
         }
         Relationships: []
+      }
+      whatsapp_template_header_media: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          file_size: number
+          format: string
+          header_handle: string
+          id: string
+          institution: string
+          local_template_id: string
+          mime_type: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          file_size: number
+          format: string
+          header_handle: string
+          id?: string
+          institution: string
+          local_template_id: string
+          mime_type: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          file_size?: number
+          format?: string
+          header_handle?: string
+          id?: string
+          institution?: string
+          local_template_id?: string
+          mime_type?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_template_header_media_local_template_id_fkey"
+            columns: ["local_template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_template_submissions: {
         Row: {
