@@ -29,9 +29,7 @@ import {
   emptyFilters, resolveRecipients, resolveContentTargeting, TargetingMode,
   AUDIENCE_LABELS, ALL_AUDIENCES,
 } from "@/lib/segments";
-import { TemplateCard, StartBlankCard } from "@/components/app/messages/TemplateCard";
-import { TemplateEditorDialog } from "@/components/app/messages/TemplateEditorDialog";
-import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
+import { TemplateCard } from "@/components/app/messages/TemplateCard";
 import type { MessageTemplate } from "@/lib/templates";
 import { useAuth } from "@/lib/auth";
 import { useNavigate } from "react-router-dom";
