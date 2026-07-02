@@ -287,6 +287,7 @@ function shouldApplyStatus(current: string | null | undefined, next: string): bo
 }
 
 Deno.serve(async (req) => {
+  // ... handler defined below the file ...
   const url = new URL(req.url);
 
   // Meta handshake
