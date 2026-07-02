@@ -31,17 +31,29 @@ export function TemplateCard({
   onEdit,
   onDuplicate,
   onNewVersion,
+  variant = "editor",
+  useDisabledReason,
 }: {
   template: MessageTemplate;
   onUse: () => void;
-  onEdit: () => void;
-  onDuplicate: () => void;
+  onEdit?: () => void;
+  onDuplicate?: () => void;
   onNewVersion?: () => void;
+  variant?: "editor" | "catalog";
+  useDisabledReason?: string;
 }) {
   const isDefault = !!template.is_default;
   const isMeta = template.template_kind === "meta";
   const status = template.meta_status;
   const footerDiverges = !!template.meta_has_local_differences;
+  const isCatalog = variant === "catalog";
+  const useDisabled = !!useDisabledReason;
+  const lastSyncLabel = template.last_synced_at
+    ? new Date(template.last_synced_at).toLocaleString("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })
+    : null;
 
   return (
     <article className="grid h-full grid-rows-[auto_auto_1fr_auto] rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
@@ -100,28 +112,49 @@ export function TemplateCard({
         />
       </div>
 
-      <div className="flex items-center gap-1.5 pt-4">
-        <Button variant="hero" size="sm" className="flex-1" onClick={onUse}>
-          <Send className="h-3.5 w-3.5" /> Usar objetivo
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onEdit}
-          disabled={isDefault}
-          title={isDefault ? "Objetivo padrão. Duplique para editar." : "Editar"}
-          aria-label="Editar"
-        >
-          <Edit3 className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={onDuplicate} aria-label="Duplicar" title="Duplicar">
-          <Copy className="h-4 w-4" />
-        </Button>
-        {onNewVersion && (
-          <Button variant="ghost" size="icon" onClick={onNewVersion} aria-label="Nova versão" title="Criar nova versão para a Meta">
-            <GitBranch className="h-4 w-4" />
-          </Button>
+      <div className="flex flex-col gap-2 pt-4">
+        {isCatalog && (
+          <div className="text-[11px] text-muted-foreground">
+            {lastSyncLabel
+              ? <>Última sincronização: <time dateTime={template.last_synced_at ?? undefined}>{lastSyncLabel}</time></>
+              : "Ainda não sincronizado"}
+          </div>
         )}
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="hero"
+            size="sm"
+            className="flex-1"
+            onClick={onUse}
+            disabled={useDisabled}
+            title={useDisabledReason}
+            aria-label={`Usar modelo ${template.name}`}
+          >
+            <Send className="h-3.5 w-3.5" /> Usar modelo
+          </Button>
+          {!isCatalog && onEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onEdit}
+              disabled={isDefault}
+              title={isDefault ? "Objetivo padrão. Duplique para editar." : "Editar"}
+              aria-label="Editar"
+            >
+              <Edit3 className="h-4 w-4" />
+            </Button>
+          )}
+          {!isCatalog && onDuplicate && (
+            <Button variant="ghost" size="icon" onClick={onDuplicate} aria-label="Duplicar" title="Duplicar">
+              <Copy className="h-4 w-4" />
+            </Button>
+          )}
+          {!isCatalog && onNewVersion && (
+            <Button variant="ghost" size="icon" onClick={onNewVersion} aria-label="Nova versão" title="Criar nova versão para a Meta">
+              <GitBranch className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
     </article>
   );

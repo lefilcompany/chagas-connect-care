@@ -17,6 +17,8 @@ export const qk = {
   profile: (id: string) => ["profile", id] as const,
   segments: ["segments"] as const,
   templates: ["message-templates"] as const,
+  institutionTemplates: (institution: string) =>
+    ["institution-templates", institution] as const,
   batches: ["message-batches"] as const,
   institutionWhatsAppSettings: (institution: string) =>
     ["institutionWhatsAppSettings", institution] as const,
