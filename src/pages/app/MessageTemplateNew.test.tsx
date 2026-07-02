@@ -84,6 +84,7 @@ function makeService(
       updated_at: new Date().toISOString(),
     }) as any),
     updateDraft: vi.fn(async () => ({} as any)),
+    submitToMeta: vi.fn(async () => ({ meta_template_id: "m", meta_status: "submitted", submitted_at: "2026-07-02T00:00:00.000Z" })),
     ...overrides,
   };
 }

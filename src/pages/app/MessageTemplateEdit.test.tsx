@@ -81,6 +81,7 @@ describe("MessageTemplateEdit", () => {
       getById: vi.fn(async () => draft),
       createDraft: vi.fn(),
       updateDraft: vi.fn(async (id, input) => ({ ...draft, id, ...input } as any)),
+      submitToMeta: vi.fn(async () => ({ meta_template_id: "m", meta_status: "submitted", submitted_at: "2026-07-02T00:00:00.000Z" })),
     };
     renderAt("/app/modelos/t-1", service);
 
@@ -108,6 +109,7 @@ describe("MessageTemplateEdit", () => {
       getById: vi.fn(async () => approved),
       createDraft: vi.fn(),
       updateDraft: vi.fn(),
+      submitToMeta: vi.fn(async () => ({ meta_template_id: "m", meta_status: "submitted", submitted_at: "2026-07-02T00:00:00.000Z" })),
     };
     renderAt("/app/modelos/t-2", service);
 
@@ -124,6 +126,7 @@ describe("MessageTemplateEdit", () => {
       getById: vi.fn(async () => makeTemplate()),
       createDraft: vi.fn(),
       updateDraft: vi.fn(),
+      submitToMeta: vi.fn(async () => ({ meta_template_id: "m", meta_status: "submitted", submitted_at: "2026-07-02T00:00:00.000Z" })),
     };
     renderAt("/app/modelos/t-1", service, {
       ...adminIdentity,
