@@ -334,14 +334,14 @@ export function TemplateEditorForm({
                 />
                 {b.type === "url" && (
                   <Input
-                    value={(b as Extract<TemplateDraftButton, { type: "url" }>).url}
+                    value={(b as any).url}
                     onChange={(e) => updateButton(i, { url: e.target.value } as Partial<TemplateDraftButton>)}
                     placeholder="https://..."
                   />
                 )}
                 {b.type === "phone_number" && (
                   <Input
-                    value={(b as Extract<TemplateDraftButton, { type: "phone_number" }>).phone_number}
+                    value={(b as any).phone_number}
                     onChange={(e) =>
                       updateButton(i, { phone_number: e.target.value } as Partial<TemplateDraftButton>)
                     }
