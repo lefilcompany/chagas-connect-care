@@ -106,29 +106,29 @@ describe("MessageTemplates page", () => {
   it("filters the list by status", async () => {
     renderPage({
       templates: [
-        makeTemplate({ id: "1", name: "Aprovado", meta_status: "approved" }),
-        makeTemplate({ id: "2", name: "Em análise", meta_status: "submitted" }),
+        makeTemplate({ id: "1", name: "Modelo Alfa", meta_status: "approved" }),
+        makeTemplate({ id: "2", name: "Modelo Bravo", meta_status: "submitted" }),
       ],
     });
-    await screen.findByText("Aprovado");
+    await screen.findByText("Modelo Alfa");
     fireEvent.change(screen.getByLabelText("Status"), { target: { value: "submitted" } });
-    expect(screen.getByText("Em análise")).toBeInTheDocument();
-    expect(screen.queryByText("Aprovado")).not.toBeInTheDocument();
+    expect(screen.getByText("Modelo Bravo")).toBeInTheDocument();
+    expect(screen.queryByText("Modelo Alfa")).not.toBeInTheDocument();
   });
 
   it("enables 'Usar modelo' for approved Meta templates", async () => {
     renderPage({
-      templates: [makeTemplate({ name: "Aprovado", meta_status: "approved" })],
+      templates: [makeTemplate({ name: "Modelo Alfa", meta_status: "approved" })],
     });
-    const button = await screen.findByRole("button", { name: /Usar modelo Aprovado/ });
+    const button = await screen.findByRole("button", { name: /Usar modelo Modelo Alfa/ });
     expect(button).toBeEnabled();
   });
 
   it("does not allow sending non-approved Meta templates", async () => {
     renderPage({
-      templates: [makeTemplate({ name: "Em análise", meta_status: "submitted" })],
+      templates: [makeTemplate({ name: "Modelo Bravo", meta_status: "submitted" })],
     });
-    const button = await screen.findByRole("button", { name: /Usar modelo Em análise/ });
+    const button = await screen.findByRole("button", { name: /Usar modelo Modelo Bravo/ });
     expect(button).toBeDisabled();
   });
 
