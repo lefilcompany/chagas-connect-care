@@ -72,6 +72,11 @@ export interface InstitutionTemplateService {
     submitted_at: string | null;
     deduplicated?: boolean;
   }>;
+  syncFromMeta(id: string): Promise<{
+    meta_status: string;
+    updated: number;
+    matched: number;
+  }>;
 }
 
 /** Real implementation: reads from the message_templates table scoped by RLS. */
@@ -155,6 +160,28 @@ export const supabaseInstitutionTemplates: InstitutionTemplateService = {
       meta_status: resp.meta_status ?? "submitted",
       submitted_at: resp.submitted_at ?? null,
       deduplicated: resp.deduplicated,
+    };
+  },
+  async syncFromMeta(id) {
+    if (!id) throw new Error("Modelo inválido.");
+    const { data, error } = await supabase.functions.invoke(
+      "sync-whatsapp-templates",
+      { body: { local_template_id: id } },
+    );
+    if (error) throw new Error(error.message ?? "Falha ao sincronizar com a Meta.");
+    const resp = (data ?? {}) as {
+      ok?: boolean;
+      error?: string;
+      matched?: number;
+      updated?: number;
+    };
+    if (!resp.ok) throw new Error(resp.error ?? "Falha ao sincronizar.");
+    // Refetch the row to return the fresh meta_status.
+    const fresh = await this.getById(id);
+    return {
+      meta_status: fresh?.meta_status ?? "submitted",
+      updated: resp.updated ?? 0,
+      matched: resp.matched ?? 0,
     };
   },
 };
