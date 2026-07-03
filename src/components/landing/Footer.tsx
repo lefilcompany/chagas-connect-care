@@ -1,6 +1,7 @@
-import { Heart, Instagram, Linkedin, Twitter } from "lucide-react";
+import { Instagram, Linkedin, Twitter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import elo2Logo from "@/assets/elo2-logo.png.asset.json";
 
 const handleLegalClick = () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -11,12 +12,7 @@ export const Footer = () => (
     <div className="container py-14">
       <div className="grid gap-10 md:grid-cols-3">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-brand-foreground">
-              <Heart className="h-5 w-5" fill="currentColor" />
-            </span>
-            <span className="font-display text-lg font-bold text-brand">Chagas Cuidado Digital</span>
-          </div>
+          <img src={elo2Logo.url} alt="ELO2" className="h-10 w-auto" />
           <p className="mt-4 max-w-xs text-sm text-muted-foreground">
             Plataforma digital dedicada ao cuidado contínuo da Doença de Chagas.
           </p>
