@@ -76,15 +76,15 @@ export function WhatsAppPreview({
       <div className="rounded-lg bg-[#e6dfd4] dark:bg-zinc-800 p-2">
         <div className="relative ml-auto max-w-[90%] rounded-lg rounded-tr-sm bg-[#dcf8c6] dark:bg-emerald-900/60 px-2.5 py-1.5 shadow-sm">
           {header && (
-            <p className="mb-1 text-[11px] font-semibold text-zinc-900 dark:text-zinc-50 line-clamp-1">
+            <p className="mb-1 text-[11px] font-semibold text-zinc-900 dark:text-zinc-50">
               {header}
             </p>
           )}
-          <p className="text-[11px] leading-snug text-zinc-800 dark:text-zinc-100 whitespace-pre-wrap line-clamp-4">
+          <p className="text-[11px] leading-snug text-zinc-800 dark:text-zinc-100 whitespace-pre-wrap break-words">
             {renderText(body || "Sua mensagem aparece aqui…")}
           </p>
           {footer && (
-            <p className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400 italic line-clamp-1">
+            <p className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400 italic">
               {footer}
             </p>
           )}
