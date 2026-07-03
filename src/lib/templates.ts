@@ -30,6 +30,9 @@ export type MessageTemplate = {
   meta_language: string;
   meta_category: string | null;
   meta_status: MetaStatus;
+  meta_header_type?: string | null;
+  meta_header_text?: string | null;
+  meta_buttons?: unknown;
   meta_footer_text?: string | null;
   meta_footer_source?: "none" | "institution_default" | "custom" | "meta_synced" | null;
   meta_has_local_differences?: boolean | null;
