@@ -17,6 +17,7 @@ import {
   type TemplateDraftInput,
 } from "@/lib/templateDraft";
 import { TemplateEditorForm } from "@/components/app/messages/TemplateEditorForm";
+import { useInstitutionDefaultFooter } from "@/hooks/useInstitutionDefaultFooter";
 import type { MessageTemplate } from "@/lib/templates";
 
 function templateToDraft(t: MessageTemplate): TemplateDraftInput {
@@ -85,6 +86,7 @@ export default function MessageTemplateEdit() {
   const [form, setForm] = useState<TemplateDraftInput | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [statusOpen, setStatusOpen] = useState(false);
+  const { defaultFooter } = useInstitutionDefaultFooter(identity.institution);
 
   useEffect(() => {
     if (query.data && !form) setForm(templateToDraft(query.data));
@@ -271,6 +273,7 @@ export default function MessageTemplateEdit() {
           await uploadMediaMutation.mutateAsync(file);
         }}
         uploadingHeaderMedia={uploadMediaMutation.isPending}
+        institutionDefaultFooter={defaultFooter}
         statusBadge={
           <Badge variant="outline">
             {query.data.meta_status === "not_submitted" ? "Rascunho" : query.data.meta_status}
