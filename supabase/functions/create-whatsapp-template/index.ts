@@ -41,13 +41,11 @@ async function loadTemplate(id: string): Promise<TemplateRow | null> {
   return (data as TemplateRow | null) ?? null;
 }
 
-async function loadWabaFor(institution: string) {
-  const { data } = await admin
-    .from("institution_whatsapp_settings")
-    .select("waba_id")
-    .eq("institution", institution)
-    .maybeSingle();
-  const wabaId = (data as { waba_id?: string } | null)?.waba_id ?? ENV_WABA_FALLBACK;
+async function loadWabaFor(_institution: string) {
+  // institution_whatsapp_settings does not (yet) hold a per-institution WABA
+  // id — fall back to the platform-wide WHATSAPP_WABA_ID env until that column
+  // is introduced. Keeping the signature stable so the handler is unchanged.
+  const wabaId = ENV_WABA_FALLBACK;
   return wabaId ? { wabaId } : null;
 }
 
