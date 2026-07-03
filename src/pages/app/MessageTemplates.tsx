@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Plus } from "lucide-react";
 import { TemplateCard } from "@/components/app/messages/TemplateCard";
 import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
+import { MetaStatusDialog } from "@/components/app/messages/MetaStatusDialog";
 import {
   META_STATUS_LABEL,
   TEMPLATE_CATEGORIES,
@@ -71,6 +72,8 @@ export default function MessageTemplates() {
   const [catFilter, setCatFilter] = useState<string>(initialCatFilter);
   const [usingTpl, setUsingTpl] = useState<MessageTemplate | null>(null);
   const [useOpen, setUseOpen] = useState(false);
+  const [statusTpl, setStatusTpl] = useState<MessageTemplate | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   const updateCatFilter = (value: string) => {
     setCatFilter(value);
@@ -245,7 +248,10 @@ export default function MessageTemplates() {
                   setUseOpen(true);
                 }}
                 onEdit={identity.isAdmin ? () => navigate(`/app/modelos/${t.id}`) : undefined}
-                onOpenDetails={() => navigate(`/app/modelos/${t.id}`)}
+                onOpenDetails={() => {
+                  setStatusTpl(t);
+                  setStatusOpen(true);
+                }}
                 onSubmitToMeta={
                   identity.isAdmin && isMeta &&
                   (t.meta_status === "not_submitted" ||
