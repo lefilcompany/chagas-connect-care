@@ -1,35 +1,55 @@
-## Problema
+## Objetivo
 
-Na tela `/app/modelos` (catálogo), os cards de rascunho mostram apenas "Usar modelo" (desabilitado) e "Ainda não sincronizado". Não há botão para editar nem para enviar à Meta — o botão "Enviar para aprovação" só existe no editor `/app/modelos/:id`, mas o card do catálogo não expõe atalho para chegar lá. Além disso, drafts antigos (criados antes do auto-preenchimento de variáveis) foram salvos com `meta_variable_examples` vazio e o edge function `create-whatsapp-template` retorna `TEMPLATE_INVALID` exigindo um exemplo por variável.
+Deixar todas as prévias de modelos de mensagem com o visual da referência enviada (bolha branca com título em negrito, corpo, rodapé itálico em cinza, horário à direita e cada botão como um "card" branco separado abaixo da bolha, com ícone de seta para respostas rápidas e ícone de link externo para URLs). Aplicar em todos os locais onde a prévia aparece.
 
-## O que vou entregar
+## Onde a prévia é usada
 
-### 1. Ações no card do catálogo (admins)
-Em `src/components/app/messages/TemplateCard.tsx` + `src/pages/app/MessageTemplates.tsx`, para templates Meta em rascunho (`meta_status = 'not_submitted'`) e usuário admin:
-- Botão **"Editar"** (abre `/app/modelos/:id`).
-- Botão **"Enviar para Meta"** que dispara `service.submitToMeta(id)` direto, com toast de sucesso/erro (reaproveita as mensagens de erro já melhoradas).
-- Para status `error`, botão vira **"Reenviar"**.
-- Continua escondendo essas ações para não-admins.
+1. `src/components/app/messages/TemplateCard.tsx` — card do catálogo/editor (variant `compact`)
+2. `src/components/app/messages/TemplateEditorForm.tsx` — editor (variant `full`)
+3. `src/components/app/messages/UseTemplateDialog.tsx` — modal ao usar modelo
+4. `src/components/app/messages/CampaignTab.tsx` — aba de campanha
+5. `src/pages/app/WhatsAppSettings.tsx` — configurações WhatsApp
 
-### 2. Backfill automático de exemplos ao submeter
-Em `src/services/institutionTemplates.ts`, antes de chamar `create-whatsapp-template`:
-- Extrair variáveis do `body` (`extractSemanticKeys`).
-- Se `meta_variable_examples[k]` estiver vazio, preencher com o `example` semântico (`getSemanticVariable(k).example`) e persistir via `updateDraft`.
-- Assim tanto envio pelo catálogo quanto reenvio de drafts antigos funcionam sem exigir reabrir o editor.
+## Mudanças
 
-### 3. Limpeza do lookup de WABA
-Em `supabase/functions/create-whatsapp-template/index.ts`, remover o `select("waba_id")` de `institution_whatsapp_settings` (coluna não existe — sempre erra silenciosamente) e usar diretamente `WHATSAPP_WABA_ID` do ambiente. Mantém compatibilidade com o secret já configurado.
+### 1. `src/components/app/messages/WhatsAppPreview.tsx`
+Reformular a bolha para bater com a referência, em ambas as variantes (`compact` e `full`):
+- Fundo da bolha em branco (`bg-white dark:bg-zinc-900`) em vez de verde, com sombra sutil e cantos arredondados.
+- Fundo do container mantendo o bege com padrão discreto do WhatsApp.
+- Título (header) em negrito, cor forte, acima do corpo — usar `meta_header_text` do template quando existir; se não houver, cair para o `template.name` (ou nada na variante `full` quando não informado).
+- Corpo em cinza escuro, `whitespace-pre-wrap`, com destaque de variáveis mantido.
+- Rodapé em cinza claro, itálico, tamanho menor.
+- Horário alinhado à direita, sem o "check" azul (ficar só o horário para casar com a referência).
+- Botões renderizados como blocos brancos separados abaixo da bolha, cada um em sua própria linha, largura total da bolha, com divisórias sutis:
+  - `quick_reply` → ícone `CornerUpLeft` (seta de resposta) + texto centralizado em verde.
+  - `url` → ícone `ExternalLink` + texto verde.
+  - `phone_number` → ícone `Phone` + texto verde.
+  - `copy_code` → ícone `Copy` + texto verde.
+- Buscar visual coeso entre `compact` (menor, dentro do card) e `full` (maior, no editor), mesma linguagem visual.
 
-### 4. Feedback visual
-- Toast já melhorado no turno anterior mostra erros específicos ("Informe um exemplo para {nome_paciente}"), mas com o backfill esses casos deixam de acontecer.
-- Card mostra `meta_status` em tempo real (realtime já assinado no editor; adicionarei `invalidateQueries` no catálogo após submit).
+### 2. `src/lib/templates.ts`
+Expor os campos que faltam no tipo `MessageTemplate` para permitir passar header e botões para a prévia em todos os lugares:
+- `meta_header_text?: string | null`
+- `meta_header_type?: string | null`
+- `meta_buttons?: unknown` (array de botões conforme `TemplateDraftButton`)
 
-## Fora do escopo
-- Configurar novo WABA por instituição (segue usando env fallback).
-- Alterar o wizard de criação de modelos.
-- Mudanças no fluxo de aprovação/rejeição via webhook (já funciona).
+### 3. `src/services/institutionTemplates.ts`
+No mapeamento de linhas do banco para `MessageTemplate`, incluir `meta_header_text`, `meta_header_type` e `meta_buttons` (parse defensivo do JSON) para que a prévia tenha acesso.
 
-## Verificação
-- Clicar "Enviar para Meta" no card do "Teste de Mensagem" → toast de sucesso, badge muda para "Em análise".
-- Testar reenvio de draft com `meta_status = 'error'`.
-- Confirmar via `curl` no edge function que retorna 200 com `meta_template_id`.
+### 4. `TemplateCard.tsx`
+Passar `header={template.meta_header_text ?? template.name}` e `buttons={template.meta_buttons}` para `WhatsAppPreview`, além do `footer` que já é passado.
+
+### 5. Editor, UseTemplateDialog, CampaignTab, WhatsAppSettings
+Nos locais onde `WhatsAppPreview` é usado com dados do template/rascunho, passar também `header` e `buttons` (quando disponíveis) para que a prévia fique consistente em toda a plataforma.
+
+## Detalhes técnicos
+
+- Manter as props existentes de `WhatsAppPreview` (`header`, `footer`, `buttons`, `messageType`, `templateStatus`) — só ajustar a apresentação visual e adicionar novos ícones (`CornerUpLeft`, `Copy`) via `lucide-react`.
+- Sem mudanças de dados/backend: só apresentação + surface dos campos já persistidos.
+- Sem novas dependências.
+
+## Fora de escopo
+
+- Alterações no fluxo de submissão à Meta.
+- Mudança de estrutura do card (badges, botões de ação continuam iguais).
+- Ajustes no editor de botões.
