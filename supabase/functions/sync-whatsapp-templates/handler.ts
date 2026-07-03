@@ -20,6 +20,7 @@ export interface LocalTemplateRow {
   body_patient: string | null;
   body_contact: string | null;
   body_segment: string | null;
+  meta_body_parameter_order?: unknown;
 }
 
 export interface SyncDeps {
@@ -61,6 +62,33 @@ const STATUS_MAP: Record<string, string> = {
   PENDING_DELETION: "disabled",
   DELETED: "disabled",
 };
+
+const SEMANTIC_RE = /\{([a-zA-Z0-9_]+)\}/g;
+const POSITIONAL_RE = /\{\{\s*(\d+)\s*\}\}/g;
+
+/** Ordered, unique semantic keys as they first appear in `text`. */
+function extractSemanticKeys(text: string | null | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const re = new RegExp(SEMANTIC_RE);
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text ?? "")) !== null) {
+    if (!seen.has(m[1])) { seen.add(m[1]); out.push(m[1]); }
+  }
+  return out;
+}
+
+/** Highest positional index used in `text` (0 if none). */
+function countPositional(text: string | null | undefined): number {
+  let max = 0;
+  const re = new RegExp(POSITIONAL_RE);
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text ?? "")) !== null) {
+    const n = Number(m[1]);
+    if (n > max) max = n;
+  }
+  return max;
+}
 
 function parseComponents(components: unknown) {
   const list = Array.isArray(components) ? (components as any[]) : [];
@@ -190,6 +218,22 @@ export async function runSync(
     const bodyDifferent =
       parsed.bodyText != null && localBody != null && parsed.bodyText !== localBody;
 
+    // Auto-derive the semantic→positional mapping from the local body when
+    // the approved Meta body uses {{1}}, {{2}}, ... and the mapping is not
+    // yet configured. Only apply when the counts match, so we don't silently
+    // produce a wrong ordering.
+    const currentOrder = Array.isArray(existing.meta_body_parameter_order)
+      ? (existing.meta_body_parameter_order as string[])
+      : [];
+    let nextOrder: string[] | undefined;
+    const positionalCount = countPositional(parsed.bodyText);
+    if (positionalCount > 0 && currentOrder.length === 0) {
+      const semanticKeys = extractSemanticKeys(localBody);
+      if (semanticKeys.length === positionalCount) {
+        nextOrder = semanticKeys;
+      }
+    }
+
     const patch: Record<string, unknown> = {
       meta_template_id: t?.id ?? existing.meta_template_id ?? null,
       meta_waba_id: existing.meta_waba_id ?? waba,
@@ -209,6 +253,7 @@ export async function runSync(
       meta_authentication_config: parsed.authConfig,
       meta_has_local_differences: footerDifferent || bodyDifferent,
     };
+    if (nextOrder) patch.meta_body_parameter_order = nextOrder;
     await deps.updateTemplate(existing.id, patch);
     updated++;
   }
