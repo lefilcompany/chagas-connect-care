@@ -45,9 +45,9 @@ export function buildApprovedTemplateMessage(
   if (t.meta_status !== "approved") {
     return { ok: false, errorCode: "TEMPLATE_NOT_APPROVED", error: "Este template não está aprovado pela Meta." };
   }
-  if (t.meta_has_local_differences === true) {
-    return { ok: false, errorCode: "TEMPLATE_LOCAL_DIFFERENCES", error: "Template diverge da versão aprovada pela Meta. Sincronize antes de enviar." };
-  }
+  // Note: `meta_has_local_differences` is informational (local editor body/footer
+  // may differ from the approved Meta version). Sending always uses
+  // `meta_definition` (the approved version), so we don't block on it here.
   if (!t.meta_definition || !Array.isArray((t.meta_definition as any).components)) {
     return { ok: false, errorCode: "TEMPLATE_DEFINITION_MISSING", error: "Definição sincronizada da Meta ausente para este template." };
   }
