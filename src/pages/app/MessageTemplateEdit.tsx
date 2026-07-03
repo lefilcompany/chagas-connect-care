@@ -284,18 +284,20 @@ export default function MessageTemplateEdit() {
         }
       />
 
-      {showMetaPanel && (
-        <MetaStatusPanel
-          template={query.data}
-          onSync={() => syncMutation.mutate()}
-          syncing={syncMutation.isPending}
-        />
-      )}
-
       <div className="flex justify-end gap-2">
         <Button asChild variant="outline">
           <Link to="/app/modelos">{canEdit ? "Cancelar" : "Voltar"}</Link>
         </Button>
+        {showMetaPanel && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setStatusOpen(true)}
+          >
+            <Activity className="h-4 w-4" />
+            Ver status na Meta
+          </Button>
+        )}
         {canEdit && (
           <Button
             onClick={handleSubmit}
@@ -322,6 +324,24 @@ export default function MessageTemplateEdit() {
           </Button>
         )}
       </div>
+
+      {showMetaPanel && (
+        <Dialog open={statusOpen} onOpenChange={setStatusOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Status na Meta</DialogTitle>
+              <DialogDescription>
+                Acompanhe a aprovação deste modelo pela Meta (WhatsApp Business).
+              </DialogDescription>
+            </DialogHeader>
+            <MetaStatusPanel
+              template={query.data}
+              onSync={() => syncMutation.mutate()}
+              syncing={syncMutation.isPending}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
