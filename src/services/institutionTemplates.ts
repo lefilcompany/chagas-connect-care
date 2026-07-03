@@ -42,13 +42,7 @@ export function draftToRow(draft: TemplateDraftInput): Record<string, unknown> {
     row.meta_category = draft.meta_category;
     row.meta_footer_text = draft.meta_footer_text || null;
     row.meta_footer_source = draft.meta_footer_text ? "custom" : "institution_default";
-    // Header/buttons kept as JSON siblings in the row (schema-flexible).
-    (row as Record<string, unknown>).meta_header = {
-      type: draft.meta_header_type,
-      text: draft.meta_header_text,
-      handle: draft.meta_header_handle ?? "",
-      format: draft.meta_header_format ?? null,
-    };
+    // Header stored in individual columns (meta_header composite does not exist).
     (row as Record<string, unknown>).meta_header_type = draft.meta_header_type;
     (row as Record<string, unknown>).meta_header_text = draft.meta_header_text || null;
     (row as Record<string, unknown>).meta_buttons = draft.meta_buttons;
