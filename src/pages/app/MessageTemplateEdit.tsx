@@ -18,6 +18,7 @@ import {
   type TemplateDraftInput,
 } from "@/lib/templateDraft";
 import { TemplateEditorForm } from "@/components/app/messages/TemplateEditorForm";
+import { TemplateParameterOrder } from "@/components/app/messages/TemplateParameterOrder";
 import { useInstitutionDefaultFooter } from "@/hooks/useInstitutionDefaultFooter";
 import type { MessageTemplate } from "@/lib/templates";
 
@@ -296,6 +297,10 @@ export default function MessageTemplateEdit() {
           </Badge>
         }
       />
+
+      {canEdit && query.data.template_kind === "meta" && (
+        <TemplateParameterOrder template={query.data} />
+      )}
 
       <div className="flex justify-end gap-2">
         <Button asChild variant="outline">
