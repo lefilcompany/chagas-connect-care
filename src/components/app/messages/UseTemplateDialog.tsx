@@ -461,6 +461,9 @@ export function UseTemplateDialog({
                 recipientName={recipientName || "Destinatário"}
                 resolveExamples
                 variableValues={vars}
+                header={previewHeader}
+                footer={previewFooter}
+                buttons={previewButtons}
               />
             </div>
           </div>
@@ -495,6 +498,9 @@ export function UseTemplateDialog({
                 highlightVars={false}
                 resolveExamples
                 variableValues={vars}
+                header={previewHeader}
+                footer={previewFooter}
+                buttons={previewButtons}
               />
             </div>
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
