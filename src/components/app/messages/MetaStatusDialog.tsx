@@ -37,6 +37,19 @@ function qualityBadgeClass(score: string | null | undefined): string {
   return "text-muted-foreground";
 }
 
+function qualityLabel(score: string | null | undefined): string {
+  const s = String(score ?? "").toUpperCase();
+  switch (s) {
+    case "GREEN": return "Alta";
+    case "YELLOW": return "Média";
+    case "RED": return "Baixa";
+    case "UNKNOWN":
+    case "":
+      return "Pendente";
+    default: return s;
+  }
+}
+
 export function MetaStatusPanel({
   template,
   onSync,
@@ -91,7 +104,7 @@ export function MetaStatusPanel({
         {quality && (
           <div className="flex items-center gap-2">
             <dt className="text-muted-foreground">Qualidade:</dt>
-            <dd><Badge variant="outline" className={qualityBadgeClass(quality)}>{quality}</Badge></dd>
+            <dd><Badge variant="outline" className={qualityBadgeClass(quality)}>{qualityLabel(quality)}</Badge></dd>
           </div>
         )}
         {rec.meta_template_id && (

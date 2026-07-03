@@ -39,6 +39,7 @@ export type MessageTemplate = {
   meta_version?: number | null;
   meta_parent_template_id?: string | null;
   last_synced_at?: string | null;
+  meta_last_synced_at?: string | null;
   institution?: string | null;
   created_by: string | null;
   is_active: boolean;

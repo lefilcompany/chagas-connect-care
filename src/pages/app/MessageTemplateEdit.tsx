@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Activity, Save, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { META_STATUS_LABEL, type MetaStatus } from "@/lib/templates";
 import { MetaStatusDialog } from "@/components/app/messages/MetaStatusDialog";
 import { qk } from "@/lib/queries";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,19 @@ import {
 import { TemplateEditorForm } from "@/components/app/messages/TemplateEditorForm";
 import { useInstitutionDefaultFooter } from "@/hooks/useInstitutionDefaultFooter";
 import type { MessageTemplate } from "@/lib/templates";
+
+function statusBadgeClass(s: string | null | undefined): string {
+  switch (s) {
+    case "approved":
+      return "border-emerald-500/40 text-emerald-700 dark:text-emerald-300";
+    case "submitted":
+      return "border-amber-500/40 text-amber-700 dark:text-amber-300";
+    case "rejected":
+      return "border-rose-500/40 text-rose-700 dark:text-rose-300";
+    default:
+      return "";
+  }
+}
 
 function templateToDraft(t: MessageTemplate): TemplateDraftInput {
   const header = (t as unknown as { meta_header?: { type?: string; text?: string } })
@@ -275,8 +289,10 @@ export default function MessageTemplateEdit() {
         uploadingHeaderMedia={uploadMediaMutation.isPending}
         institutionDefaultFooter={defaultFooter}
         statusBadge={
-          <Badge variant="outline">
-            {query.data.meta_status === "not_submitted" ? "Rascunho" : query.data.meta_status}
+          <Badge variant="outline" className={statusBadgeClass(query.data.meta_status)}>
+            {query.data.meta_status === "not_submitted"
+              ? "Rascunho"
+              : (META_STATUS_LABEL[query.data.meta_status as MetaStatus] ?? query.data.meta_status)}
           </Badge>
         }
       />

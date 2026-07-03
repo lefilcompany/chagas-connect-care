@@ -73,8 +73,9 @@ export function TemplateCard({
   const showDetailsButton =
     isCatalog && isMeta && !!onOpenDetails &&
     (status === "submitted" || status === "rejected" || status === "paused" || (status as string) === "disabled");
-  const lastSyncLabel = template.last_synced_at
-    ? new Date(template.last_synced_at).toLocaleString("pt-BR", {
+  const lastSyncedAt = template.meta_last_synced_at ?? template.last_synced_at ?? null;
+  const lastSyncLabel = lastSyncedAt
+    ? new Date(lastSyncedAt).toLocaleString("pt-BR", {
         dateStyle: "short",
         timeStyle: "short",
       })
@@ -143,7 +144,7 @@ export function TemplateCard({
         {isCatalog && (
           <div className="text-[11px] text-muted-foreground">
             {lastSyncLabel
-              ? <>Última sincronização: <time dateTime={template.last_synced_at ?? undefined}>{lastSyncLabel}</time></>
+              ? <>Última sincronização: <time dateTime={lastSyncedAt ?? undefined}>{lastSyncLabel}</time></>
               : "Ainda não sincronizado"}
           </div>
         )}
