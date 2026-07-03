@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +46,25 @@ export function TemplateEditorForm({
 }: EditorFormProps) {
   const isMeta = value.template_kind === "meta";
   const vars = useMemo(() => extractSemanticKeys(value.body), [value.body]);
+
+  // Auto-fill missing variable examples with the semantic default so the user
+  // does not need to type each one before submitting to Meta. Only fills empty
+  // slots — never overwrites what the user typed.
+  const autofillSig = useRef<string>("");
+  useEffect(() => {
+    if (!isMeta || vars.length === 0) return;
+    const missing = vars.filter((k) => !(value.variable_examples[k] ?? "").trim());
+    if (missing.length === 0) return;
+    const sig = missing.join("|");
+    if (autofillSig.current === sig) return;
+    autofillSig.current = sig;
+    const patch: Record<string, string> = { ...value.variable_examples };
+    for (const k of missing) {
+      const cat = getSemanticVariable(k);
+      if (cat.example) patch[k] = cat.example;
+    }
+    onChange({ variable_examples: patch });
+  }, [isMeta, vars, value.variable_examples, onChange]);
 
   const set = <K extends keyof EditorFormState>(key: K, v: EditorFormState[K]) =>
     onChange({ [key]: v } as Partial<EditorFormState>);
