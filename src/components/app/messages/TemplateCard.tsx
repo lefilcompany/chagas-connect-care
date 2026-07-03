@@ -144,7 +144,7 @@ export function TemplateCard({
         {isCatalog && (
           <div className="text-[11px] text-muted-foreground">
             {lastSyncLabel
-              ? <>Última sincronização: <time dateTime={template.last_synced_at ?? undefined}>{lastSyncLabel}</time></>
+              ? <>Última sincronização: <time dateTime={lastSyncedAt ?? undefined}>{lastSyncLabel}</time></>
               : "Ainda não sincronizado"}
           </div>
         )}
