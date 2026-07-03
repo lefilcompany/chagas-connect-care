@@ -90,6 +90,7 @@ export default function MessageTemplateEdit() {
 
   const [form, setForm] = useState<TemplateDraftInput | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [statusOpen, setStatusOpen] = useState(false);
 
   useEffect(() => {
     if (query.data && !form) setForm(templateToDraft(query.data));
