@@ -345,11 +345,47 @@ export function TemplateEditorForm({
               {value.meta_footer_text.length}/60
             </span>
           </div>
+          {institutionDefaultFooter && (() => {
+            const usingDefault =
+              value.meta_footer_text.trim() === institutionDefaultFooter.trim();
+            return (
+              <div className="flex items-start justify-between gap-3 rounded-md bg-muted/40 p-2">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">
+                    Usar rodapé padrão da instituição
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    “{institutionDefaultFooter}”
+                  </p>
+                </div>
+                <Switch
+                  checked={usingDefault}
+                  disabled={disabled}
+                  onCheckedChange={(on) =>
+                    set("meta_footer_text", on ? institutionDefaultFooter.slice(0, 60) : "")
+                  }
+                  aria-label="Usar rodapé padrão da instituição"
+                />
+              </div>
+            );
+          })()}
           <Input
             value={value.meta_footer_text}
             onChange={(e) => set("meta_footer_text", e.target.value.slice(0, 60))}
-            placeholder="Ex.: Hospital das Clínicas — não responda a esta mensagem."
+            placeholder={
+              institutionDefaultFooter
+                ? "Defina um rodapé customizado ou ative o padrão acima."
+                : "Ex.: Hospital das Clínicas — não responda a esta mensagem."
+            }
+            disabled={
+              disabled ||
+              (!!institutionDefaultFooter &&
+                value.meta_footer_text.trim() === institutionDefaultFooter.trim())
+            }
           />
+          <p className="text-[11px] text-muted-foreground">
+            Deixe em branco para não enviar rodapé à Meta neste modelo.
+          </p>
         </div>
       )}
 
