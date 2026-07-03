@@ -1,55 +1,62 @@
-## Objetivo
+# Acompanhar status de aprovação de modelos na Meta
 
-Deixar todas as prévias de modelos de mensagem com o visual da referência enviada (bolha branca com título em negrito, corpo, rodapé itálico em cinza, horário à direita e cada botão como um "card" branco separado abaixo da bolha, com ícone de seta para respostas rápidas e ícone de link externo para URLs). Aplicar em todos os locais onde a prévia aparece.
+Hoje um modelo em análise mostra apenas o badge "Em análise" no card e o botão "Usar modelo" fica desabilitado. Não há forma óbvia de abrir o modelo para ver detalhes de aprovação. Vamos habilitar isso e enriquecer o painel de status com os campos que a Graph API do WhatsApp Business já retorna (a função `sync-whatsapp-templates` já busca `status`, `category`, `quality_score`, `rejected_reason`, `components`, etc. — só falta expor).
 
-## Onde a prévia é usada
+## O que muda para o usuário
 
-1. `src/components/app/messages/TemplateCard.tsx` — card do catálogo/editor (variant `compact`)
-2. `src/components/app/messages/TemplateEditorForm.tsx` — editor (variant `full`)
-3. `src/components/app/messages/UseTemplateDialog.tsx` — modal ao usar modelo
-4. `src/components/app/messages/CampaignTab.tsx` — aba de campanha
-5. `src/pages/app/WhatsAppSettings.tsx` — configurações WhatsApp
+1. **Card do modelo (`TemplateCard`, aba Catálogo)**
+   - Quando o modelo é Meta e o status é `submitted`, `rejected`, `paused` ou `disabled`, aparece um novo botão **"Acompanhar status"** (ícone `Activity`/`Info`) ao lado de "Usar modelo".
+   - Clicar navega para `/app/modelos/:id` (mesma rota da edição, agora em modo somente leitura para não-admins).
+   - Admins continuam vendo o lápis de edição como hoje.
 
-## Mudanças
+2. **Página de detalhes (`MessageTemplateEdit`)**
+   - Deixa de redirecionar não-admins: passa a renderizar em **modo somente leitura** (`disabled` no formulário, sem botões de salvar/enviar). Admins continuam com edição completa quando o modelo está destravado.
+   - `MetaStatusPanel` é exibido sempre que `template_kind === "meta"` e o status é diferente de `not_submitted` (hoje só aparece quando `isLocked`, o que já cobre `submitted` — mas garantimos a exibição para não-admins também).
 
-### 1. `src/components/app/messages/WhatsAppPreview.tsx`
-Reformular a bolha para bater com a referência, em ambas as variantes (`compact` e `full`):
-- Fundo da bolha em branco (`bg-white dark:bg-zinc-900`) em vez de verde, com sombra sutil e cantos arredondados.
-- Fundo do container mantendo o bege com padrão discreto do WhatsApp.
-- Título (header) em negrito, cor forte, acima do corpo — usar `meta_header_text` do template quando existir; se não houver, cair para o `template.name` (ou nada na variante `full` quando não informado).
-- Corpo em cinza escuro, `whitespace-pre-wrap`, com destaque de variáveis mantido.
-- Rodapé em cinza claro, itálico, tamanho menor.
-- Horário alinhado à direita, sem o "check" azul (ficar só o horário para casar com a referência).
-- Botões renderizados como blocos brancos separados abaixo da bolha, cada um em sua própria linha, largura total da bolha, com divisórias sutis:
-  - `quick_reply` → ícone `CornerUpLeft` (seta de resposta) + texto centralizado em verde.
-  - `url` → ícone `ExternalLink` + texto verde.
-  - `phone_number` → ícone `Phone` + texto verde.
-  - `copy_code` → ícone `Copy` + texto verde.
-- Buscar visual coeso entre `compact` (menor, dentro do card) e `full` (maior, no editor), mesma linguagem visual.
+3. **Painel "Status na Meta" enriquecido**
+   Novos campos, extraídos de colunas já existentes em `message_templates` e de `meta_definition` (JSON bruto retornado pela Graph API):
+   - Status interno + status bruto da Meta (`meta_status_raw`, ex. `PENDING`, `IN_APPEAL`).
+   - Categoria (`meta_category`) e idioma (`meta_language`).
+   - Quality score (`meta_definition.quality_score.score` — `GREEN` / `YELLOW` / `RED` / `UNKNOWN`), com badge colorida.
+   - ID Meta, data de envio, última sincronização, último webhook.
+   - Motivo de rejeição (quando `rejected`).
+   - Botão **"Atualizar status"** (já existe) — chama `sync-whatsapp-templates` que faz `GET /{waba}/message_templates?fields=id,name,language,status,category,components,rejected_reason,quality_score,parameter_format`.
+   - Auto-refetch a cada 20s enquanto `submitted` (já implementado).
 
-### 2. `src/lib/templates.ts`
-Expor os campos que faltam no tipo `MessageTemplate` para permitir passar header e botões para a prévia em todos os lugares:
-- `meta_header_text?: string | null`
-- `meta_header_type?: string | null`
-- `meta_buttons?: unknown` (array de botões conforme `TemplateDraftButton`)
+## Escopo técnico
 
-### 3. `src/services/institutionTemplates.ts`
-No mapeamento de linhas do banco para `MessageTemplate`, incluir `meta_header_text`, `meta_header_type` e `meta_buttons` (parse defensivo do JSON) para que a prévia tenha acesso.
+Só front-end e um pequeno ajuste de guard — nenhuma mudança de schema, RLS, edge function ou payload de sincronização. A Graph API relevante já é consumida por `supabase/functions/sync-whatsapp-templates/handler.ts` e os campos são persistidos.
 
-### 4. `TemplateCard.tsx`
-Passar `header={template.meta_header_text ?? template.name}` e `buttons={template.meta_buttons}` para `WhatsAppPreview`, além do `footer` que já é passado.
+### Arquivos alterados
 
-### 5. Editor, UseTemplateDialog, CampaignTab, WhatsAppSettings
-Nos locais onde `WhatsAppPreview` é usado com dados do template/rascunho, passar também `header` e `buttons` (quando disponíveis) para que a prévia fique consistente em toda a plataforma.
+- **`src/components/app/messages/TemplateCard.tsx`**
+  - Nova prop `onOpenDetails?: () => void`.
+  - Renderiza botão "Acompanhar status" (variant `outline`, ícone `Activity`) quando `variant === "catalog"`, `template.template_kind === "meta"` e `meta_status` ∈ {`submitted`, `rejected`, `paused`, `disabled`}.
 
-## Detalhes técnicos
+- **`src/pages/app/MessageTemplates.tsx`**
+  - Passa `onOpenDetails={() => navigate(\`/app/modelos/${t.id}\`)}` para o `TemplateCard` (independente de `isAdmin`).
 
-- Manter as props existentes de `WhatsAppPreview` (`header`, `footer`, `buttons`, `messageType`, `templateStatus`) — só ajustar a apresentação visual e adicionar novos ícones (`CornerUpLeft`, `Copy`) via `lucide-react`.
-- Sem mudanças de dados/backend: só apresentação + surface dos campos já persistidos.
-- Sem novas dependências.
+- **`src/pages/app/MessageTemplateEdit.tsx`**
+  - Remover o `Navigate` que expulsa não-admins. Em vez disso, computar `const readOnly = !identity.isAdmin || isLocked;` e:
+    - Passar `disabled={readOnly}` para `TemplateEditorForm`.
+    - Esconder botões "Salvar rascunho" e "Enviar para aprovação" quando `!identity.isAdmin`.
+    - Ajustar o título/subtítulo do header quando não-admin ("Detalhes do modelo" / "Visualização somente leitura").
+  - Renderizar `MetaStatusPanel` quando `template_kind === "meta"` e `meta_status !== "not_submitted"` (não só quando `isLocked`).
+  - Manter `syncMutation` disponível para todos (ele chama a função edge, que já valida permissão por instituição no `handler.ts`).
 
-## Fora de escopo
+- **`MetaStatusPanel` (mesmo arquivo)**
+  - Ler campos adicionais: `meta_status_raw`, `meta_category`, `meta_language`, `meta_definition?.quality_score`.
+  - Renderizar linhas: Status (interno + bruto), Categoria, Idioma, Quality score (badge colorida), ID Meta, Enviado em, Última sincronização, Último webhook, Motivo (se rejeitado).
+  - Manter botão "Atualizar status" e o auto-refetch de 20s.
 
-- Alterações no fluxo de submissão à Meta.
-- Mudança de estrutura do card (badges, botões de ação continuam iguais).
-- Ajustes no editor de botões.
+### Referência Graph API (já usada em `sync-whatsapp-templates/handler.ts`)
+
+`GET https://graph.facebook.com/{version}/{waba_id}/message_templates?fields=id,name,language,status,category,components,rejected_reason,quality_score,parameter_format`
+
+Valores relevantes de `status`: `PENDING`, `IN_APPEAL`, `APPROVED`, `REJECTED`, `PAUSED`, `DISABLED`, `PENDING_DELETION`, `DELETED` — já mapeados em `META_TEMPLATE_STATUS_MAP`.
+
+## Fora do escopo
+
+- Endpoint dedicado por template na Meta (`GET /{template_id}`) — o sync por WABA já traz o item específico via filtro.
+- Histórico de eventos/webhooks em UI — os dados existem em `whatsapp_template_events` mas não serão exibidos agora.
+- Alterar RLS ou permissões da edge function.

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, RefreshCw, Save, Send, ShieldCheck } from "lucide-react";
@@ -175,10 +175,6 @@ export default function MessageTemplateEdit() {
     [query.data],
   );
 
-  if (!identity.loading && !identity.isAdmin) {
-    return <Navigate to="/app/modelos" replace />;
-  }
-
   if (query.isLoading || !form) {
     return <p className="text-sm text-muted-foreground">Carregando modelo…</p>;
   }
@@ -196,6 +192,11 @@ export default function MessageTemplateEdit() {
 
   const handleChange = (patch: Partial<TemplateDraftInput>) =>
     setForm((cur) => (cur ? { ...cur, ...patch } : cur));
+
+  const canEdit = identity.isAdmin;
+  const readOnly = !canEdit || isLocked;
+  const showMetaPanel =
+    query.data.template_kind === "meta" && query.data.meta_status !== "not_submitted";
 
   const handleSubmit = () => {
     if (!form) return;
@@ -220,11 +221,15 @@ export default function MessageTemplateEdit() {
       </div>
 
       <header className="space-y-1">
-        <h1 className="font-display text-2xl font-bold text-brand">Editar modelo</h1>
+        <h1 className="font-display text-2xl font-bold text-brand">
+          {canEdit ? "Editar modelo" : "Detalhes do modelo"}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          {isLocked
-            ? "Este modelo já foi enviado à Meta e não pode ser editado nesta fase."
-            : "Ajuste o rascunho e salve para atualizar."}
+          {!canEdit
+            ? "Visualização somente leitura. Acompanhe o status de aprovação abaixo."
+            : isLocked
+              ? "Este modelo já foi enviado à Meta e não pode ser editado nesta fase."
+              : "Ajuste o rascunho e salve para atualizar."}
         </p>
       </header>
 
@@ -259,7 +264,7 @@ export default function MessageTemplateEdit() {
         value={form}
         onChange={handleChange}
         errors={errors}
-        disabled={isLocked}
+        disabled={readOnly}
         onUploadHeaderMedia={async (file) => {
           await uploadMediaMutation.mutateAsync(file);
         }}
@@ -271,24 +276,28 @@ export default function MessageTemplateEdit() {
         }
       />
 
-      {isLocked && <MetaStatusPanel
-        template={query.data}
-        onSync={() => syncMutation.mutate()}
-        syncing={syncMutation.isPending}
-      />}
+      {showMetaPanel && (
+        <MetaStatusPanel
+          template={query.data}
+          onSync={() => syncMutation.mutate()}
+          syncing={syncMutation.isPending}
+        />
+      )}
 
       <div className="flex justify-end gap-2">
         <Button asChild variant="outline">
-          <Link to="/app/modelos">Cancelar</Link>
+          <Link to="/app/modelos">{canEdit ? "Cancelar" : "Voltar"}</Link>
         </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={isLocked || updateMutation.isPending}
-        >
-          <Save className="h-4 w-4" />
-          {updateMutation.isPending ? "Salvando…" : "Salvar rascunho"}
-        </Button>
-        {query.data.template_kind === "meta" && !isLocked && (
+        {canEdit && (
+          <Button
+            onClick={handleSubmit}
+            disabled={isLocked || updateMutation.isPending}
+          >
+            <Save className="h-4 w-4" />
+            {updateMutation.isPending ? "Salvando…" : "Salvar rascunho"}
+          </Button>
+        )}
+        {canEdit && query.data.template_kind === "meta" && !isLocked && (
           <Button
             variant="default"
             onClick={() => submitMutation.mutate()}
@@ -321,6 +330,14 @@ function statusLabel(s: string | null | undefined): string {
   }
 }
 
+function qualityBadgeClass(score: string | null | undefined): string {
+  const s = String(score ?? "").toUpperCase();
+  if (s === "GREEN") return "border-emerald-500/40 text-emerald-700 dark:text-emerald-300";
+  if (s === "YELLOW") return "border-amber-500/40 text-amber-700 dark:text-amber-300";
+  if (s === "RED") return "border-rose-500/40 text-rose-700 dark:text-rose-300";
+  return "text-muted-foreground";
+}
+
 function MetaStatusPanel({
   template,
   onSync,
@@ -332,16 +349,21 @@ function MetaStatusPanel({
 }) {
   const rec = template as unknown as {
     meta_status?: string | null;
+    meta_status_raw?: string | null;
+    meta_category?: string | null;
+    meta_language?: string | null;
     meta_template_id?: string | null;
     meta_submitted_at?: string | null;
     meta_last_synced_at?: string | null;
     meta_last_webhook_at?: string | null;
     meta_rejection_reason?: string | null;
     meta_rejection_info?: { reason?: string | null } | null;
+    meta_definition?: { quality_score?: { score?: string | null; date?: number | null } | null } | null;
   };
-  const lastUpdate =
-    rec.meta_last_webhook_at ?? rec.meta_last_synced_at ?? rec.meta_submitted_at ?? null;
   const reason = rec.meta_rejection_reason ?? rec.meta_rejection_info?.reason ?? null;
+  const quality = rec.meta_definition?.quality_score?.score ?? null;
+  const fmt = (v: string | null | undefined) =>
+    v ? new Date(v).toLocaleString("pt-BR") : "—";
   return (
     <section
       aria-label="Status na Meta"
@@ -351,24 +373,44 @@ function MetaStatusPanel({
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">Status:</span>
           <Badge variant="outline">{statusLabel(rec.meta_status)}</Badge>
+          {rec.meta_status_raw && (
+            <span className="text-xs text-muted-foreground">({rec.meta_status_raw})</span>
+          )}
         </div>
         <Button size="sm" variant="outline" onClick={onSync} disabled={syncing}>
           <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
           {syncing ? "Sincronizando…" : "Atualizar status"}
         </Button>
       </div>
-      {rec.meta_template_id && (
-        <p className="text-xs text-muted-foreground">
-          ID Meta: <code>{rec.meta_template_id}</code>
-        </p>
-      )}
-      {lastUpdate && (
-        <p className="text-xs text-muted-foreground">
-          Última atualização: {new Date(lastUpdate).toLocaleString("pt-BR")}
-        </p>
-      )}
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+        {rec.meta_category && (
+          <div className="flex gap-2"><dt className="text-muted-foreground">Categoria:</dt><dd>{rec.meta_category}</dd></div>
+        )}
+        {rec.meta_language && (
+          <div className="flex gap-2"><dt className="text-muted-foreground">Idioma:</dt><dd>{rec.meta_language}</dd></div>
+        )}
+        {quality && (
+          <div className="flex items-center gap-2">
+            <dt className="text-muted-foreground">Qualidade:</dt>
+            <dd><Badge variant="outline" className={qualityBadgeClass(quality)}>{quality}</Badge></dd>
+          </div>
+        )}
+        {rec.meta_template_id && (
+          <div className="flex gap-2"><dt className="text-muted-foreground">ID Meta:</dt><dd><code>{rec.meta_template_id}</code></dd></div>
+        )}
+        <div className="flex gap-2"><dt className="text-muted-foreground">Enviado em:</dt><dd>{fmt(rec.meta_submitted_at)}</dd></div>
+        <div className="flex gap-2"><dt className="text-muted-foreground">Última sincronização:</dt><dd>{fmt(rec.meta_last_synced_at)}</dd></div>
+        <div className="flex gap-2"><dt className="text-muted-foreground">Último webhook:</dt><dd>{fmt(rec.meta_last_webhook_at)}</dd></div>
+      </dl>
       {rec.meta_status === "rejected" && reason && (
-        <p className="text-xs text-destructive">Motivo: {reason}</p>
+        <p className="rounded-md bg-destructive/5 p-2 text-xs text-destructive">
+          <strong>Motivo da rejeição:</strong> {reason}
+        </p>
+      )}
+      {rec.meta_status === "submitted" && (
+        <p className="text-xs text-muted-foreground">
+          A Meta costuma responder em minutos, podendo levar até 24h. Esta página atualiza automaticamente.
+        </p>
       )}
     </section>
   );
