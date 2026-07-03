@@ -234,9 +234,10 @@ export default function MessageTemplates() {
                 default:
                   disabledReason = "Ainda não submetido.";
               }
-            } else if (isMeta && t.meta_has_local_differences) {
-              disabledReason = "Template diverge da versão aprovada. Sincronize antes de enviar.";
             }
+            // Nota: divergência local (meta_has_local_differences) NÃO bloqueia o envio,
+            // pois a Meta envia usando a versão aprovada por ela (via meta_template_name).
+            // A divergência é apenas informativa (badge "Rodapé divergente" no card).
             return (
               <TemplateCard
                 key={t.id}
