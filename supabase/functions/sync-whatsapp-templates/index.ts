@@ -13,7 +13,7 @@ const GRAPH_VERSION = /^v\d+\.\d+$/.test(RAW_VER) ? RAW_VER : "v25.0";
 const TEMPLATE_SELECT = [
   "id", "institution", "meta_template_id", "meta_template_name",
   "meta_language", "meta_waba_id", "meta_status", "meta_footer_text",
-  "body_patient", "body_contact", "body_segment",
+  "body_patient", "body_contact", "body_segment", "meta_body_parameter_order",
 ].join(", ");
 
 function json(status: number, body: unknown) {
