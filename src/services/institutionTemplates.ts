@@ -159,6 +159,30 @@ export const supabaseInstitutionTemplates: InstitutionTemplateService = {
   },
   async submitToMeta(id) {
     if (!id) throw new Error("Modelo inválido.");
+    // Backfill missing variable examples with semantic defaults so drafts
+    // created before the auto-fill UX can still be submitted directly from
+    // the catalog without opening the editor.
+    try {
+      const current = await this.getById(id);
+      if (current && current.template_kind === "meta") {
+        const vars = extractSemanticKeys(current.body ?? "");
+        const existing = (current.meta_variable_examples ?? {}) as Record<string, string>;
+        const patch: Record<string, string> = { ...existing };
+        let changed = false;
+        for (const k of vars) {
+          if (!(patch[k] ?? "").trim()) {
+            const ex = getSemanticVariable(k).example;
+            if (ex) { patch[k] = ex; changed = true; }
+          }
+        }
+        if (changed) {
+          await supabase
+            .from("message_templates")
+            .update({ meta_variable_examples: patch } as never)
+            .eq("id", id);
+        }
+      }
+    } catch { /* non-fatal — server will validate again */ }
     const { data, error } = await supabase.functions.invoke(
       "create-whatsapp-template",
       { body: { local_template_id: id } },
