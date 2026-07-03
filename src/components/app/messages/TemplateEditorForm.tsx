@@ -431,7 +431,13 @@ export function TemplateEditorForm({
           body={value.body}
           variant="compact"
           resolveExamples
+          header={value.meta_header_text || value.name || undefined}
           footer={value.meta_footer_text || undefined}
+          buttons={
+            value.meta_buttons && value.meta_buttons.length > 0
+              ? value.meta_buttons.map((b) => ({ type: b.type, text: b.text }))
+              : undefined
+          }
         />
       </div>
     </fieldset>

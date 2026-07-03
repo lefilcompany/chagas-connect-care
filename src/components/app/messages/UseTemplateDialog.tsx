@@ -22,7 +22,7 @@ import {
   VARIANT_LABEL, type MessageTemplate, type TemplateVariant,
 } from "@/lib/templates";
 import { getSemanticVariable } from "@/lib/metaVariables";
-import { WhatsAppPreview } from "./WhatsAppPreview";
+import { WhatsAppPreview, type WhatsAppPreviewButton } from "./WhatsAppPreview";
 import { queueAndSendFromTemplate } from "@/lib/whatsapp";
 import { VariableInput } from "./VariableInput";
 
@@ -54,6 +54,25 @@ export function UseTemplateDialog({
 }) {
   const { user } = useAuth();
   const qc = useQueryClient();
+
+  const previewButtons: WhatsAppPreviewButton[] | undefined = useMemo(() => {
+    const raw = template?.meta_buttons;
+    if (!Array.isArray(raw) || raw.length === 0) return undefined;
+    const out: WhatsAppPreviewButton[] = [];
+    for (const b of raw as unknown[]) {
+      if (!b || typeof b !== "object") continue;
+      const rec = b as Record<string, unknown>;
+      const type = String(rec.type ?? "").toLowerCase();
+      const text = typeof rec.text === "string" ? rec.text : "";
+      if (!text) continue;
+      if (type === "quick_reply" || type === "url" || type === "phone_number" || type === "copy_code") {
+        out.push({ type, text } as WhatsAppPreviewButton);
+      }
+    }
+    return out.length > 0 ? out : undefined;
+  }, [template?.meta_buttons]);
+  const previewHeader = template?.meta_header_text ?? template?.name;
+  const previewFooter = template?.meta_footer_text ?? undefined;
 
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState<Mode>("patient");
@@ -442,6 +461,9 @@ export function UseTemplateDialog({
                 recipientName={recipientName || "Destinatário"}
                 resolveExamples
                 variableValues={vars}
+                header={previewHeader}
+                footer={previewFooter}
+                buttons={previewButtons}
               />
             </div>
           </div>
@@ -476,6 +498,9 @@ export function UseTemplateDialog({
                 highlightVars={false}
                 resolveExamples
                 variableValues={vars}
+                header={previewHeader}
+                footer={previewFooter}
+                buttons={previewButtons}
               />
             </div>
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">

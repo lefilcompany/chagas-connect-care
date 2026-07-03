@@ -1,4 +1,4 @@
-import { Check, ExternalLink, Phone, Reply } from "lucide-react";
+import { CornerUpLeft, Copy, ExternalLink, Phone } from "lucide-react";
 import { renderWithExamples } from "@/lib/metaVariables";
 
 export type WhatsAppPreviewMessageType =
@@ -9,7 +9,7 @@ export type WhatsAppPreviewMessageType =
 
 export type WhatsAppPreviewButton =
   | { type: "quick_reply"; text: string }
-  | { type: "url"; text: string }
+  | { type: "url"; text: string; url?: string }
   | { type: "phone_number"; text: string }
   | { type: "copy_code"; text: string };
 
@@ -71,40 +71,63 @@ export function WhatsAppPreview({
     );
   };
 
+  const buttonIcon = (b: WhatsAppPreviewButton) => {
+    switch (b.type) {
+      case "url":
+        return <ExternalLink className="h-3.5 w-3.5" />;
+      case "phone_number":
+        return <Phone className="h-3.5 w-3.5" />;
+      case "copy_code":
+        return <Copy className="h-3.5 w-3.5" />;
+      case "quick_reply":
+      default:
+        return <CornerUpLeft className="h-3.5 w-3.5" />;
+    }
+  };
+
+  const chatBg: React.CSSProperties = {
+    backgroundColor: "#e6dfd4",
+    backgroundImage:
+      "radial-gradient(circle at 1px 1px, rgba(0,0,0,0.05) 1px, transparent 0)",
+    backgroundSize: "14px 14px",
+  };
+
   if (variant === "compact") {
     return (
-      <div className="rounded-lg bg-[#e6dfd4] dark:bg-zinc-800 p-2">
-        <div className="relative ml-auto max-w-[90%] rounded-lg rounded-tr-sm bg-[#dcf8c6] dark:bg-emerald-900/60 px-2.5 py-1.5 shadow-sm">
-          {header && (
-            <p className="mb-1 text-[11px] font-semibold text-zinc-900 dark:text-zinc-50">
-              {header}
+      <div className="rounded-lg p-2 dark:bg-zinc-800" style={chatBg}>
+        <div className="ml-auto max-w-[92%] space-y-1">
+          <div className="relative rounded-lg rounded-tl-sm bg-white dark:bg-zinc-900 px-2.5 py-2 shadow-sm">
+            {header && (
+              <p className="mb-1 text-[12px] font-bold text-zinc-900 dark:text-zinc-50 break-words">
+                {header}
+              </p>
+            )}
+            <p className="text-[11px] leading-snug text-zinc-800 dark:text-zinc-100 whitespace-pre-wrap break-words">
+              {renderText(body || "Sua mensagem aparece aqui…")}
             </p>
-          )}
-          <p className="text-[11px] leading-snug text-zinc-800 dark:text-zinc-100 whitespace-pre-wrap break-words">
-            {renderText(body || "Sua mensagem aparece aqui…")}
-          </p>
-          {footer && (
-            <p className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400 italic">
-              {footer}
-            </p>
-          )}
-          <div className="mt-0.5 flex items-center justify-end gap-0.5 text-[9px] text-zinc-500 dark:text-zinc-400">
-            <span>{time}</span>
-            <Check className="h-2.5 w-2.5" />
+            {footer && (
+              <p className="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500 italic break-words">
+                {footer}
+              </p>
+            )}
+            <div className="mt-0.5 flex items-center justify-end gap-0.5 text-[9px] text-zinc-400 dark:text-zinc-500">
+              <span>{time}</span>
+            </div>
           </div>
+          {buttons && buttons.length > 0 && (
+            <div className="space-y-1">
+              {buttons.slice(0, 3).map((b, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-white px-2 py-1.5 text-[11px] font-medium text-emerald-600 shadow-sm dark:bg-zinc-900 dark:text-emerald-300"
+                >
+                  {buttonIcon(b)}
+                  <span className="truncate">{b.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        {buttons && buttons.length > 0 && (
-          <div className="mt-1 ml-auto max-w-[90%] space-y-0.5">
-            {buttons.slice(0, 3).map((b, i) => (
-              <div
-                key={i}
-                className="rounded-md bg-white text-[10px] font-medium text-emerald-700 px-2 py-1 text-center shadow-sm dark:bg-zinc-900 dark:text-emerald-300"
-              >
-                {b.text}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     );
   }
@@ -122,55 +145,46 @@ export function WhatsAppPreview({
           <p className="text-[10px] opacity-80">online</p>
         </div>
       </div>
-      <div
-        className="min-h-[180px] p-4"
-        style={{
-          backgroundColor: "#e6dfd4",
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, rgba(0,0,0,0.04) 1px, transparent 0)",
-          backgroundSize: "14px 14px",
-        }}
-      >
-        <div className="relative ml-auto max-w-[85%] rounded-xl rounded-tr-sm bg-[#dcf8c6] dark:bg-emerald-900/70 px-3 py-2 shadow">
-          {header && (
-            <p className="mb-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-              {header}
-            </p>
-          )}
-          <p className="text-sm leading-relaxed text-zinc-800 dark:text-zinc-100 whitespace-pre-wrap">
-            {renderText(body || "Comece a escrever a mensagem…")}
-          </p>
-          {footer && (
-            <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 italic">
-              {footer}
-            </p>
-          )}
-          <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-zinc-500 dark:text-zinc-400">
-            {templateStatus && (
-              <span className="mr-auto rounded bg-white/70 px-1 text-[9px] font-medium uppercase text-emerald-700 dark:bg-zinc-900/70 dark:text-emerald-300">
-                {messageType === "template" ? `Template · ${templateStatus}` : templateStatus}
-              </span>
+      <div className="min-h-[180px] p-4" style={chatBg}>
+        <div className="ml-auto max-w-[85%] space-y-1.5">
+          <div className="relative rounded-xl rounded-tl-sm bg-white dark:bg-zinc-900 px-3 py-2.5 shadow">
+            {header && (
+              <p className="mb-1.5 text-sm font-bold text-zinc-900 dark:text-zinc-50 break-words">
+                {header}
+              </p>
             )}
-            <span>{time}</span>
-            <Check className="h-3 w-3" />
+            <p className="text-sm leading-relaxed text-zinc-800 dark:text-zinc-100 whitespace-pre-wrap break-words">
+              {renderText(body || "Comece a escrever a mensagem…")}
+            </p>
+            {footer && (
+              <p className="mt-1.5 text-[11px] text-zinc-400 dark:text-zinc-500 italic break-words">
+                {footer}
+              </p>
+            )}
+            <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+              {templateStatus && (
+                <span className="mr-auto rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium uppercase text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                  {messageType === "template" ? `Template · ${templateStatus}` : templateStatus}
+                </span>
+              )}
+              <span>{time}</span>
+            </div>
           </div>
+          {buttons && buttons.length > 0 && (
+            <div className="space-y-1">
+              {buttons.slice(0, 3).map((b, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-medium text-emerald-600 shadow-sm dark:bg-zinc-900 dark:text-emerald-300"
+                >
+                  {buttonIcon(b)}
+                  <span className="truncate">{b.text}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        {buttons && buttons.length > 0 && (
-          <div className="mt-1.5 ml-auto max-w-[85%] space-y-1">
-            {buttons.slice(0, 3).map((b, i) => (
-              <button
-                key={i}
-                type="button"
-                className="flex w-full items-center justify-center gap-1.5 rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-700 shadow-sm dark:bg-zinc-900 dark:text-emerald-300"
-              >
-                {b.type === "url" && <ExternalLink className="h-3 w-3" />}
-                {b.type === "phone_number" && <Phone className="h-3 w-3" />}
-                {b.type === "quick_reply" && <Reply className="h-3 w-3" />}
-                <span className="truncate">{b.text}</span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
