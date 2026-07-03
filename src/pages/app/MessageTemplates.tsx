@@ -247,7 +247,8 @@ export default function MessageTemplates() {
                 onEdit={identity.isAdmin ? () => navigate(`/app/modelos/${t.id}`) : undefined}
                 onSubmitToMeta={
                   identity.isAdmin && isMeta &&
-                  (t.meta_status === "not_submitted" || t.meta_status === "error")
+                  (t.meta_status === "not_submitted" ||
+                    (t.meta_status as string) === "error")
                     ? () => submitMutation.mutate(t.id)
                     : undefined
                 }
