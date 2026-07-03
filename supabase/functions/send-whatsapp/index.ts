@@ -268,13 +268,9 @@ Deno.serve(async (req) => {
         }).eq("id", msg.id);
         return json(200, { ok: false, error_code: "TEMPLATE_NAME_MISSING", error: "Template sem nome configurado." });
       }
-      if ((tpl as any).meta_has_local_differences === true) {
-        await admin.from("messages").update({
-          status: "failed", failed_at: new Date().toISOString(),
-          last_error: "Template diverge da versão aprovada pela Meta",
-        }).eq("id", msg.id);
-        return json(200, { ok: false, error_code: "TEMPLATE_LOCAL_DIFFERENCES", error: "Template diverge da versão aprovada. Sincronize antes de enviar." });
-      }
+      // `meta_has_local_differences` reflects local editor/footer drift only.
+      // Outbound payload is built from `meta_definition` (the approved version),
+      // so we don't block sending on this informational flag.
       if (!(tpl as any).meta_definition || !Array.isArray(((tpl as any).meta_definition ?? {}).components)) {
         await admin.from("messages").update({
           status: "failed", failed_at: new Date().toISOString(),
