@@ -1,7 +1,8 @@
-import { Heart, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import elo2Logo from "@/assets/elo2-logo.png.asset.json";
 
 const nav = [
   { label: "Funcionalidades", href: "#funcionalidades" },
@@ -15,13 +16,8 @@ export const Header = () => {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="container flex h-18 items-center justify-between py-4">
-        <a href="#" className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-brand-foreground">
-            <Heart className="h-5 w-5" fill="currentColor" />
-          </span>
-          <span className="font-display text-lg font-bold text-brand">
-            Chagas <span className="font-medium text-foreground">Cuidado Digital</span>
-          </span>
+        <a href="#" className="flex items-center gap-2" aria-label="ELO2">
+          <img src={elo2Logo.url} alt="ELO2" className="h-9 w-auto" />
         </a>
         <nav className="hidden items-center gap-8 md:flex">
           {nav.map((n) => (
