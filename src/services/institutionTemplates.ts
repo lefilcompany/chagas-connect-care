@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { MessageTemplate } from "@/lib/templates";
 import type { TemplateDraftInput } from "@/lib/templateDraft";
-import { semanticToPositional } from "@/lib/metaVariables";
+import { extractSemanticKeys, getSemanticVariable, semanticToPositional } from "@/lib/metaVariables";
 
 /** Fields the server owns — never accepted from the client. */
 const SERVER_OWNED = ["meta_status", "institution", "id", "created_at", "updated_at"] as const;
