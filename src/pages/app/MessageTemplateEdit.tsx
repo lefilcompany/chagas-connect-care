@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Activity, Save, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Activity, RefreshCw, Save, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { META_STATUS_LABEL, type MetaStatus } from "@/lib/templates";
@@ -237,6 +237,22 @@ export default function MessageTemplateEdit() {
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Link>
         </Button>
+        {query.data.template_kind === "meta" &&
+          query.data.meta_status !== "not_submitted" && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ml-auto"
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${syncMutation.isPending ? "animate-spin" : ""}`}
+              />
+              {syncMutation.isPending ? "Sincronizando…" : "Sincronizar com Meta"}
+            </Button>
+          )}
       </div>
 
       <header className="space-y-1">
