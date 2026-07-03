@@ -3,7 +3,23 @@ import { Button } from "@/components/ui/button";
 import { Copy, Edit3, Send, FilePlus2, Lock, ShieldCheck, AlertTriangle, Clock, XCircle, PauseCircle, GitBranch, Upload, RefreshCw } from "lucide-react";
 import { META_STATUS_LABEL, type MessageTemplate } from "@/lib/templates";
 import { getTemplateDescription } from "@/lib/templateDescriptions";
-import { WhatsAppPreview } from "./WhatsAppPreview";
+import { WhatsAppPreview, type WhatsAppPreviewButton } from "./WhatsAppPreview";
+
+function coerceButtons(raw: unknown): WhatsAppPreviewButton[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const out: WhatsAppPreviewButton[] = [];
+  for (const b of raw) {
+    if (!b || typeof b !== "object") continue;
+    const rec = b as Record<string, unknown>;
+    const type = String(rec.type ?? "").toLowerCase();
+    const text = typeof rec.text === "string" ? rec.text : "";
+    if (!text) continue;
+    if (type === "quick_reply" || type === "url" || type === "phone_number" || type === "copy_code") {
+      out.push({ type, text } as WhatsAppPreviewButton);
+    }
+  }
+  return out.length > 0 ? out : undefined;
+}
 
 export function StartBlankCard({ onClick }: { onClick: () => void }) {
   return (
@@ -112,7 +128,9 @@ export function TemplateCard({
           body={template.body}
           variant="compact"
           resolveExamples
+          header={template.meta_header_text ?? template.name}
           footer={template.meta_footer_text ?? undefined}
+          buttons={coerceButtons(template.meta_buttons)}
         />
       </div>
 
