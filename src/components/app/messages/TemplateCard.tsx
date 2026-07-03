@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Edit3, Send, FilePlus2, Lock, ShieldCheck, AlertTriangle, Clock, XCircle, PauseCircle, GitBranch } from "lucide-react";
+import { Copy, Edit3, Send, FilePlus2, Lock, ShieldCheck, AlertTriangle, Clock, XCircle, PauseCircle, GitBranch, Upload, RefreshCw } from "lucide-react";
 import { META_STATUS_LABEL, type MessageTemplate } from "@/lib/templates";
 import { getTemplateDescription } from "@/lib/templateDescriptions";
 import { WhatsAppPreview } from "./WhatsAppPreview";
@@ -33,6 +33,8 @@ export function TemplateCard({
   onNewVersion,
   variant = "editor",
   useDisabledReason,
+  onSubmitToMeta,
+  submitting = false,
 }: {
   template: MessageTemplate;
   onUse: () => void;
@@ -41,6 +43,8 @@ export function TemplateCard({
   onNewVersion?: () => void;
   variant?: "editor" | "catalog";
   useDisabledReason?: string;
+  onSubmitToMeta?: () => void;
+  submitting?: boolean;
 }) {
   const isDefault = !!template.is_default;
   const isMeta = template.template_kind === "meta";
@@ -132,6 +136,38 @@ export function TemplateCard({
           >
             <Send className="h-3.5 w-3.5" /> Usar modelo
           </Button>
+          {isCatalog && onEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onEdit}
+              title="Editar rascunho"
+              aria-label="Editar rascunho"
+            >
+              <Edit3 className="h-4 w-4" />
+            </Button>
+          )}
+          {isCatalog && onSubmitToMeta && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSubmitToMeta}
+              disabled={submitting}
+              title={(template.meta_status as string) === "error" ? "Reenviar para Meta" : "Enviar para Meta"}
+              aria-label={(template.meta_status as string) === "error" ? "Reenviar para Meta" : "Enviar para Meta"}
+            >
+              {(template.meta_status as string) === "error" ? (
+                <RefreshCw className="h-3.5 w-3.5" />
+              ) : (
+                <Upload className="h-3.5 w-3.5" />
+              )}
+              {submitting
+                ? "Enviando…"
+                : (template.meta_status as string) === "error"
+                  ? "Reenviar"
+                  : "Enviar"}
+            </Button>
+          )}
           {!isCatalog && onEdit && (
             <Button
               variant="ghost"
