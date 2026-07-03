@@ -395,7 +395,7 @@ function MetaStatusPanel({
   return (
     <section
       aria-label="Status na Meta"
-      className="rounded-lg border bg-card p-4 text-sm space-y-2"
+      className="rounded-lg border bg-card/50 p-4 text-sm space-y-3"
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
