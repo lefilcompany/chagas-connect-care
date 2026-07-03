@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,23 @@ export default function MessageTemplates() {
   const service = useInstitutionTemplateService();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const qc = useQueryClient();
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+
+  const submitMutation = useMutation({
+    mutationFn: (id: string) => service.submitToMeta(id),
+    onMutate: (id) => setSubmittingId(id),
+    onSettled: () => setSubmittingId(null),
+    onSuccess: (r) => {
+      toast.success(
+        r.deduplicated
+          ? "Modelo já havia sido enviado; status atualizado."
+          : "Enviado para análise da Meta.",
+      );
+      qc.invalidateQueries({ queryKey: qk.institutionTemplates(identity.institution ?? "") });
+    },
+    onError: (e: Error) => toast.error(e.message ?? "Falha ao enviar modelo."),
+  });
 
   const knownCategories = new Set(TEMPLATE_CATEGORIES.map((c) => c.value));
   const initialCategoria = searchParams.get("categoria") ?? "todos";
@@ -227,16 +245,17 @@ export default function MessageTemplates() {
                   setUseOpen(true);
                 }}
                 onEdit={identity.isAdmin ? () => navigate(`/app/modelos/${t.id}`) : undefined}
+                onSubmitToMeta={
+                  identity.isAdmin && isMeta &&
+                  (t.meta_status === "not_submitted" || t.meta_status === "error")
+                    ? () => submitMutation.mutate(t.id)
+                    : undefined
+                }
+                submitting={submittingId === t.id}
               />
             );
           })}
         </div>
-      )}
-
-      {identity.isAdmin && (
-        <p className="text-xs text-muted-foreground">
-          Em breve: criar e submeter modelos à Meta diretamente por esta tela.
-        </p>
       )}
 
       <UseTemplateDialog
