@@ -124,11 +124,11 @@ export function TemplateCard({
               : "Ainda não sincronizado"}
           </div>
         )}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Button
             variant="hero"
             size="sm"
-            className="flex-1"
+            className="flex-1 min-w-[140px]"
             onClick={onUse}
             disabled={useDisabled}
             title={useDisabledReason}
@@ -151,6 +151,7 @@ export function TemplateCard({
             <Button
               variant="outline"
               size="sm"
+              className="flex-1 min-w-[110px]"
               onClick={onSubmitToMeta}
               disabled={submitting}
               title={(template.meta_status as string) === "error" ? "Reenviar para Meta" : "Enviar para Meta"}
