@@ -5,12 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchAllAppRoutes, prefetchRoute } from "@/lib/queries";
 import {
-  Heart, LayoutDashboard, Users, MessageCircle, BookOpen, BarChart3,
+  LayoutDashboard, Users, MessageCircle, BookOpen, BarChart3,
   UserCircle, LogOut, Menu, X, Target, Settings, Inbox, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import elo2Logo from "@/assets/elo2-logo.png.asset.json";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,11 +77,8 @@ export const AppLayout = () => {
         open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
       )}>
         <div className="h-16 flex items-center justify-between px-5 border-b border-border">
-          <NavLink to="/app" className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-brand-foreground">
-              <Heart className="h-4 w-4" fill="currentColor" />
-            </span>
-            <span className="font-display font-bold text-brand">Cuidado Digital</span>
+          <NavLink to="/app" className="flex items-center gap-2" aria-label="ELO2">
+            <img src={elo2Logo.url} alt="ELO2" className="h-8 w-auto" />
           </NavLink>
           <button className="lg:hidden" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
         </div>
