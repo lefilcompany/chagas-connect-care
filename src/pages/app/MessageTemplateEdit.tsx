@@ -221,11 +221,15 @@ export default function MessageTemplateEdit() {
       </div>
 
       <header className="space-y-1">
-        <h1 className="font-display text-2xl font-bold text-brand">Editar modelo</h1>
+        <h1 className="font-display text-2xl font-bold text-brand">
+          {canEdit ? "Editar modelo" : "Detalhes do modelo"}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          {isLocked
-            ? "Este modelo já foi enviado à Meta e não pode ser editado nesta fase."
-            : "Ajuste o rascunho e salve para atualizar."}
+          {!canEdit
+            ? "Visualização somente leitura. Acompanhe o status de aprovação abaixo."
+            : isLocked
+              ? "Este modelo já foi enviado à Meta e não pode ser editado nesta fase."
+              : "Ajuste o rascunho e salve para atualizar."}
         </p>
       </header>
 
@@ -260,7 +264,7 @@ export default function MessageTemplateEdit() {
         value={form}
         onChange={handleChange}
         errors={errors}
-        disabled={isLocked}
+        disabled={readOnly}
         onUploadHeaderMedia={async (file) => {
           await uploadMediaMutation.mutateAsync(file);
         }}
@@ -272,24 +276,28 @@ export default function MessageTemplateEdit() {
         }
       />
 
-      {isLocked && <MetaStatusPanel
-        template={query.data}
-        onSync={() => syncMutation.mutate()}
-        syncing={syncMutation.isPending}
-      />}
+      {showMetaPanel && (
+        <MetaStatusPanel
+          template={query.data}
+          onSync={() => syncMutation.mutate()}
+          syncing={syncMutation.isPending}
+        />
+      )}
 
       <div className="flex justify-end gap-2">
         <Button asChild variant="outline">
-          <Link to="/app/modelos">Cancelar</Link>
+          <Link to="/app/modelos">{canEdit ? "Cancelar" : "Voltar"}</Link>
         </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={isLocked || updateMutation.isPending}
-        >
-          <Save className="h-4 w-4" />
-          {updateMutation.isPending ? "Salvando…" : "Salvar rascunho"}
-        </Button>
-        {query.data.template_kind === "meta" && !isLocked && (
+        {canEdit && (
+          <Button
+            onClick={handleSubmit}
+            disabled={isLocked || updateMutation.isPending}
+          >
+            <Save className="h-4 w-4" />
+            {updateMutation.isPending ? "Salvando…" : "Salvar rascunho"}
+          </Button>
+        )}
+        {canEdit && query.data.template_kind === "meta" && !isLocked && (
           <Button
             variant="default"
             onClick={() => submitMutation.mutate()}
