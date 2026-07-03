@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, RefreshCw, Save, Send, ShieldCheck } from "lucide-react";
@@ -175,10 +175,6 @@ export default function MessageTemplateEdit() {
     [query.data],
   );
 
-  if (!identity.loading && !identity.isAdmin) {
-    return <Navigate to="/app/modelos" replace />;
-  }
-
   if (query.isLoading || !form) {
     return <p className="text-sm text-muted-foreground">Carregando modelo…</p>;
   }
@@ -196,6 +192,11 @@ export default function MessageTemplateEdit() {
 
   const handleChange = (patch: Partial<TemplateDraftInput>) =>
     setForm((cur) => (cur ? { ...cur, ...patch } : cur));
+
+  const canEdit = identity.isAdmin;
+  const readOnly = !canEdit || isLocked;
+  const showMetaPanel =
+    query.data.template_kind === "meta" && query.data.meta_status !== "not_submitted";
 
   const handleSubmit = () => {
     if (!form) return;
