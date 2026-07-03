@@ -163,17 +163,31 @@ export const supabaseInstitutionTemplates: InstitutionTemplateService = {
       "create-whatsapp-template",
       { body: { local_template_id: id } },
     );
-    if (error) throw new Error(error.message ?? "Falha ao enviar modelo à Meta.");
-    const resp = (data ?? {}) as {
+    // supabase-js sets `error` on non-2xx and leaves `data` null; parse the
+    // response body so we can surface backend validation details to the user.
+    let resp = (data ?? {}) as {
       ok?: boolean;
       error?: string;
       error_code?: string;
+      errors?: Record<string, string>;
       meta_template_id?: string | null;
       meta_status?: string;
       submitted_at?: string | null;
       deduplicated?: boolean;
     };
-    if (!resp.ok) throw new Error(resp.error ?? resp.error_code ?? "Falha ao enviar modelo.");
+    if (error) {
+      const ctx = (error as unknown as { context?: { response?: Response } }).context;
+      if (ctx?.response) {
+        try { resp = await ctx.response.clone().json(); } catch { /* ignore */ }
+      }
+      if (!resp.error && !resp.errors) {
+        throw new Error(error.message ?? "Falha ao enviar modelo à Meta.");
+      }
+    }
+    if (!resp.ok) {
+      const details = resp.errors ? Object.values(resp.errors).join(" · ") : null;
+      throw new Error(details || resp.error || resp.error_code || "Falha ao enviar modelo.");
+    }
     return {
       meta_template_id: resp.meta_template_id ?? null,
       meta_status: resp.meta_status ?? "submitted",
