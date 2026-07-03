@@ -245,6 +245,7 @@ export default function MessageTemplates() {
                   setUseOpen(true);
                 }}
                 onEdit={identity.isAdmin ? () => navigate(`/app/modelos/${t.id}`) : undefined}
+                onOpenDetails={() => navigate(`/app/modelos/${t.id}`)}
                 onSubmitToMeta={
                   identity.isAdmin && isMeta &&
                   (t.meta_status === "not_submitted" ||
