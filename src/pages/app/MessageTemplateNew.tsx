@@ -16,6 +16,7 @@ import {
   type TemplateDraftInput,
 } from "@/lib/templateDraft";
 import { TemplateEditorForm } from "@/components/app/messages/TemplateEditorForm";
+import { useInstitutionDefaultFooter } from "@/hooks/useInstitutionDefaultFooter";
 
 const emptyDraft = (): TemplateDraftInput => ({
   name: "",
@@ -50,6 +51,7 @@ export default function MessageTemplateNew() {
 
   const [form, setForm] = useState<TemplateDraftInput>(emptyDraft);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { defaultFooter } = useInstitutionDefaultFooter(identity.institution);
 
   const createMutation = useMutation({
     mutationFn: async (input: TemplateDraftInput) =>
@@ -113,6 +115,7 @@ export default function MessageTemplateNew() {
         errors={errors}
         disabled={!canAdmin}
         statusBadge={<Badge variant="outline">Rascunho</Badge>}
+        institutionDefaultFooter={defaultFooter}
       />
 
       <div className="flex justify-end gap-2">
