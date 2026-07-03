@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Edit3, Send, FilePlus2, Lock, ShieldCheck, AlertTriangle, Clock, XCircle, PauseCircle, GitBranch, Upload, RefreshCw } from "lucide-react";
+import { Copy, Edit3, Send, FilePlus2, Lock, ShieldCheck, AlertTriangle, Clock, XCircle, PauseCircle, GitBranch, Upload, RefreshCw, Activity } from "lucide-react";
 import { META_STATUS_LABEL, type MessageTemplate } from "@/lib/templates";
 import { getTemplateDescription } from "@/lib/templateDescriptions";
 import { WhatsAppPreview, type WhatsAppPreviewButton } from "./WhatsAppPreview";
@@ -51,6 +51,7 @@ export function TemplateCard({
   useDisabledReason,
   onSubmitToMeta,
   submitting = false,
+  onOpenDetails,
 }: {
   template: MessageTemplate;
   onUse: () => void;
@@ -61,6 +62,7 @@ export function TemplateCard({
   useDisabledReason?: string;
   onSubmitToMeta?: () => void;
   submitting?: boolean;
+  onOpenDetails?: () => void;
 }) {
   const isDefault = !!template.is_default;
   const isMeta = template.template_kind === "meta";
@@ -68,6 +70,9 @@ export function TemplateCard({
   const footerDiverges = !!template.meta_has_local_differences;
   const isCatalog = variant === "catalog";
   const useDisabled = !!useDisabledReason;
+  const showDetailsButton =
+    isCatalog && isMeta && !!onOpenDetails &&
+    (status === "submitted" || status === "rejected" || status === "paused" || (status as string) === "disabled");
   const lastSyncLabel = template.last_synced_at
     ? new Date(template.last_synced_at).toLocaleString("pt-BR", {
         dateStyle: "short",
@@ -154,6 +159,18 @@ export function TemplateCard({
           >
             <Send className="h-3.5 w-3.5" /> Usar modelo
           </Button>
+          {showDetailsButton && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 min-w-[140px]"
+              onClick={onOpenDetails}
+              title="Acompanhar status de aprovação na Meta"
+              aria-label={`Acompanhar status do modelo ${template.name}`}
+            >
+              <Activity className="h-3.5 w-3.5" /> Acompanhar status
+            </Button>
+          )}
           {isCatalog && onEdit && (
             <Button
               variant="ghost"
