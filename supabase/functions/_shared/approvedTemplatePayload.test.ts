@@ -62,15 +62,13 @@ Deno.test("rejects a non-approved template", () => {
   assertEquals(r.errorCode, "TEMPLATE_NOT_APPROVED");
 });
 
-Deno.test("rejects a template flagged with local differences", () => {
+Deno.test("sends even when local editor differs from approved Meta version", () => {
   const r = buildApprovedTemplateMessage({
     template: { ...baseTemplate, meta_has_local_differences: true },
     to: "5581999999999",
     variables: { nome_paciente: "M", data_consulta: "1/1" },
   });
-  assert(!r.ok);
-  if (r.ok) return;
-  assertEquals(r.errorCode, "TEMPLATE_LOCAL_DIFFERENCES");
+  assert(r.ok);
 });
 
 Deno.test("rejects when meta_definition is missing", () => {
