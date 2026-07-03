@@ -50,7 +50,7 @@ All colors MUST be HSL.
     --shadow-card: 0 4px 20px -8px hsl(120 3% 30% / 0.10);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
-    --sidebar-background: 0 0% 98%;
+    --sidebar-background: 7 60% 97%;
 
     --sidebar-foreground: 240 5.3% 26.1%;
 
@@ -58,11 +58,11 @@ All colors MUST be HSL.
 
     --sidebar-primary-foreground: 0 0% 98%;
 
-    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent: 7 55% 94%;
 
     --sidebar-accent-foreground: 240 5.9% 10%;
 
-    --sidebar-border: 220 13% 91%;
+    --sidebar-border: 7 40% 92%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
