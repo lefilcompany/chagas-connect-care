@@ -275,6 +275,15 @@ export default function MessageTemplates() {
         template={usingTpl}
         onGoToSegmented={(t) => navigate(`/app/conteudos/campanha?template=${t.id}`)}
       />
+
+      <MetaStatusDialog
+        template={statusTpl}
+        open={statusOpen}
+        onOpenChange={(o) => {
+          setStatusOpen(o);
+          if (!o) setStatusTpl(null);
+        }}
+      />
     </div>
   );
 }
