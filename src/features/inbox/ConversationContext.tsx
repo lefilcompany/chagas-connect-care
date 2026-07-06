@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Copy, ExternalLink, ShieldCheck, ShieldOff, StickyNote, User, UserPlus } from "lucide-react";
+import { ArrowRight, Copy, ShieldCheck, ShieldOff, StickyNote, User, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -119,15 +119,6 @@ export function ConversationContext({
         </div>
       </section>
 
-      <section className="care-card p-4 text-xs text-muted-foreground">
-        <p className="font-medium text-ink mb-1 inline-flex items-center gap-1">
-          <ExternalLink className="h-3 w-3" aria-hidden /> Fluxo antigo
-        </p>
-        <p>
-          Se precisar da experiência anterior (busca avançada e diálogos legados), acesse{" "}
-          <Link to="/app/mensagens" className="underline">Mensagens</Link>.
-        </p>
-      </section>
     </aside>
   );
 }
