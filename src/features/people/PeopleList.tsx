@@ -1,4 +1,4 @@
-import { Fragment, useState, type LucideIcon } from "react";
+import { Fragment, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertCircle,
@@ -10,6 +10,7 @@ import {
   Stethoscope,
   UserRound,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import type { CareNetworkContact, PersonWithDerived } from "./types";
 import { ChannelBadge } from "@/components/care/ChannelBadge";
