@@ -84,7 +84,7 @@ export default function Profile() {
           <div className="rounded-2xl border border-border bg-card p-6 shadow-card text-center">
             {ready ? (
               <>
-                <div className="mx-auto h-20 w-20 rounded-full bg-primary text-brand flex items-center justify-center text-2xl font-bold ring-4 ring-primary/30">
+                <div className="mx-auto h-20 w-20 rounded-full bg-gradient-to-br from-brand to-brand/80 text-primary-foreground flex items-center justify-center text-2xl font-bold ring-4 ring-primary/20 shadow-md">
                   {initials}
                 </div>
                 <div className="mt-3 font-semibold text-brand truncate">{profile.full_name || "Sem nome"}</div>
