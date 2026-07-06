@@ -30,6 +30,7 @@ import Insights from "./pages/app/Insights";
 import Channels from "./pages/app/Channels";
 import Integrations from "./pages/app/Integrations";
 import Profile from "./pages/app/Profile";
+import Privacy from "./pages/app/Privacy";
 import WhatsAppSettings from "./pages/app/WhatsAppSettings";
 import MessageTemplates from "./pages/app/MessageTemplates";
 import MessageTemplateNew from "./pages/app/MessageTemplateNew";
@@ -100,7 +101,7 @@ const App = () => (
               <Route path="configuracoes/whatsapp" element={<WhatsAppSettings />} />
               <Route path="admin/instituicao" element={<Profile />} />
               <Route path="admin/equipe" element={<Profile />} />
-              <Route path="admin/privacidade" element={<Profile />} />
+              <Route path="admin/privacidade" element={<Privacy />} />
               <Route path="admin/perfil" element={<Profile />} />
 
               {/* Legacy routes preserved via redirects (no broken bookmarks) */}
