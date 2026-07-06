@@ -138,8 +138,17 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
   };
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
-      <table className="w-full min-w-[920px] text-sm">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <table className="w-full table-fixed text-sm">
+        <colgroup>
+          <col className="w-[30%]" />
+          <col className="w-[12%]" />
+          <col className="w-[14%]" />
+          <col className="w-[16%]" />
+          <col className="w-[10%]" />
+          <col className="w-[12%]" />
+          <col className="w-[56px]" />
+        </colgroup>
         <caption className="sr-only">Lista de pessoas acompanhadas e suas redes de cuidado</caption>
         <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
