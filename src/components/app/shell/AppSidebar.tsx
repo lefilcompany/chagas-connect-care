@@ -143,7 +143,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
           <button
             onClick={onToggleCollapse}
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-            className="hidden lg:inline-flex tap-target h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            className="hidden lg:inline-flex tap-target h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
           >
             {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
           </button>
