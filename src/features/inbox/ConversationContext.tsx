@@ -49,7 +49,7 @@ export function ConversationContext({
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Pessoa</p>
             <h2 className="font-display text-base font-semibold text-ink truncate">
               {conversation.display_name}
-            </h3>
+            </h2>
             <p className="text-xs text-muted-foreground">{conversation.phone || "—"}</p>
           </div>
           <Button variant="ghost" size="icon" onClick={copyPhone} aria-label="Copiar telefone">
