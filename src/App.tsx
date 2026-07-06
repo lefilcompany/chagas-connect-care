@@ -16,6 +16,7 @@ import Patients from "./pages/app/Patients";
 import PatientDetail from "./pages/app/PatientDetail";
 import People from "./pages/app/People";
 import PersonDetail from "./pages/app/PersonDetail";
+import Inbox from "./pages/app/Inbox";
 import Messages from "./pages/app/Messages";
 import Content from "./pages/app/Content";
 import Campaign from "./pages/app/Campaign";
@@ -70,7 +71,7 @@ const App = () => (
               <Route path="hoje" element={<Today />} />
               <Route path="pessoas" element={<People />} />
               <Route path="pessoas/:id" element={<PersonDetail />} />
-              <Route path="caixa" element={<Messages />} />
+              <Route path="caixa" element={<Inbox />} />
               <Route path="jornadas" element={<Campaign />} />
               <Route path="biblioteca" element={<Content />} />
               <Route path="insights" element={<Reports />} />
