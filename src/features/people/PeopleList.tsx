@@ -177,7 +177,7 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
             return (
               <Fragment key={p.id}>
                 <tr className={cn("border-t border-border hover:bg-secondary/40", isExpanded && "bg-secondary/30")}>
-                  <td className="px-4 py-2 align-top">
+                  <td className="px-4 py-2 align-middle">
                     <Link
                       to={`/app/pessoas/${p.id}`}
                       className="rounded font-display text-sm font-semibold text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -193,26 +193,26 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2 align-top text-xs">{stage}</td>
-                  <td className="px-4 py-2 align-top">
+                  <td className="px-4 py-2 align-middle text-xs">{stage}</td>
+                  <td className="px-4 py-2 align-middle">
                     {isSupportedChannel(p.channel_pref) ? (
                       <ChannelBadge channel={p.channel_pref} />
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-2 align-top text-xs text-muted-foreground">
+                  <td className="px-4 py-2 align-middle text-xs text-muted-foreground">
                     {p.derived.lastContactAt
                       ? `há ${formatDistanceToNowStrict(p.derived.lastContactAt)}`
                       : "sem registro"}
                   </td>
-                  <td className="px-4 py-2 align-top">
+                  <td className="px-4 py-2 align-middle">
                     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                       <Users className="h-3 w-3" aria-hidden />
                       {p.derived.contactsCount}
                     </span>
                   </td>
-                  <td className="px-4 py-2 align-top">
+                  <td className="px-4 py-2 align-middle">
                     {p.derived.pendencies.length === 0 ? (
                       <span className="text-xs text-care">Em dia</span>
                     ) : (
@@ -222,7 +222,7 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2 align-top text-right">
+                  <td className="px-4 py-2 align-middle text-right">
                     <button
                       type="button"
                       onClick={() => toggleExpanded(p.id)}
