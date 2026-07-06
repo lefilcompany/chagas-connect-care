@@ -84,7 +84,7 @@ export function TemplateCard({
   return (
     <article className="grid h-full grid-rows-[auto_auto_1fr_auto] rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex flex-col gap-2">
-        <h3 className="font-display text-base font-bold text-brand break-words">{template.name}</h3>
+        <h2 className="font-display text-base font-bold text-brand break-words">{template.name}</h2>
         <div className="flex flex-row flex-wrap items-center justify-end gap-1 shrink-0">
           {isMeta && status === "approved" && (
             <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-300">
