@@ -31,6 +31,8 @@ import Insights from "./pages/app/Insights";
 import Channels from "./pages/app/Channels";
 import Integrations from "./pages/app/Integrations";
 import Profile from "./pages/app/Profile";
+import Equipe from "./pages/app/Equipe";
+import Instituicao from "./pages/app/Instituicao";
 import Privacy from "./pages/app/Privacy";
 import WhatsAppSettings from "./pages/app/WhatsAppSettings";
 import MessageTemplates from "./pages/app/MessageTemplates";
@@ -101,8 +103,8 @@ const App = () => (
               />
               <Route path="admin/canais" element={<Channels />} />
               <Route path="configuracoes/whatsapp" element={<WhatsAppSettings />} />
-              <Route path="admin/instituicao" element={<Profile />} />
-              <Route path="admin/equipe" element={<Profile />} />
+              <Route path="admin/instituicao" element={<Instituicao />} />
+              <Route path="admin/equipe" element={<Equipe />} />
               <Route path="admin/privacidade" element={<Privacy />} />
               <Route path="admin/perfil" element={<Profile />} />
 
