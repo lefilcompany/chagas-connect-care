@@ -325,6 +325,245 @@ export type Database = {
         }
         Relationships: []
       }
+      journey_run_steps: {
+        Row: {
+          attempt: number
+          detail: Json
+          error: string | null
+          finished_at: string | null
+          id: string
+          node_id: string
+          node_kind: string
+          run_id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          attempt?: number
+          detail?: Json
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          node_id: string
+          node_kind: string
+          run_id: string
+          started_at?: string
+          status: string
+        }
+        Update: {
+          attempt?: number
+          detail?: Json
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          node_id?: string
+          node_kind?: string
+          run_id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_run_steps_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "journey_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journey_runs: {
+        Row: {
+          attempt: number
+          context: Json
+          created_at: string
+          current_node_id: string | null
+          ended_at: string | null
+          entered_at: string
+          error: string | null
+          id: string
+          institution: string
+          journey_id: string
+          journey_version: number
+          patient_id: string | null
+          resume_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt?: number
+          context?: Json
+          created_at?: string
+          current_node_id?: string | null
+          ended_at?: string | null
+          entered_at?: string
+          error?: string | null
+          id?: string
+          institution?: string
+          journey_id: string
+          journey_version?: number
+          patient_id?: string | null
+          resume_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt?: number
+          context?: Json
+          created_at?: string
+          current_node_id?: string | null
+          ended_at?: string | null
+          entered_at?: string
+          error?: string | null
+          id?: string
+          institution?: string
+          journey_id?: string
+          journey_version?: number
+          patient_id?: string | null
+          resume_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_runs_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journey_runs_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journey_tasks: {
+        Row: {
+          assignee_id: string | null
+          created_at: string
+          description: string
+          due_at: string | null
+          id: string
+          institution: string
+          journey_id: string | null
+          patient_id: string | null
+          priority: string
+          run_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          created_at?: string
+          description?: string
+          due_at?: string | null
+          id?: string
+          institution?: string
+          journey_id?: string | null
+          patient_id?: string | null
+          priority?: string
+          run_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          created_at?: string
+          description?: string
+          due_at?: string | null
+          id?: string
+          institution?: string
+          journey_id?: string | null
+          patient_id?: string | null
+          priority?: string
+          run_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_tasks_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "journeys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journey_tasks_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journey_tasks_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "journey_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journeys: {
+        Row: {
+          audience_id: string | null
+          created_at: string
+          created_by: string | null
+          goal: string
+          graph: Json
+          id: string
+          institution: string
+          name: string
+          status: string
+          trigger: Json
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          audience_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          goal?: string
+          graph?: Json
+          id?: string
+          institution?: string
+          name: string
+          status?: string
+          trigger?: Json
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          audience_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          goal?: string
+          graph?: Json
+          id?: string
+          institution?: string
+          name?: string
+          status?: string
+          trigger?: Json
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journeys_audience_id_fkey"
+            columns: ["audience_id"]
+            isOneToOne: false
+            referencedRelation: "audience_segments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medications: {
         Row: {
           created_at: string
