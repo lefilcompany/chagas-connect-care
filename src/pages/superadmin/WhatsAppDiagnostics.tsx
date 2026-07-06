@@ -77,7 +77,7 @@ export default function WhatsAppDiagnostics() {
               <li key={check.id} className="flex flex-wrap items-center gap-3 p-4 text-sm">
                 <StateIcon state={check.state} />
                 <div className="min-w-[220px] flex-1"><p className="font-medium text-ink">{check.label}</p>{check.detail && <p className="mt-1 text-xs text-muted-foreground">{check.detail}</p>}</div>
-                <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{check.state.replaceAll("_", " ")}</span>
+                <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{check.state.replace(/_/g, " ")}</span>
               </li>
             ))}
           </ul>
