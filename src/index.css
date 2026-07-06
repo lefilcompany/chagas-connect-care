@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Chagas Connect Care — Centro de Cuidado Conectado
+ * All colors are HSL. Semantic tokens only; never hardcode hex in components.
+ *
+ * Palette (reference):
+ *   brand-graphite #4A504A · ink #29322E
+ *   coral #E7877C · coral-strong #B94E47 (primary action)
+ *   care-green #236B5A · care-green-medium #2F7D6C (confirm/care)
+ *   mint-soft #E7F2EE · coral-soft #FBE9E6
+ *   background-warm #FFF8F5 · background-neutral #F4F7F5
+ *   border-soft #DDE4E0 · text-muted #65716B
+ */
+
+@layer base {
+  :root {
+    --background: 20 100% 98%;             /* #FFF8F5 warm */
+    --background-neutral: 140 11% 96%;     /* #F4F7F5 */
+    --foreground: 156 8% 18%;              /* #29322E ink */
+
+    --card: 0 0% 100%;
+    --card-foreground: 156 8% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 156 8% 18%;
+
+    --brand: 132 5% 30%;                   /* #4A504A graphite */
+    --brand-foreground: 20 100% 98%;
+    --ink: 156 8% 18%;                     /* #29322E */
+
+    --button-hover-foreground: 20 100% 98%;
+
+    /* Primary action: coral-strong for AA contrast on white */
+    --primary: 4 45% 50%;                  /* #B94E47 */
+    --primary-foreground: 20 100% 98%;
+    --coral: 7 68% 69%;                    /* #E7877C — decorative */
+    --coral-soft: 12 71% 94%;              /* #FBE9E6 */
+
+    /* Care/confirm */
+    --care: 165 51% 28%;                   /* #236B5A */
+    --care-foreground: 20 100% 98%;
+    --care-medium: 168 46% 34%;            /* #2F7D6C */
+    --mint-soft: 156 27% 92%;              /* #E7F2EE */
+
+    --secondary: 140 11% 96%;              /* neutral surface */
+    --secondary-foreground: 156 8% 18%;
+
+    --muted: 140 11% 96%;
+    --muted-foreground: 138 6% 42%;        /* #65716B AA on white */
+
+    --accent: 156 27% 92%;                 /* mint-soft */
+    --accent-foreground: 165 51% 22%;
+
+    --destructive: 4 62% 46%;
+    --destructive-foreground: 20 100% 98%;
+
+    --warning: 32 85% 46%;
+    --warning-foreground: 20 100% 98%;
+
+    --border: 140 12% 88%;                 /* #DDE4E0 border-soft */
+    --input: 140 12% 88%;
+    --ring: 4 45% 50%;
+
+    --radius: 0.875rem;
+
+    --gradient-warm: linear-gradient(180deg, hsl(20 100% 98%) 0%, hsl(20 100% 99%) 100%);
+    --gradient-care: linear-gradient(135deg, hsl(156 27% 92%) 0%, hsl(20 100% 98%) 55%, hsl(12 71% 94%) 100%);
+    --shadow-soft: 0 18px 50px -28px hsl(156 8% 18% / 0.18);
+    --shadow-card: 0 10px 24px -18px hsl(156 8% 18% / 0.22);
+    --shadow-ring: 0 0 0 4px hsl(4 45% 50% / 0.14);
+    --transition-smooth: all 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 156 8% 18%;
+    --sidebar-primary: 4 45% 50%;
+    --sidebar-primary-foreground: 20 100% 98%;
+    --sidebar-accent: 156 27% 92%;
+    --sidebar-accent-foreground: 165 51% 22%;
+    --sidebar-border: 140 12% 88%;
+    --sidebar-ring: 4 45% 50%;
+  }
+
+  .dark {
+    --background: 156 12% 8%;
+    --background-neutral: 156 10% 11%;
+    --foreground: 140 11% 92%;
+
+    --card: 156 10% 11%;
+    --card-foreground: 140 11% 92%;
+
+    --popover: 156 10% 11%;
+    --popover-foreground: 140 11% 92%;
+
+    --brand: 140 11% 88%;
+    --brand-foreground: 156 12% 8%;
+    --ink: 140 11% 92%;
+
+    --button-hover-foreground: 156 12% 8%;
+
+    --primary: 7 68% 69%;
+    --primary-foreground: 156 12% 8%;
+    --coral: 7 68% 69%;
+    --coral-soft: 12 25% 20%;
+
+    --care: 165 45% 55%;
+    --care-foreground: 156 12% 8%;
+    --care-medium: 168 40% 48%;
+    --mint-soft: 165 20% 18%;
+
+    --secondary: 156 10% 15%;
+    --secondary-foreground: 140 11% 92%;
+
+    --muted: 156 10% 15%;
+    --muted-foreground: 140 8% 68%;
+
+    --accent: 165 20% 18%;
+    --accent-foreground: 140 11% 92%;
+
+    --destructive: 4 55% 55%;
+    --destructive-foreground: 156 12% 8%;
+
+    --warning: 32 75% 60%;
+    --warning-foreground: 156 12% 8%;
+
+    --border: 156 10% 18%;
+    --input: 156 10% 18%;
+    --ring: 7 68% 69%;
+
+    --sidebar-background: 156 10% 10%;
+    --sidebar-foreground: 140 11% 92%;
+    --sidebar-primary: 7 68% 69%;
+    --sidebar-primary-foreground: 156 12% 8%;
+    --sidebar-accent: 156 10% 15%;
+    --sidebar-accent-foreground: 140 11% 92%;
+    --sidebar-border: 156 10% 18%;
+    --sidebar-ring: 7 68% 69%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+
+  html { scrollbar-gutter: stable; }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  body[data-scroll-locked] {
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  h1, h2, h3, h4 { @apply font-display tracking-tight; }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-ring);
+    border-radius: calc(var(--radius) - 4px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+@layer components {
+  .care-card {
+    @apply rounded-2xl border border-border bg-card shadow-card;
+  }
+
+  .care-surface {
+    @apply rounded-2xl border border-border bg-card;
+  }
+
+  .care-hero {
+    @apply relative overflow-hidden rounded-3xl border border-border bg-card shadow-soft;
+    background-image: var(--gradient-care);
+  }
+
+  .care-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold text-brand;
+  }
+
+  .care-chip-care {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-mint-soft px-3 py-1 text-xs font-semibold text-care;
+  }
+
+  /* Minimum 44x44 target for primary interactive elements */
+  .tap-target { min-height: 2.75rem; min-width: 2.75rem; }
+}
