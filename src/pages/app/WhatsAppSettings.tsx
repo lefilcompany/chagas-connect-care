@@ -252,6 +252,7 @@ export default function WhatsAppSettings() {
                     checked={form.signature_enabled}
                     onCheckedChange={(v) => update("signature_enabled", v)}
                     disabled={!isAdmin}
+                    aria-label="Exibir identidade nas mensagens"
                   />
                 </div>
 
@@ -274,7 +275,7 @@ export default function WhatsAppSettings() {
                         htmlFor={`sm-${o.v}`}
                         className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 hover:bg-muted/40"
                       >
-                        <RadioGroupItem id={`sm-${o.v}`} value={o.v} className="mt-1" />
+                        <RadioGroupItem id={`sm-${o.v}`} value={o.v} aria-label={o.l} className="mt-1" />
                         <span>
                           <span className="block text-sm font-medium">{o.l}</span>
                           <span className="block text-xs text-muted-foreground">{o.d}</span>
