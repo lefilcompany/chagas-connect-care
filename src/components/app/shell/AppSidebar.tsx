@@ -113,7 +113,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
             {!collapsed && <span>Administração</span>}
             <ChevronDown
               aria-hidden
-              className={cn("shrink-0", collapsed ? "h-[18px] w-[18px]" : "h-3.5 w-3.5 transition-transform", adminOpen && !collapsed && "rotate-180")}
+              className={cn("shrink-0 transition-transform", collapsed ? "h-[18px] w-[18px]" : "h-3.5 w-3.5", adminOpen && "rotate-180")}
             />
           </button>
             {adminOpen && (
