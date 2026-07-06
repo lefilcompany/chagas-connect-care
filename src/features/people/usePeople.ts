@@ -20,6 +20,7 @@ const RECENT_CONTACT_DAYS = 30;
 export function usePeopleWithDerived() {
   return useQuery({
     queryKey: ["people-derived"],
+    refetchOnMount: "always",
     queryFn: async (): Promise<PersonWithDerived[]> => {
       const [pRes, cRes, mRes] = await Promise.all([
         supabase
