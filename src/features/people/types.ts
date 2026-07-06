@@ -13,6 +13,17 @@ export type PersonRow = {
   updated_at: string | null;
 };
 
+export type CareNetworkContact = {
+  id: string;
+  patient_id: string;
+  full_name: string;
+  phone: string | null;
+  relation: string | null;
+  channel_pref: string | null;
+  authorization_status: string | null;
+  receives_reminders: boolean | null;
+};
+
 export type PersonDerived = {
   age: number | null;
   lastContactAt: string | null;
@@ -27,7 +38,10 @@ export type PersonDerived = {
   nextActionKey: string | null;
 };
 
-export type PersonWithDerived = PersonRow & { derived: PersonDerived };
+export type PersonWithDerived = PersonRow & {
+  contacts: CareNetworkContact[];
+  derived: PersonDerived;
+};
 
 export type QuickFilter =
   | "todos"
