@@ -214,7 +214,7 @@ export function JourneyBuilder({ id }: { id: string }) {
             <Save className="h-4 w-4" aria-hidden /> Salvar {dirty ? "•" : ""}
           </Button>
           {journey.status !== "ativa" ? (
-            <Button variant="care" onClick={() => publish(journey.id)}>
+            <Button variant="default" onClick={() => publish(journey.id)}>
               <Play className="h-4 w-4" aria-hidden /> Publicar
             </Button>
           ) : (
