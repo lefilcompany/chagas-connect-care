@@ -101,7 +101,7 @@ export function ConversationThread({
               )}
               {m.body && <p className="whitespace-pre-wrap">{renderWithLinks(m.body)}</p>}
               {m.last_error && (
-                <p className="mt-1 text-[11px] text-destructive-foreground/90 rounded bg-destructive/40 px-1.5 py-0.5">
+                <p className="mt-1 text-[11px] font-medium text-destructive-foreground rounded bg-destructive px-1.5 py-0.5">
                   {m.last_error}
                 </p>
               )}
