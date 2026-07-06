@@ -22,6 +22,9 @@ import JourneyEditor from "./pages/app/JourneyEditor";
 import Messages from "./pages/app/Messages";
 import Content from "./pages/app/Content";
 import Campaign from "./pages/app/Campaign";
+import Library from "./pages/app/Library";
+import Audiences from "./pages/app/Audiences";
+import SegmentEditor from "./pages/app/SegmentEditor";
 import Reports from "./pages/app/Reports";
 import Integrations from "./pages/app/Integrations";
 import Profile from "./pages/app/Profile";
@@ -76,7 +79,8 @@ const App = () => (
               <Route path="caixa" element={<Inbox />} />
               <Route path="jornadas" element={<Journeys />} />
               <Route path="jornadas/:id" element={<JourneyEditor />} />
-              <Route path="biblioteca" element={<Content />} />
+              <Route path="biblioteca" element={<Library />} />
+              <Route path="audiencias" element={<Audiences />} />
               <Route path="insights" element={<Reports />} />
               <Route
                 path="admin/modelos-meta"
@@ -108,10 +112,10 @@ const App = () => (
               <Route path="modelos" element={<Navigate to="/app/admin/modelos-meta" replace />} />
               <Route path="modelos/novo" element={<Navigate to="/app/admin/modelos-meta/novo" replace />} />
               <Route path="modelos/:templateId" element={<LegacyRedirect from="modelos" to="admin/modelos-meta" />} />
-              <Route path="segmentos" element={<Navigate to="/app/jornadas" replace />} />
-              <Route path="segmentos/novo" element={<Navigate to="/app/jornadas" replace />} />
-              <Route path="segmentos/:id/editar" element={<Navigate to="/app/jornadas" replace />} />
-              <Route path="segmentos/:id/duplicar" element={<Navigate to="/app/jornadas" replace />} />
+              <Route path="segmentos" element={<Navigate to="/app/audiencias" replace />} />
+              <Route path="segmentos/novo" element={<SegmentEditor />} />
+              <Route path="segmentos/:id/editar" element={<SegmentEditor />} />
+              <Route path="segmentos/:id/duplicar" element={<SegmentEditor />} />
               <Route path="relatorios" element={<Navigate to="/app/insights" replace />} />
               <Route path="integracoes" element={<Integrations />} />
               <Route path="configuracoes/whatsapp" element={<Navigate to="/app/admin/canais" replace />} />
