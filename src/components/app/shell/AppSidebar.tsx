@@ -25,13 +25,16 @@ function NavItemLink({ item, collapsed, onClick }: { item: NavItem; collapsed: b
       onClick={onClick}
       title={collapsed ? item.label : undefined}
       className={({ isActive }) => cn(
-        "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors tap-target",
+        "group flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200 tap-target",
+        collapsed
+          ? "h-11 w-11 shrink-0 flex-col justify-center self-center rounded-2xl px-0 py-0"
+          : "px-3 py-2.5",
         isActive
           ? "bg-mint-soft text-care"
-          : "text-foreground/75 hover:bg-secondary hover:text-foreground",
+          : "text-foreground/80 hover:bg-accent/60 hover:shadow-sm hover:text-foreground",
       )}
     >
-      <item.icon className="h-4 w-4 shrink-0" aria-hidden />
+      <item.icon className={cn("shrink-0", collapsed ? "h-[18px] w-[18px]" : "h-4 w-4")} aria-hidden />
       {!collapsed && <span className="truncate">{item.label}</span>}
     </NavLink>
   );
@@ -81,7 +84,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
       )}
 
       <ScrollArea className="min-h-0 flex-1" type="hover" scrollHideDelay={400}>
-        <nav className="px-3 py-4">
+        <nav className={cn("py-4", collapsed ? "flex flex-col items-center px-1" : "px-3")}>
           {!collapsed && (
             <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
               Cuidado
@@ -96,21 +99,23 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
           </ul>
 
           <div className="mt-6">
-            <button
-              onClick={() => setAdminOpen((v) => !v)}
-              aria-expanded={adminOpen}
-              aria-controls="admin-nav"
-              className={cn(
-                "flex w-full items-center justify-between rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground",
-                collapsed && "justify-center",
-              )}
-            >
-              {!collapsed && <span>Administração</span>}
-              <ChevronDown
-                aria-hidden
-                className={cn("h-3.5 w-3.5 transition-transform", adminOpen && "rotate-180")}
-              />
-            </button>
+          <button
+            onClick={() => setAdminOpen((v) => !v)}
+            aria-expanded={adminOpen}
+            aria-controls="admin-nav"
+            className={cn(
+              "flex items-center rounded-xl text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-all duration-200 hover:bg-accent/60 hover:shadow-sm hover:text-foreground",
+              collapsed
+                ? "h-11 w-11 shrink-0 justify-center self-center rounded-2xl p-0"
+                : "w-full justify-between px-3 py-2",
+            )}
+          >
+            {!collapsed && <span>Administração</span>}
+            <ChevronDown
+              aria-hidden
+              className={cn("shrink-0", collapsed ? "h-[18px] w-[18px]" : "h-3.5 w-3.5 transition-transform", adminOpen && !collapsed && "rotate-180")}
+            />
+          </button>
             {adminOpen && (
               <ul id="admin-nav" className="mt-1 space-y-0.5">
                 {adminNav.map((n) => (
@@ -134,11 +139,11 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
             <div className="truncate text-muted-foreground">{email}</div>
           </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
           <button
             onClick={onToggleCollapse}
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-            className="hidden lg:inline-flex tap-target items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+            className="hidden lg:inline-flex tap-target h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
           >
             {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
           </button>
