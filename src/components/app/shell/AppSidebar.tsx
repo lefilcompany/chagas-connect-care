@@ -49,11 +49,6 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
       <div className="flex h-16 items-center justify-between border-b border-border px-4">
         <NavLink to="/app/hoje" className="flex items-center gap-2" aria-label="Chagas Connect Care — Início">
           <img src={elo2Logo.url} alt="" aria-hidden className="h-8 w-auto" />
-          {!collapsed && (
-            <span className="font-display text-sm font-bold text-ink leading-tight">
-              Chagas<br/>Connect Care
-            </span>
-          )}
         </NavLink>
         {onCloseMobile && (
           <button
