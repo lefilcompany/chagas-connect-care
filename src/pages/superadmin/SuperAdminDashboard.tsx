@@ -19,6 +19,11 @@ function MetricCard({ label, value, helper, icon: Icon }: { label: string; value
   );
 }
 
+function latestDate(values: Array<string | null>): string | null {
+  const sorted = values.filter((value): value is string => Boolean(value)).sort();
+  return sorted.length > 0 ? sorted[sorted.length - 1] : null;
+}
+
 export default function SuperAdminDashboard() {
   const { selectedInstitution } = useSuperAdminScope();
 
@@ -59,16 +64,8 @@ export default function SuperAdminDashboard() {
       const institutions = new Set((profiles.data ?? []).map((row) => row.institution).filter(Boolean));
       const activeChannels = channelRows.filter((row) => row.status === "active" || row.status === "connected").length;
       const warningChannels = channelRows.filter((row) => !["active", "connected"].includes(row.status)).length;
-      const latestWebhook = channelRows
-        .map((row) => row.last_webhook_at)
-        .filter(Boolean)
-        .sort()
-        .at(-1) ?? null;
-      const latestSync = channelRows
-        .map((row) => row.last_synced_at)
-        .filter(Boolean)
-        .sort()
-        .at(-1) ?? null;
+      const latestWebhook = latestDate(channelRows.map((row) => row.last_webhook_at));
+      const latestSync = latestDate(channelRows.map((row) => row.last_synced_at));
 
       return {
         institutionCount: selectedInstitution ? 1 : institutions.size,
@@ -144,3 +141,5 @@ export default function SuperAdminDashboard() {
     </div>
   );
 }
+
+export { latestDate };
