@@ -11,8 +11,9 @@ import TermsOfUse from "./pages/legal/TermsOfUse";
 import DataDeletion from "./pages/legal/DataDeletion";
 import { AuthProvider } from "@/lib/auth";
 import { AppLayout } from "@/components/app/AppLayout";
+import { RequireSuperAdmin } from "@/components/auth/RequireSuperAdmin";
+import { SuperAdminLayout } from "@/components/superadmin/SuperAdminLayout";
 import Today from "./pages/app/Today";
-import Patients from "./pages/app/Patients";
 import PatientDetail from "./pages/app/PatientDetail";
 import People from "./pages/app/People";
 import PersonDetail from "./pages/app/PersonDetail";
@@ -20,25 +21,26 @@ import Inbox from "./pages/app/Inbox";
 import Journeys from "./pages/app/Journeys";
 import JourneyEditor from "./pages/app/JourneyEditor";
 import JourneyTasks from "./pages/app/JourneyTasks";
-import Messages from "./pages/app/Messages";
-import Content from "./pages/app/Content";
-import Campaign from "./pages/app/Campaign";
 import Library from "./pages/app/Library";
 import Audiences from "./pages/app/Audiences";
 import SegmentEditor from "./pages/app/SegmentEditor";
-import Reports from "./pages/app/Reports";
 import Insights from "./pages/app/Insights";
-import Channels from "./pages/app/Channels";
 import Integrations from "./pages/app/Integrations";
 import Profile from "./pages/app/Profile";
 import Equipe from "./pages/app/Equipe";
 import Instituicao from "./pages/app/Instituicao";
 import Privacy from "./pages/app/Privacy";
-import WhatsAppSettings from "./pages/app/WhatsAppSettings";
 import MessageTemplates from "./pages/app/MessageTemplates";
 import MessageTemplateNew from "./pages/app/MessageTemplateNew";
 import MessageTemplateEdit from "./pages/app/MessageTemplateEdit";
 import OnboardingForm from "./pages/public/OnboardingForm";
+import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
+import SuperAdminInstitutions from "./pages/superadmin/Institutions";
+import SuperAdminChannels from "./pages/superadmin/Channels";
+import SuperAdminWhatsAppSettings from "./pages/superadmin/WhatsAppSettings";
+import SuperAdminWhatsAppTemplates from "./pages/superadmin/WhatsAppTemplates";
+import SuperAdminWhatsAppDiagnostics from "./pages/superadmin/WhatsAppDiagnostics";
+import SuperAdminAuditLog from "./pages/superadmin/AuditLog";
 import { InstitutionIdentityProvider } from "@/services/institutionIdentityProvider";
 
 function LegacyRedirect({ to }: { from: string; to: string }) {
@@ -50,8 +52,6 @@ function LegacyRedirect({ to }: { from: string; to: string }) {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Aggressive caching: dados ficam "frescos" por 5 min e em memória por 30 min,
-      // assim a troca de rotas não dispara loaders/refetch o tempo todo.
       staleTime: 5 * 60_000,
       gcTime: 30 * 60_000,
       refetchOnWindowFocus: false,
@@ -76,8 +76,8 @@ const App = () => (
             <Route path="/termos-de-uso" element={<TermsOfUse />} />
             <Route path="/exclusao-de-dados" element={<DataDeletion />} />
             <Route path="/cadastro/:token" element={<OnboardingForm />} />
+
             <Route path="/app" element={<AppLayout />}>
-              {/* New IA */}
               <Route index element={<Navigate to="/app/hoje" replace />} />
               <Route path="hoje" element={<Today />} />
               <Route path="pessoas" element={<People />} />
@@ -89,29 +89,19 @@ const App = () => (
               <Route path="biblioteca" element={<Library />} />
               <Route path="audiencias" element={<Audiences />} />
               <Route path="insights" element={<Insights />} />
-              <Route
-                path="admin/modelos-meta"
-                element={<InstitutionIdentityProvider><MessageTemplates /></InstitutionIdentityProvider>}
-              />
-              <Route
-                path="admin/modelos-meta/novo"
-                element={<InstitutionIdentityProvider><MessageTemplateNew /></InstitutionIdentityProvider>}
-              />
-              <Route
-                path="admin/modelos-meta/:templateId"
-                element={<InstitutionIdentityProvider><MessageTemplateEdit /></InstitutionIdentityProvider>}
-              />
-              <Route path="admin/canais" element={<Channels />} />
-              <Route path="configuracoes/whatsapp" element={<WhatsAppSettings />} />
+              <Route path="admin/modelos-meta" element={<InstitutionIdentityProvider><MessageTemplates /></InstitutionIdentityProvider>} />
+              <Route path="admin/modelos-meta/novo" element={<InstitutionIdentityProvider><MessageTemplateNew /></InstitutionIdentityProvider>} />
+              <Route path="admin/modelos-meta/:templateId" element={<InstitutionIdentityProvider><MessageTemplateEdit /></InstitutionIdentityProvider>} />
               <Route path="admin/instituicao" element={<Instituicao />} />
               <Route path="admin/equipe" element={<Equipe />} />
               <Route path="admin/privacidade" element={<Privacy />} />
               <Route path="admin/perfil" element={<Profile />} />
 
-              {/* Legacy routes preserved via redirects (no broken bookmarks) */}
+              <Route path="admin/canais" element={<Navigate to="/superadmin/canais" replace />} />
+              <Route path="configuracoes/whatsapp" element={<Navigate to="/superadmin/whatsapp/configuracoes" replace />} />
+
               <Route path="dashboard" element={<Navigate to="/app/hoje" replace />} />
               <Route path="pacientes" element={<Navigate to="/app/pessoas" replace />} />
-              {/* Ficha clínica completa (fluxo pré-existente, ainda usado como visão detalhada de edição) */}
               <Route path="pacientes/:id" element={<PatientDetail />} />
               <Route path="mensagens" element={<Navigate to="/app/caixa" replace />} />
               <Route path="conversas" element={<Navigate to="/app/caixa" replace />} />
@@ -128,7 +118,21 @@ const App = () => (
               <Route path="integracoes" element={<Integrations />} />
               <Route path="perfil" element={<Navigate to="/app/admin/perfil" replace />} />
             </Route>
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+
+            <Route element={<RequireSuperAdmin />}>
+              <Route path="/superadmin" element={<SuperAdminLayout />}>
+                <Route index element={<Navigate to="/superadmin/dashboard" replace />} />
+                <Route path="dashboard" element={<SuperAdminDashboard />} />
+                <Route path="instituicoes" element={<SuperAdminInstitutions />} />
+                <Route path="canais" element={<SuperAdminChannels />} />
+                <Route path="whatsapp" element={<Navigate to="/superadmin/whatsapp/configuracoes" replace />} />
+                <Route path="whatsapp/configuracoes" element={<SuperAdminWhatsAppSettings />} />
+                <Route path="whatsapp/templates" element={<SuperAdminWhatsAppTemplates />} />
+                <Route path="whatsapp/diagnostico" element={<SuperAdminWhatsAppDiagnostics />} />
+                <Route path="auditoria" element={<SuperAdminAuditLog />} />
+              </Route>
+            </Route>
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
