@@ -23,6 +23,21 @@ export default {
           DEFAULT: "hsl(var(--brand))",
           foreground: "hsl(var(--brand-foreground))",
         },
+        ink: "hsl(var(--ink))",
+        care: {
+          DEFAULT: "hsl(var(--care))",
+          foreground: "hsl(var(--care-foreground))",
+          medium: "hsl(var(--care-medium))",
+        },
+        coral: {
+          DEFAULT: "hsl(var(--coral))",
+          soft: "hsl(var(--coral-soft))",
+        },
+        "mint-soft": "hsl(var(--mint-soft))",
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
         buttonHoverForeground: "hsl(var(--button-hover-foreground))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
@@ -69,8 +84,10 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       backgroundImage: {
-        "gradient-soft": "var(--gradient-soft)",
-        "gradient-brand": "var(--gradient-brand)",
+        "gradient-warm": "var(--gradient-warm)",
+        "gradient-care": "var(--gradient-care)",
+        "gradient-soft": "var(--gradient-care)",
+        "gradient-brand": "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--care)) 100%)",
       },
       boxShadow: {
         soft: "var(--shadow-soft)",
