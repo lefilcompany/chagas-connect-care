@@ -152,13 +152,13 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
         <caption className="sr-only">Lista de pessoas acompanhadas e suas redes de cuidado</caption>
         <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th scope="col" className="px-4 py-3">Pessoa</th>
-            <th scope="col" className="px-4 py-3">Estágio</th>
-            <th scope="col" className="px-4 py-3">Canal</th>
-            <th scope="col" className="px-4 py-3">Último contato</th>
-            <th scope="col" className="px-4 py-3">Rede</th>
-            <th scope="col" className="px-4 py-3">Pendências</th>
-            <th scope="col" className="px-4 py-3 sr-only">Mostrar rede de cuidado</th>
+            <th scope="col" className="px-4 py-2">Pessoa</th>
+            <th scope="col" className="px-4 py-2">Estágio</th>
+            <th scope="col" className="px-4 py-2">Canal</th>
+            <th scope="col" className="px-4 py-2">Último contato</th>
+            <th scope="col" className="px-4 py-2">Rede</th>
+            <th scope="col" className="px-4 py-2">Pendências</th>
+            <th scope="col" className="px-4 py-2 sr-only">Mostrar rede de cuidado</th>
           </tr>
         </thead>
         <tbody>
@@ -177,14 +177,14 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
             return (
               <Fragment key={p.id}>
                 <tr className={cn("border-t border-border hover:bg-secondary/40", isExpanded && "bg-secondary/30")}>
-                  <td className="px-4 py-3 align-top">
+                  <td className="px-4 py-2 align-top">
                     <Link
                       to={`/app/pessoas/${p.id}`}
-                      className="rounded font-display font-semibold text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="rounded font-display text-sm font-semibold text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {p.full_name}
                     </Link>
-                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                       {p.derived.age !== null && <span>{p.derived.age} anos</span>}
                       {location && (
                         <span className="inline-flex items-center gap-1">
@@ -193,26 +193,26 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 align-top text-xs">{stage}</td>
-                  <td className="px-4 py-3 align-top">
+                  <td className="px-4 py-2 align-top text-xs">{stage}</td>
+                  <td className="px-4 py-2 align-top">
                     {isSupportedChannel(p.channel_pref) ? (
                       <ChannelBadge channel={p.channel_pref} />
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+                  <td className="px-4 py-2 align-top text-xs text-muted-foreground">
                     {p.derived.lastContactAt
                       ? `há ${formatDistanceToNowStrict(p.derived.lastContactAt)}`
                       : "sem registro"}
                   </td>
-                  <td className="px-4 py-3 align-top">
+                  <td className="px-4 py-2 align-top">
                     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                       <Users className="h-3 w-3" aria-hidden />
                       {p.derived.contactsCount}
                     </span>
                   </td>
-                  <td className="px-4 py-3 align-top">
+                  <td className="px-4 py-2 align-top">
                     {p.derived.pendencies.length === 0 ? (
                       <span className="text-xs text-care">Em dia</span>
                     ) : (
@@ -222,14 +222,14 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 align-top text-right">
+                  <td className="px-4 py-2 align-top text-right">
                     <button
                       type="button"
                       onClick={() => toggleExpanded(p.id)}
                       aria-expanded={isExpanded}
                       aria-controls={networkRegionId}
                       aria-label={`${isExpanded ? "Ocultar" : "Mostrar"} familiares, cuidadores e médico de ${p.full_name}`}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} aria-hidden />
                     </button>
@@ -238,9 +238,9 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
 
                 {isExpanded && (
                   <tr id={networkRegionId} className="border-t border-border bg-secondary/20">
-                    <td colSpan={7} className="px-4 py-4">
-                      <div className="rounded-xl border border-border bg-background p-4">
-                        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                    <td colSpan={7} className="px-4 py-3">
+                      <div className="rounded-xl border border-border bg-background p-3">
+                        <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
                           <div>
                             <h3 className="font-display text-sm font-semibold text-ink">
                               Rede de cuidado de {p.full_name}
@@ -258,7 +258,7 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
                         </div>
 
                         {contacts.length === 0 ? (
-                          <div className="rounded-xl border border-dashed border-border bg-card px-4 py-5 text-center">
+                          <div className="rounded-xl border border-dashed border-border bg-card px-4 py-4 text-center">
                             <Users className="mx-auto h-5 w-5 text-muted-foreground" aria-hidden />
                             <p className="mt-2 text-sm font-medium text-ink">Nenhum vínculo cadastrado</p>
                             <p className="mt-1 text-xs text-muted-foreground">
