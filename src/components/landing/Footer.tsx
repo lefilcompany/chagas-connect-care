@@ -19,7 +19,7 @@ export const Footer = () => (
         </div>
         <div className="grid grid-cols-2 gap-8 md:col-span-1">
           <div>
-            <h4 className="mb-3 font-display text-sm font-bold text-brand">Plataforma</h4>
+            <h2 className="mb-3 font-display text-sm font-bold text-brand">Plataforma</h2>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><a href="#funcionalidades" className="hover:text-brand">Funcionalidades</a></li>
               <li><a href="#beneficios" className="hover:text-brand">Benefícios</a></li>
@@ -27,7 +27,7 @@ export const Footer = () => (
             </ul>
           </div>
           <div>
-            <h4 className="mb-3 font-display text-sm font-bold text-brand">Legal</h4>
+            <h2 className="mb-3 font-display text-sm font-bold text-brand">Legal</h2>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link to="/politica-de-privacidade" onClick={handleLegalClick} className="hover:text-brand">Política de Privacidade</Link></li>
               <li><Link to="/termos-de-uso" onClick={handleLegalClick} className="hover:text-brand">Termos de Uso</Link></li>
