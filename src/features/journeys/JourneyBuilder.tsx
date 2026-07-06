@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, GripVertical, Pencil, Plus, Save, Trash2, X,
+  ArrowLeft, GripVertical, Pause, Pencil, Play, Plus, Save, Trash2, UserPlus, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,15 +13,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { toast } from "@/hooks/use-toast";
-import { PreviewBanner } from "./PreviewBanner";
-import { useJourney } from "./useJourneys";
+import { useJourneys, useJourney } from "./useJourneys";
+import { RunStatusBanner } from "./RunStatusBanner";
+import { JourneyEnrollDialog } from "./JourneyEnrollDialog";
+import { JourneyRunsPanel } from "./JourneyRunsPanel";
 import { NODE_CATALOG, TONE_STYLES, nodeMeta } from "./nodeCatalog";
 import type { JourneyNode, JourneyNodeKind, JourneyStatus } from "./types";
 
 const STATUS_OPTIONS: { value: JourneyStatus; label: string }[] = [
   { value: "rascunho", label: "Rascunho" },
-  { value: "ativa-preview", label: "Ativa (preview)" },
+  { value: "ativa", label: "Ativa" },
   { value: "pausada", label: "Pausada" },
   { value: "arquivada", label: "Arquivada" },
 ];
@@ -149,11 +150,20 @@ function EditNodeDialog({
 
 export function JourneyBuilder({ id }: { id: string }) {
   const navigate = useNavigate();
-  const { journey, addNode, addColumn, renameColumn, removeColumn, patchNode, removeNode, update } = useJourney(id);
+  const {
+    journey, isLoading, dirty,
+    addNode, addColumn, renameColumn, removeColumn, patchNode, removeNode, update,
+    saveGraph, enroll,
+  } = useJourney(id);
+  const { publish, pause } = useJourneys();
   const [addTarget, setAddTarget] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ columnId: string; node: JourneyNode } | null>(null);
   const [newColumnTitle, setNewColumnTitle] = useState("");
+  const [enrollOpen, setEnrollOpen] = useState(false);
 
+  if (isLoading) {
+    return <Card className="p-8 text-center text-muted-foreground">Carregando…</Card>;
+  }
   if (!journey) {
     return (
       <div className="space-y-4">
@@ -161,7 +171,7 @@ export function JourneyBuilder({ id }: { id: string }) {
           <Link to="/app/jornadas"><ArrowLeft className="h-4 w-4" /> Voltar</Link>
         </Button>
         <Card className="p-8 text-center text-muted-foreground">
-          Jornada não encontrada. Ela pode ter sido excluída neste navegador.
+          Jornada não encontrada.
         </Card>
       </div>
     );
@@ -193,34 +203,40 @@ export function JourneyBuilder({ id }: { id: string }) {
             value={journey.status}
             onValueChange={(v) => update(journey.id, { status: v as JourneyStatus })}
           >
-            <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[160px]" aria-label="Status da jornada"><SelectValue /></SelectTrigger>
             <SelectContent>
               {STATUS_OPTIONS.map((o) => (
                 <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button
-            onClick={() => {
-              // Já salvamos a cada edição; este botão dá feedback explícito.
-              update(journey.id, {});
-              toast({ title: "Rascunho atualizado", description: "Estrutura salva localmente para revisão." });
-            }}
-          >
-            <Save className="h-4 w-4" aria-hidden /> Salvar rascunho
+          <Button onClick={() => saveGraph()} disabled={!dirty}>
+            <Save className="h-4 w-4" aria-hidden /> Salvar {dirty ? "•" : ""}
           </Button>
-          <Button variant="outline" onClick={() => navigate("/app/jornadas")}>
-            Concluir
+          {journey.status !== "ativa" ? (
+            <Button variant="default" onClick={() => publish(journey.id)}>
+              <Play className="h-4 w-4" aria-hidden /> Publicar
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => pause(journey.id)}>
+              <Pause className="h-4 w-4" aria-hidden /> Pausar
+            </Button>
+          )}
+          <Button variant="outline" disabled={journey.status !== "ativa"} onClick={() => setEnrollOpen(true)}>
+            <UserPlus className="h-4 w-4" aria-hidden /> Inscrever
           </Button>
+          <Button variant="ghost" onClick={() => navigate("/app/jornadas")}>Voltar</Button>
         </div>
       </div>
 
-      <PreviewBanner />
+      <RunStatusBanner journeyId={journey.id} status={journey.status} />
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Badge variant="outline" className="border-border bg-secondary text-ink">
           {journey.columns.reduce((acc, c) => acc + c.nodes.length, 0)} blocos
         </Badge>
+        <span>·</span>
+        <span>Versão publicada: v{journey.version}</span>
         <span>·</span>
         <span>Última alteração {new Date(journey.updatedAt).toLocaleString("pt-BR")}</span>
       </div>
@@ -293,6 +309,8 @@ export function JourneyBuilder({ id }: { id: string }) {
         </div>
       </div>
 
+      <JourneyRunsPanel journeyId={journey.id} />
+
       <AddNodeDialog
         open={!!addTarget}
         onOpenChange={(v) => { if (!v) setAddTarget(null); }}
@@ -303,6 +321,12 @@ export function JourneyBuilder({ id }: { id: string }) {
         node={editing?.node ?? null}
         onOpenChange={(v) => { if (!v) setEditing(null); }}
         onSave={(patch) => { if (editing) patchNode(editing.columnId, editing.node.id, patch); }}
+      />
+
+      <JourneyEnrollDialog
+        open={enrollOpen}
+        onOpenChange={setEnrollOpen}
+        onConfirm={async (ids) => { await enroll(ids); setEnrollOpen(false); }}
       />
     </div>
   );

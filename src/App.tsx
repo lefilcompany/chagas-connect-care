@@ -19,6 +19,7 @@ import PersonDetail from "./pages/app/PersonDetail";
 import Inbox from "./pages/app/Inbox";
 import Journeys from "./pages/app/Journeys";
 import JourneyEditor from "./pages/app/JourneyEditor";
+import JourneyTasks from "./pages/app/JourneyTasks";
 import Messages from "./pages/app/Messages";
 import Content from "./pages/app/Content";
 import Campaign from "./pages/app/Campaign";
@@ -81,6 +82,7 @@ const App = () => (
               <Route path="pessoas/:id" element={<PersonDetail />} />
               <Route path="caixa" element={<Inbox />} />
               <Route path="jornadas" element={<Journeys />} />
+              <Route path="jornadas/tarefas" element={<JourneyTasks />} />
               <Route path="jornadas/:id" element={<JourneyEditor />} />
               <Route path="biblioteca" element={<Library />} />
               <Route path="audiencias" element={<Audiences />} />
