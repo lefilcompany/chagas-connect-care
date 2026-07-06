@@ -34,6 +34,9 @@ import {
 import { TemplateCard, StartBlankCard } from "./TemplateCard";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 import { VariableInput } from "./VariableInput";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MessageSafetyPreview, messageHasClinicalContent } from "@/features/privacy/MessageSafetyPreview";
+import { ShieldAlert, ShieldCheck } from "lucide-react";
 
 const STEPS = ["Modelo", "Destinatários", "Revisar", "Enviar"] as const;
 
@@ -74,6 +77,7 @@ export default function CampaignTab({
   const [institution, setInstitution] = useState("");
   const [medicationMode, setMedicationMode] = useState<"all" | "first">("all");
   const [branding, setBranding] = useState<InstitutionWhatsAppSettings | null>(null);
+  const [confirmPrivacy, setConfirmPrivacy] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -331,6 +335,15 @@ export default function CampaignTab({
 
   const handleSend = async () => {
     if (finalRecipients.length === 0) return toast.error("Sem destinatários");
+    const clinical = messageHasClinicalContent(renderedBody);
+    const invalid = finalRecipients.filter((r) => !normalizeBR(r.phone)).length;
+    const thirdParty = clinical
+      ? finalRecipients.filter((r) => r.relation && r.relation !== "paciente").length
+      : 0;
+    const needsConfirm = clinical || invalid > 0 || thirdParty > 0;
+    if (needsConfirm && !confirmPrivacy) {
+      return toast.error("Confirme os avisos de privacidade antes de disparar.");
+    }
     setSending(true);
     const result = await createBatch({
       name: campaignName.trim() || (selectedTemplate?.name ?? "Campanha"),
@@ -375,6 +388,7 @@ export default function CampaignTab({
     setVars({});
     setSelected(new Set());
     setPatientIds([]);
+    setConfirmPrivacy(false);
   };
 
   return (
