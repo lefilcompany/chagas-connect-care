@@ -26,6 +26,8 @@ import Library from "./pages/app/Library";
 import Audiences from "./pages/app/Audiences";
 import SegmentEditor from "./pages/app/SegmentEditor";
 import Reports from "./pages/app/Reports";
+import Insights from "./pages/app/Insights";
+import Channels from "./pages/app/Channels";
 import Integrations from "./pages/app/Integrations";
 import Profile from "./pages/app/Profile";
 import WhatsAppSettings from "./pages/app/WhatsAppSettings";
@@ -81,7 +83,7 @@ const App = () => (
               <Route path="jornadas/:id" element={<JourneyEditor />} />
               <Route path="biblioteca" element={<Library />} />
               <Route path="audiencias" element={<Audiences />} />
-              <Route path="insights" element={<Reports />} />
+              <Route path="insights" element={<Insights />} />
               <Route
                 path="admin/modelos-meta"
                 element={<InstitutionIdentityProvider><MessageTemplates /></InstitutionIdentityProvider>}
@@ -94,7 +96,8 @@ const App = () => (
                 path="admin/modelos-meta/:templateId"
                 element={<InstitutionIdentityProvider><MessageTemplateEdit /></InstitutionIdentityProvider>}
               />
-              <Route path="admin/canais" element={<WhatsAppSettings />} />
+              <Route path="admin/canais" element={<Channels />} />
+              <Route path="configuracoes/whatsapp" element={<WhatsAppSettings />} />
               <Route path="admin/instituicao" element={<Profile />} />
               <Route path="admin/equipe" element={<Profile />} />
               <Route path="admin/privacidade" element={<Profile />} />
@@ -118,7 +121,6 @@ const App = () => (
               <Route path="segmentos/:id/duplicar" element={<SegmentEditor />} />
               <Route path="relatorios" element={<Navigate to="/app/insights" replace />} />
               <Route path="integracoes" element={<Integrations />} />
-              <Route path="configuracoes/whatsapp" element={<Navigate to="/app/admin/canais" replace />} />
               <Route path="perfil" element={<Navigate to="/app/admin/perfil" replace />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

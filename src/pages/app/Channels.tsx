@@ -17,19 +17,23 @@ function useWhatsAppHealth() {
     queryFn: async () => {
       const since24h = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
       const [settings, health, failures] = await Promise.all([
-        supabase.from("institution_whatsapp_settings").select("display_name, phone_number, updated_at").maybeSingle(),
-        supabase.from("whatsapp_integration_health").select("last_success_at, last_error").maybeSingle(),
+        supabase.from("institution_whatsapp_settings")
+          .select("brand_name, application_display_name, updated_at").maybeSingle(),
+        supabase.from("whatsapp_integration_health")
+          .select("status, checked_at, detail").order("checked_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("messages").select("id", { count: "exact", head: true })
           .eq("status", "failed").eq("direction", "out").gte("created_at", since24h),
       ]);
-      const configured = !!settings.data?.phone_number;
-      const lastSyncISO = health.data?.last_success_at ?? settings.data?.updated_at ?? null;
+      const configured = !!(settings.data?.application_display_name || settings.data?.brand_name);
+      const lastSyncISO = health.data?.checked_at ?? settings.data?.updated_at ?? null;
       const recentFailures = failures.count ?? 0;
       let status: ChannelStatus = "inativo";
-      if (configured) status = recentFailures > 5 ? "atencao" : "operacional";
+      if (configured) {
+        status = health.data?.status === "error" || recentFailures > 5 ? "atencao" : "operacional";
+      }
       return {
         configured,
-        sender: settings.data?.display_name ?? settings.data?.phone_number ?? undefined,
+        sender: settings.data?.application_display_name ?? settings.data?.brand_name ?? undefined,
         lastSync: lastSyncISO ? new Date(lastSyncISO).toLocaleString("pt-BR") : undefined,
         recentFailures,
         status,
