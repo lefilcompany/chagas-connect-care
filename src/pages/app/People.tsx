@@ -48,6 +48,11 @@ export default function People() {
     });
   }, [people, query, filter]);
 
+  const handleWizardOpenChange = (nextOpen: boolean) => {
+    setNewOpen(nextOpen);
+    if (!nextOpen) void refetch();
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -60,7 +65,7 @@ export default function People() {
         <Button variant="hero" onClick={() => setNewOpen(true)} className="tap-target">
           <Plus className="h-4 w-4" /> Nova pessoa
         </Button>
-        <NewPatientWizard open={newOpen} onOpenChange={setNewOpen} />
+        <NewPatientWizard open={newOpen} onOpenChange={handleWizardOpenChange} />
       </header>
 
       <PeopleFilters query={query} onQueryChange={setQuery} filter={filter} onFilterChange={setFilter} counts={counts} />
