@@ -43,10 +43,8 @@ Deno.serve(async (req) => {
   const { data: roles } = await admin
     .from("user_roles").select("role").eq("user_id", userId);
   const roleSet = new Set((roles ?? []).map((r: any) => r.role));
-  const role: CallerContext["role"] = roleSet.has("superadmin")
-    ? "superadmin"
-    : roleSet.has("admin") ? "admin" : "other";
-  if (role === "other") return json(403, { error: "Forbidden" });
+  const role: CallerContext["role"] = roleSet.has("superadmin") ? "superadmin" : "other";
+  if (role !== "superadmin") return json(403, { error: "Forbidden" });
 
   const { data: profile } = await admin
     .from("profiles").select("institution").eq("id", userId).maybeSingle();

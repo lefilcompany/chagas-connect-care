@@ -10,6 +10,16 @@ import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
 import TermsOfUse from "./pages/legal/TermsOfUse";
 import DataDeletion from "./pages/legal/DataDeletion";
 import { AuthProvider } from "@/lib/auth";
+import { AccessProvider } from "@/lib/access";
+import { RequireSuperAdmin, LegacyTechRedirect } from "@/components/auth/RequireSuperAdmin";
+import { SuperAdminLayout } from "@/components/superadmin/SuperAdminLayout";
+import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
+import SAInstitutions from "./pages/superadmin/Institutions";
+import SAChannels from "./pages/superadmin/Channels";
+import SAWhatsAppSettings from "./pages/superadmin/WhatsAppSettings";
+import SAWhatsAppTemplates from "./pages/superadmin/WhatsAppTemplates";
+import SAWhatsAppDiagnostics from "./pages/superadmin/WhatsAppDiagnostics";
+import SAAuditLog from "./pages/superadmin/AuditLog";
 import { AppLayout } from "@/components/app/AppLayout";
 import Today from "./pages/app/Today";
 import Patients from "./pages/app/Patients";
@@ -28,13 +38,11 @@ import Audiences from "./pages/app/Audiences";
 import SegmentEditor from "./pages/app/SegmentEditor";
 import Reports from "./pages/app/Reports";
 import Insights from "./pages/app/Insights";
-import Channels from "./pages/app/Channels";
 import Integrations from "./pages/app/Integrations";
 import Profile from "./pages/app/Profile";
 import Equipe from "./pages/app/Equipe";
 import Instituicao from "./pages/app/Instituicao";
 import Privacy from "./pages/app/Privacy";
-import WhatsAppSettings from "./pages/app/WhatsAppSettings";
 import MessageTemplates from "./pages/app/MessageTemplates";
 import MessageTemplateNew from "./pages/app/MessageTemplateNew";
 import MessageTemplateEdit from "./pages/app/MessageTemplateEdit";
@@ -69,6 +77,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <AccessProvider>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
@@ -76,6 +85,17 @@ const App = () => (
             <Route path="/termos-de-uso" element={<TermsOfUse />} />
             <Route path="/exclusao-de-dados" element={<DataDeletion />} />
             <Route path="/cadastro/:token" element={<OnboardingForm />} />
+            <Route path="/superadmin" element={<RequireSuperAdmin><SuperAdminLayout /></RequireSuperAdmin>}>
+              <Route index element={<Navigate to="/superadmin/dashboard" replace />} />
+              <Route path="dashboard" element={<SuperAdminDashboard />} />
+              <Route path="instituicoes" element={<SAInstitutions />} />
+              <Route path="canais" element={<SAChannels />} />
+              <Route path="whatsapp" element={<Navigate to="/superadmin/whatsapp/configuracoes" replace />} />
+              <Route path="whatsapp/configuracoes" element={<SAWhatsAppSettings />} />
+              <Route path="whatsapp/templates" element={<SAWhatsAppTemplates />} />
+              <Route path="whatsapp/diagnostico" element={<SAWhatsAppDiagnostics />} />
+              <Route path="auditoria" element={<SAAuditLog />} />
+            </Route>
             <Route path="/app" element={<AppLayout />}>
               {/* New IA */}
               <Route index element={<Navigate to="/app/hoje" replace />} />
@@ -101,8 +121,9 @@ const App = () => (
                 path="admin/modelos-meta/:templateId"
                 element={<InstitutionIdentityProvider><MessageTemplateEdit /></InstitutionIdentityProvider>}
               />
-              <Route path="admin/canais" element={<Channels />} />
-              <Route path="configuracoes/whatsapp" element={<WhatsAppSettings />} />
+              {/* Rotas técnicas legadas: superadmin é redirecionado à área /superadmin; demais para /app/hoje */}
+              <Route path="admin/canais" element={<LegacyTechRedirect superadminTo="/superadmin/canais" />} />
+              <Route path="configuracoes/whatsapp" element={<LegacyTechRedirect superadminTo="/superadmin/whatsapp/configuracoes" />} />
               <Route path="admin/instituicao" element={<Instituicao />} />
               <Route path="admin/equipe" element={<Equipe />} />
               <Route path="admin/privacidade" element={<Privacy />} />
@@ -131,6 +152,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </AccessProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

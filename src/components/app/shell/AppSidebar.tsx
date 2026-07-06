@@ -1,10 +1,10 @@
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
-import { ChevronDown, ChevronsLeft, ChevronsRight, HeartPulse, X } from "lucide-react";
+import { ChevronDown, ChevronsLeft, ChevronsRight, HeartPulse, ShieldCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { adminNav, careNav, type NavItem } from "./nav";
-import { ChannelHealthPill } from "./ChannelHealthPill";
+import { useAccess } from "@/lib/access";
 import elo2Logo from "@/assets/elo2-logo.png.asset.json";
 import elo2Icon from "@/assets/icone_eloz.png.asset.json";
 
@@ -42,6 +42,7 @@ function NavItemLink({ item, collapsed, onClick }: { item: NavItem; collapsed: b
 
 export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profileName, email, onSignOut }: Props) {
   const [adminOpen, setAdminOpen] = useState(false);
+  const { isSuperAdmin } = useAccess();
 
   return (
     <aside
@@ -130,9 +131,19 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
       </ScrollArea>
 
       <div className="shrink-0 border-t border-border p-3">
-        <div className={cn("mb-3", collapsed && "flex justify-center")}>
-          <ChannelHealthPill collapsed={collapsed} />
-        </div>
+        {isSuperAdmin && (
+          <NavLink
+            to="/superadmin/dashboard"
+            title="Acessar área Super Admin"
+            className={cn(
+              "mb-3 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10",
+              collapsed && "justify-center px-0",
+            )}
+          >
+            <ShieldCheck className="h-4 w-4" />
+            {!collapsed && <span>Super Admin</span>}
+          </NavLink>
+        )}
         {!collapsed && (
           <div className="mb-2 px-1 text-xs">
             <div className="truncate font-semibold text-ink">{profileName || "—"}</div>
