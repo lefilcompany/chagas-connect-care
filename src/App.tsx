@@ -14,6 +14,8 @@ import { AppLayout } from "@/components/app/AppLayout";
 import Today from "./pages/app/Today";
 import Patients from "./pages/app/Patients";
 import PatientDetail from "./pages/app/PatientDetail";
+import People from "./pages/app/People";
+import PersonDetail from "./pages/app/PersonDetail";
 import Messages from "./pages/app/Messages";
 import Content from "./pages/app/Content";
 import Campaign from "./pages/app/Campaign";
@@ -66,8 +68,8 @@ const App = () => (
               {/* New IA */}
               <Route index element={<Navigate to="/app/hoje" replace />} />
               <Route path="hoje" element={<Today />} />
-              <Route path="pessoas" element={<Patients />} />
-              <Route path="pessoas/:id" element={<PatientDetail />} />
+              <Route path="pessoas" element={<People />} />
+              <Route path="pessoas/:id" element={<PersonDetail />} />
               <Route path="caixa" element={<Messages />} />
               <Route path="jornadas" element={<Campaign />} />
               <Route path="biblioteca" element={<Content />} />
@@ -93,7 +95,8 @@ const App = () => (
               {/* Legacy routes preserved via redirects (no broken bookmarks) */}
               <Route path="dashboard" element={<Navigate to="/app/hoje" replace />} />
               <Route path="pacientes" element={<Navigate to="/app/pessoas" replace />} />
-              <Route path="pacientes/:id" element={<LegacyRedirect from="pacientes" to="pessoas" />} />
+              {/* Ficha clínica completa (fluxo pré-existente, ainda usado como visão detalhada de edição) */}
+              <Route path="pacientes/:id" element={<PatientDetail />} />
               <Route path="mensagens" element={<Navigate to="/app/caixa" replace />} />
               <Route path="conversas" element={<Navigate to="/app/caixa" replace />} />
               <Route path="conteudos" element={<Navigate to="/app/biblioteca" replace />} />
