@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { adminNav, careNav, type NavItem } from "./nav";
 import { ChannelHealthPill } from "./ChannelHealthPill";
 import elo2Logo from "@/assets/elo2-logo.png.asset.json";
+import elo2Icon from "@/assets/icone_eloz.png.asset.json";
 
 type Props = {
   collapsed: boolean;
@@ -47,9 +48,17 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
       )}
       aria-label="Navegação principal"
     >
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-4">
+      <div className={cn(
+        "flex h-16 shrink-0 items-center border-b border-border",
+        collapsed ? "justify-center px-2" : "justify-between px-4",
+      )}>
         <NavLink to="/app/hoje" className="flex items-center gap-2" aria-label="Chagas Connect Care — Início">
-          <img src={elo2Logo.url} alt="" aria-hidden className="h-8 w-auto" />
+          <img
+            src={collapsed ? elo2Icon.url : elo2Logo.url}
+            alt=""
+            aria-hidden
+            className={cn(collapsed ? "h-8 w-8" : "h-8 w-auto")}
+          />
         </NavLink>
         {onCloseMobile && (
           <button
