@@ -1,8 +1,20 @@
+import { Fragment, useState, type LucideIcon } from "react";
 import { Link } from "react-router-dom";
-import { AlertCircle, ChevronRight, MapPin, Users } from "lucide-react";
-import type { PersonWithDerived } from "./types";
+import {
+  AlertCircle,
+  ChevronDown,
+  Heart,
+  MapPin,
+  ShieldCheck,
+  ShieldOff,
+  Stethoscope,
+  UserRound,
+  Users,
+} from "lucide-react";
+import type { CareNetworkContact, PersonWithDerived } from "./types";
 import { ChannelBadge } from "@/components/care/ChannelBadge";
 import { formatDistanceToNowStrict } from "./format";
+import { cn } from "@/lib/utils";
 
 const stageLabels: Record<string, string> = {
   diagnostico: "Diagnóstico",
@@ -10,11 +22,124 @@ const stageLabels: Record<string, string> = {
   cronico: "Crônico",
 };
 
-export function PeopleList({ people }: { people: PersonWithDerived[] }) {
+type SupportedChannel = "whatsapp" | "sms" | "email" | "voice" | "secure_page";
+
+function isSupportedChannel(channel: string | null): channel is SupportedChannel {
+  return channel === "whatsapp"
+    || channel === "sms"
+    || channel === "email"
+    || channel === "voice"
+    || channel === "secure_page";
+}
+
+const relationOrder: Record<string, number> = {
+  familiar: 0,
+  cuidador: 1,
+  medico: 2,
+};
+
+const relationMeta: Record<string, { label: string; icon: LucideIcon; iconClass: string; surfaceClass: string }> = {
+  familiar: {
+    label: "Familiar",
+    icon: Heart,
+    iconClass: "text-[#E7877C]",
+    surfaceClass: "bg-coral-soft/70",
+  },
+  cuidador: {
+    label: "Cuidador",
+    icon: Users,
+    iconClass: "text-care",
+    surfaceClass: "bg-mint-soft",
+  },
+  medico: {
+    label: "Médico",
+    icon: Stethoscope,
+    iconClass: "text-care-medium",
+    surfaceClass: "bg-mint-soft/70",
+  },
+};
+
+function CareNetworkCard({ contact }: { contact: CareNetworkContact }) {
+  const meta = relationMeta[contact.relation ?? ""] ?? {
+    label: contact.relation || "Contato",
+    icon: UserRound,
+    iconClass: "text-muted-foreground",
+    surfaceClass: "bg-secondary",
+  };
+  const Icon = meta.icon;
+  const consented = contact.authorization_status === "authorized" || contact.authorization_status === "ativo";
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <table className="w-full text-sm">
-        <caption className="sr-only">Lista de pessoas acompanhadas</caption>
+    <li className="rounded-xl border border-border bg-card p-3 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", meta.surfaceClass)}>
+          <Icon className={cn("h-5 w-5", meta.iconClass)} aria-hidden />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-ink">{contact.full_name}</p>
+              <p className="text-xs font-medium text-muted-foreground">{meta.label}</p>
+            </div>
+          </div>
+
+          {contact.phone && (
+            <p className="mt-1 truncate text-xs text-muted-foreground">{contact.phone}</p>
+          )}
+
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {isSupportedChannel(contact.channel_pref) ? (
+              <ChannelBadge channel={contact.channel_pref} />
+            ) : contact.channel_pref ? (
+              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium uppercase text-muted-foreground">
+                {contact.channel_pref}
+              </span>
+            ) : null}
+
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                consented
+                  ? "border-care/30 bg-mint-soft text-care"
+                  : "border-border bg-secondary text-muted-foreground",
+              )}
+            >
+              {consented ? (
+                <ShieldCheck className="h-3 w-3" aria-hidden />
+              ) : (
+                <ShieldOff className="h-3 w-3" aria-hidden />
+              )}
+              {consented ? "Consentimento ativo" : "Consentimento pendente"}
+            </span>
+
+            {contact.receives_reminders && (
+              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                Recebe lembretes
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+export function PeopleList({ people }: { people: PersonWithDerived[] }) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+
+  const toggleExpanded = (personId: string) => {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(personId)) next.delete(personId);
+      else next.add(personId);
+      return next;
+    });
+  };
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
+      <table className="w-full min-w-[920px] text-sm">
+        <caption className="sr-only">Lista de pessoas acompanhadas e suas redes de cuidado</caption>
         <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
             <th scope="col" className="px-4 py-3">Pessoa</th>
@@ -23,70 +148,125 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
             <th scope="col" className="px-4 py-3">Último contato</th>
             <th scope="col" className="px-4 py-3">Rede</th>
             <th scope="col" className="px-4 py-3">Pendências</th>
-            <th scope="col" className="px-4 py-3 sr-only">Ações</th>
+            <th scope="col" className="px-4 py-3 sr-only">Mostrar rede de cuidado</th>
           </tr>
         </thead>
         <tbody>
           {people.map((p) => {
             const stage = p.stage ? stageLabels[p.stage] ?? p.stage : "—";
             const location = [p.city, p.state].filter(Boolean).join("/");
+            const isExpanded = expandedIds.has(p.id);
+            const contacts = [...p.contacts].sort((a, b) => {
+              const aOrder = relationOrder[a.relation ?? ""] ?? 99;
+              const bOrder = relationOrder[b.relation ?? ""] ?? 99;
+              if (aOrder !== bOrder) return aOrder - bOrder;
+              return a.full_name.localeCompare(b.full_name, "pt-BR");
+            });
+            const networkRegionId = `care-network-${p.id}`;
+
             return (
-              <tr key={p.id} className="border-t border-border hover:bg-secondary/40">
-                <td className="px-4 py-3 align-top">
-                  <Link
-                    to={`/app/pessoas/${p.id}`}
-                    className="font-display font-semibold text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  >
-                    {p.full_name}
-                  </Link>
-                  <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                    {p.derived.age !== null && <span>{p.derived.age} anos</span>}
-                    {location && (
-                      <span className="inline-flex items-center gap-1">
-                        <MapPin className="h-3 w-3" aria-hidden /> {location}
+              <Fragment key={p.id}>
+                <tr className={cn("border-t border-border hover:bg-secondary/40", isExpanded && "bg-secondary/30")}>
+                  <td className="px-4 py-3 align-top">
+                    <Link
+                      to={`/app/pessoas/${p.id}`}
+                      className="rounded font-display font-semibold text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {p.full_name}
+                    </Link>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      {p.derived.age !== null && <span>{p.derived.age} anos</span>}
+                      {location && (
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="h-3 w-3" aria-hidden /> {location}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 align-top text-xs">{stage}</td>
+                  <td className="px-4 py-3 align-top">
+                    {isSupportedChannel(p.channel_pref) ? (
+                      <ChannelBadge channel={p.channel_pref} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+                    {p.derived.lastContactAt
+                      ? `há ${formatDistanceToNowStrict(p.derived.lastContactAt)}`
+                      : "sem registro"}
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Users className="h-3 w-3" aria-hidden />
+                      {p.derived.contactsCount}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    {p.derived.pendencies.length === 0 ? (
+                      <span className="text-xs text-care">Em dia</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-coral-soft px-2 py-0.5 text-xs font-medium text-coral-strong">
+                        <AlertCircle className="h-3 w-3" aria-hidden />
+                        {p.derived.pendencies.length}
                       </span>
                     )}
-                  </div>
-                </td>
-                <td className="px-4 py-3 align-top text-xs">{stage}</td>
-                <td className="px-4 py-3 align-top">
-                  {p.channel_pref ? (
-                    <ChannelBadge channel={p.channel_pref as "whatsapp" | "sms"} />
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 align-top text-xs text-muted-foreground">
-                  {p.derived.lastContactAt
-                    ? `há ${formatDistanceToNowStrict(p.derived.lastContactAt)}`
-                    : "sem registro"}
-                </td>
-                <td className="px-4 py-3 align-top">
-                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <Users className="h-3 w-3" aria-hidden />
-                    {p.derived.contactsCount}
-                  </span>
-                </td>
-                <td className="px-4 py-3 align-top">
-                  {p.derived.pendencies.length === 0 ? (
-                    <span className="text-xs text-care">Em dia</span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-coral-soft px-2 py-0.5 text-xs font-medium text-coral-strong">
-                      <AlertCircle className="h-3 w-3" aria-hidden />
-                      {p.derived.pendencies.length}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 align-top text-right">
-                  <Link
-                    to={`/app/pessoas/${p.id}`}
-                    aria-label={`Abrir perfil de ${p.full_name}`}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <ChevronRight className="h-4 w-4" aria-hidden />
-                  </Link>
-                </td>
-              </tr>
+                  </td>
+                  <td className="px-4 py-3 align-top text-right">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(p.id)}
+                      aria-expanded={isExpanded}
+                      aria-controls={networkRegionId}
+                      aria-label={`${isExpanded ? "Ocultar" : "Mostrar"} familiares, cuidadores e médico de ${p.full_name}`}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} aria-hidden />
+                    </button>
+                  </td>
+                </tr>
+
+                {isExpanded && (
+                  <tr id={networkRegionId} className="border-t border-border bg-secondary/20">
+                    <td colSpan={7} className="px-4 py-4">
+                      <div className="rounded-xl border border-border bg-background p-4">
+                        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h3 className="font-display text-sm font-semibold text-ink">
+                              Rede de cuidado de {p.full_name}
+                            </h3>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              Familiares, cuidadores e médicos vinculados a esta pessoa.
+                            </p>
+                          </div>
+                          <Link
+                            to={`/app/pacientes/${p.id}`}
+                            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            Gerenciar vínculos
+                          </Link>
+                        </div>
+
+                        {contacts.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-border bg-card px-4 py-5 text-center">
+                            <Users className="mx-auto h-5 w-5 text-muted-foreground" aria-hidden />
+                            <p className="mt-2 text-sm font-medium text-ink">Nenhum vínculo cadastrado</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Adicione um familiar, cuidador ou médico na ficha clínica completa.
+                            </p>
+                          </div>
+                        ) : (
+                          <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {contacts.map((contact) => (
+                              <CareNetworkCard key={contact.id} contact={contact} />
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             );
           })}
         </tbody>
