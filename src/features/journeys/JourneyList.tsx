@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Copy, GitBranch, MoreHorizontal, Pencil, Plus, Search, Trash2,
+  Copy, GitBranch, MoreHorizontal, Pause, Pencil, Play, Plus, Search, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,20 +16,20 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/care/EmptyState";
-import { useJourneys } from "./useJourneys";
+import { useJourneys, useJourneyMetrics } from "./useJourneys";
 import type { Journey, JourneyStatus } from "./types";
 
 const STATUS_LABEL: Record<JourneyStatus, string> = {
   rascunho: "Rascunho",
   pausada: "Pausada",
-  "ativa-preview": "Ativa (preview)",
+  ativa: "Ativa",
   arquivada: "Arquivada",
 };
 
 const STATUS_TONE: Record<JourneyStatus, string> = {
   rascunho: "bg-secondary text-ink border-border",
   pausada: "bg-muted text-muted-foreground border-border",
-  "ativa-preview": "bg-mint-soft text-care border-care/30",
+  ativa: "bg-mint-soft text-care border-care/30",
   arquivada: "bg-muted text-muted-foreground border-border",
 };
 
@@ -38,10 +38,15 @@ function formatDate(iso?: string) {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
-function JourneyCard({ j, onDelete, onDuplicate }: {
-  j: Journey; onDelete: () => void; onDuplicate: () => void;
+function JourneyCard({ j, onDelete, onDuplicate, onPublish, onPause }: {
+  j: Journey;
+  onDelete: () => void;
+  onDuplicate: () => void;
+  onPublish: () => void;
+  onPause: () => void;
 }) {
-  const m = j.metrics ?? { active: 0, completed: 0, interrupted: 0, failed: 0, responseRate: 0 };
+  const { data: metrics } = useJourneyMetrics(j.id);
+  const m = metrics ?? { active: 0, waiting: 0, completed: 0, failed: 0, stopped: 0, handoff: 0 };
   return (
     <Card className="p-5 shadow-soft transition hover:shadow-card">
       <div className="flex items-start justify-between gap-3">
@@ -73,6 +78,15 @@ function JourneyCard({ j, onDelete, onDuplicate }: {
                 <Pencil className="mr-2 h-4 w-4" /> Editar
               </Link>
             </DropdownMenuItem>
+            {j.status !== "ativa" ? (
+              <DropdownMenuItem onClick={onPublish}>
+                <Play className="mr-2 h-4 w-4" /> Publicar
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={onPause}>
+                <Pause className="mr-2 h-4 w-4" /> Pausar
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={onDuplicate}>
               <Copy className="mr-2 h-4 w-4" /> Duplicar
             </DropdownMenuItem>
@@ -86,10 +100,10 @@ function JourneyCard({ j, onDelete, onDuplicate }: {
       <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
           ["Ativas", m.active],
+          ["Aguardando", m.waiting],
           ["Concluídas", m.completed],
-          ["Interrompidas", m.interrupted],
           ["Falhas", m.failed],
-          ["Resp. %", m.responseRate],
+          ["Handoff", m.handoff],
         ].map(([label, value]) => (
           <div key={label as string} className="rounded-lg border border-border bg-secondary/60 p-2">
             <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
@@ -99,7 +113,7 @@ function JourneyCard({ j, onDelete, onDuplicate }: {
       </dl>
 
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-        <span>Última execução: {formatDate(m.lastRunAt)}</span>
+        <span>Última execução: {formatDate((m as any).lastRunAt)}</span>
         <Button asChild variant="ghost" size="sm">
           <Link to={`/app/jornadas/${j.id}`}>Abrir editor →</Link>
         </Button>
@@ -108,7 +122,7 @@ function JourneyCard({ j, onDelete, onDuplicate }: {
   );
 }
 
-function NewJourneyDialog({ onCreate }: { onCreate: (data: { name: string; goal: string }) => void }) {
+function NewJourneyDialog({ onCreate }: { onCreate: (data: { name: string; goal: string }) => Promise<any> | void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
@@ -139,7 +153,7 @@ function NewJourneyDialog({ onCreate }: { onCreate: (data: { name: string; goal:
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
           <Button
             disabled={!name.trim()}
-            onClick={() => { onCreate({ name: name.trim(), goal: goal.trim() }); setOpen(false); setName(""); setGoal(""); }}
+            onClick={async () => { await onCreate({ name: name.trim(), goal: goal.trim() }); setOpen(false); setName(""); setGoal(""); }}
           >
             Criar rascunho
           </Button>
@@ -150,7 +164,7 @@ function NewJourneyDialog({ onCreate }: { onCreate: (data: { name: string; goal:
 }
 
 export function JourneyList() {
-  const { journeys, create, remove, duplicate } = useJourneys();
+  const { journeys, isLoading, create, remove, duplicate, publish, pause } = useJourneys();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<JourneyStatus | "todas">("todas");
 
@@ -183,7 +197,7 @@ export function JourneyList() {
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou objetivo…" className="pl-9" />
         </div>
         <div className="flex flex-wrap gap-2">
-          {(["todas", "rascunho", "ativa-preview", "pausada", "arquivada"] as const).map((s) => (
+          {(["todas", "rascunho", "ativa", "pausada", "arquivada"] as const).map((s) => (
             <Button key={s} type="button" variant={status === s ? "default" : "outline"} size="sm"
               onClick={() => setStatus(s)}>
               {s === "todas" ? "Todas" : STATUS_LABEL[s]}
@@ -192,16 +206,25 @@ export function JourneyList() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {[0,1,2,3].map((i) => <Card key={i} className="h-40 animate-pulse bg-secondary/40" />)}
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={GitBranch}
           title={q || status !== "todas" ? "Nenhuma jornada com esses filtros" : "Ainda não há jornadas"}
-          description="Crie um rascunho e desenhe o fluxo de cuidado. Nada é executado até liberarmos o motor."
+          description="Crie um rascunho, desenhe o fluxo e publique para o motor executar."
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {filtered.map((j) => (
-            <JourneyCard key={j.id} j={j} onDelete={() => remove(j.id)} onDuplicate={() => duplicate(j.id)} />
+            <JourneyCard key={j.id} j={j}
+              onDelete={() => remove(j.id)}
+              onDuplicate={() => duplicate(j.id)}
+              onPublish={() => publish(j.id)}
+              onPause={() => pause(j.id)}
+            />
           ))}
         </div>
       )}
