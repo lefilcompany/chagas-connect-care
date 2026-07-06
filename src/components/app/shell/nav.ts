@@ -1,6 +1,6 @@
 import {
   Sun, Users, Inbox, GitBranch, ListChecks, Target, BookOpen, BarChart3,
-  FileText, Radio, Building2, ShieldCheck, UserCircle, UsersRound,
+  FileText, Building2, ShieldCheck, UserCircle, UsersRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -19,7 +19,6 @@ export const careNav: NavItem[] = [
 
 export const adminNav: NavItem[] = [
   { to: "/app/admin/modelos-meta", label: "Modelos Meta", icon: FileText },
-  { to: "/app/admin/canais", label: "Canais e integrações", icon: Radio },
   { to: "/app/admin/instituicao", label: "Instituição", icon: Building2 },
   { to: "/app/admin/equipe", label: "Equipe e permissões", icon: UsersRound },
   { to: "/app/admin/privacidade", label: "Privacidade e auditoria", icon: ShieldCheck },
