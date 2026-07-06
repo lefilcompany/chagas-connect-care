@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Info, Settings, RefreshCw, CheckCircle2, XCircle, HelpCircle, Clock, AlertTriangle, Wrench } from "lucide-react";
+import { Info, Settings, RefreshCw, CheckCircle2, XCircle, HelpCircle, Clock, AlertTriangle, Wrench, ShieldCheck } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,11 +56,21 @@ function resolveSignaturePreview(s: Settings): string {
   }
 }
 
-export default function WhatsAppSettings() {
+type WhatsAppSettingsProps = {
+  /**
+   * Advanced infrastructure controls (channels, Meta sync and diagnostics) must only be
+   * rendered inside the protected /superadmin area.
+   */
+  advanced?: boolean;
+  institutionOverride?: string;
+};
+
+export default function WhatsAppSettings({ advanced = false, institutionOverride }: WhatsAppSettingsProps = {}) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [institution, setInstitution] = useState<string>("");
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
 
   useEffect(() => {
     if (!user) return;
@@ -69,10 +79,12 @@ export default function WhatsAppSettings() {
         supabase.from("profiles").select("institution").eq("id", user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
       ]);
-      setInstitution((prof as any)?.institution ?? "");
-      setIsAdmin(((roles as any[]) ?? []).some((r) => r.role === "admin"));
+      setInstitution(institutionOverride ?? (prof as any)?.institution ?? "");
+      const roleList = ((roles as any[]) ?? []).map((r) => r.role);
+      setIsAdmin(roleList.includes("admin") || roleList.includes("superadmin"));
+      setIsSuperAdmin(roleList.includes("superadmin"));
     })();
-  }, [user]);
+  }, [user, institutionOverride]);
 
   const { data: row, isLoading, isError, refetch } = useQuery({
     queryKey: ["institutionWhatsAppSettings", institution],
@@ -177,42 +189,53 @@ export default function WhatsAppSettings() {
     <div className="space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
         <div className="rounded-lg bg-muted p-2">
-          <Settings className="h-5 w-5 text-muted-foreground" />
+          {advanced ? <ShieldCheck className="h-5 w-5 text-muted-foreground" /> : <Settings className="h-5 w-5 text-muted-foreground" />}
         </div>
         <div>
-          <h1 className="text-xl font-semibold">WhatsApp</h1>
+          <h1 className="text-xl font-semibold">{advanced ? "WhatsApp — Super Admin" : "Identidade do WhatsApp"}</h1>
           <p className="text-sm text-muted-foreground">
-            Configure o canal, a identidade institucional e como sua marca aparece nas mensagens.
+            {advanced
+              ? "Configure infraestrutura, canais, templates e diagnóstico da integração WhatsApp."
+              : "Configure somente como sua instituição aparece nas mensagens enviadas pelo WhatsApp."}
           </p>
         </div>
       </header>
 
-      {!isAdmin && (
+      {advanced && !isSuperAdmin && (
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            Apenas administradores podem alterar estas configurações. Você está em modo somente leitura.
+            Apenas superadmins podem acessar configurações avançadas de infraestrutura do WhatsApp.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!advanced && !isAdmin && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Apenas administradores da instituição podem alterar estas configurações. Você está em modo somente leitura.
           </AlertDescription>
         </Alert>
       )}
 
       <Tabs defaultValue="identity">
         <TabsList className="flex flex-wrap">
-          <TabsTrigger value="overview">Visão geral</TabsTrigger>
+          {advanced && <TabsTrigger value="overview">Visão geral</TabsTrigger>}
           <TabsTrigger value="identity">Identidade e assinatura</TabsTrigger>
-          <TabsTrigger value="templates">Templates Meta</TabsTrigger>
-          <TabsTrigger value="channel">Canal</TabsTrigger>
-          <TabsTrigger value="diagnostics">Diagnóstico</TabsTrigger>
+          {advanced && <TabsTrigger value="templates">Templates Meta</TabsTrigger>}
+          {advanced && <TabsTrigger value="channel">Canal</TabsTrigger>}
+          {advanced && <TabsTrigger value="diagnostics">Diagnóstico</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="overview">
+        {advanced && <TabsContent value="overview">
           <Card className="p-4">
             <p className="text-sm text-muted-foreground">
               Use a aba <strong>Identidade e assinatura</strong> para definir como sua instituição
               aparece nas mensagens. As demais abas serão liberadas em breve.
             </p>
           </Card>
-        </TabsContent>
+        </TabsContent>}
 
         <TabsContent value="identity">
           {isLoading || !form ? (
@@ -423,17 +446,23 @@ export default function WhatsAppSettings() {
           )}
         </TabsContent>
 
-        <TabsContent value="templates">
-          <TemplatesMetaTab institution={institution} isAdmin={isAdmin} />
-        </TabsContent>
+        {advanced && (
+          <TabsContent value="templates">
+            <TemplatesMetaTab institution={institution} isAdmin={isSuperAdmin} />
+          </TabsContent>
+        )}
 
-        <TabsContent value="channel">
-          <ChannelTab institution={institution} isAdmin={isAdmin} />
-        </TabsContent>
+        {advanced && (
+          <TabsContent value="channel">
+            <ChannelTab institution={institution} isAdmin={isSuperAdmin} />
+          </TabsContent>
+        )}
 
-        <TabsContent value="diagnostics">
-          <DiagnosticsTab isAdmin={isAdmin} />
-        </TabsContent>
+        {advanced && (
+          <TabsContent value="diagnostics">
+            <DiagnosticsTab isAdmin={isSuperAdmin} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {dirty && isAdmin && (
