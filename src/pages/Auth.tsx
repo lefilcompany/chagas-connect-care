@@ -69,8 +69,9 @@ export default function AuthPage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-soft flex items-center justify-center px-4 py-12">
+    <main className="min-h-dvh bg-gradient-soft flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
+        <h1 className="sr-only">Acessar Chagas Cuidado Digital</h1>
         <Link to="/" className="mb-8 flex items-center justify-center gap-2">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-brand-foreground">
             <Heart className="h-5 w-5" fill="currentColor" />
@@ -111,6 +112,6 @@ export default function AuthPage() {
           <Link to="/" className="hover:text-brand">← Voltar ao site</Link>
         </p>
       </div>
-    </div>
+    </main>
   );
 }

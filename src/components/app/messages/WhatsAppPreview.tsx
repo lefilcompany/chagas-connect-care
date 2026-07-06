@@ -142,7 +142,7 @@ export function WhatsAppPreview({
           <p className="text-sm font-semibold leading-tight truncate">
             {recipientName || "Destinatário"}
           </p>
-          <p className="text-[10px] opacity-80">online</p>
+          <p className="text-[10px] text-white/90">online</p>
         </div>
       </div>
       <div className="min-h-[180px] p-4" style={chatBg}>

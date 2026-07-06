@@ -252,6 +252,7 @@ export default function WhatsAppSettings() {
                     checked={form.signature_enabled}
                     onCheckedChange={(v) => update("signature_enabled", v)}
                     disabled={!isAdmin}
+                    aria-label="Exibir identidade nas mensagens"
                   />
                 </div>
 
@@ -274,7 +275,7 @@ export default function WhatsAppSettings() {
                         htmlFor={`sm-${o.v}`}
                         className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 hover:bg-muted/40"
                       >
-                        <RadioGroupItem id={`sm-${o.v}`} value={o.v} className="mt-1" />
+                        <RadioGroupItem id={`sm-${o.v}`} value={o.v} aria-label={o.l} className="mt-1" />
                         <span>
                           <span className="block text-sm font-medium">{o.l}</span>
                           <span className="block text-xs text-muted-foreground">{o.d}</span>
@@ -313,6 +314,7 @@ export default function WhatsAppSettings() {
                         checked={form.append_signature_to_text}
                         onCheckedChange={(v) => update("append_signature_to_text", v)}
                         disabled={!isAdmin || !form.signature_enabled}
+                        aria-label="Aplicar assinatura em mensagens de texto livre"
                       />
                     </div>
                     <div className="flex items-start justify-between gap-3">
@@ -326,6 +328,7 @@ export default function WhatsAppSettings() {
                         checked={form.use_native_interactive_footer}
                         onCheckedChange={(v) => update("use_native_interactive_footer", v)}
                         disabled={!isAdmin || !form.signature_enabled}
+                        aria-label="Aplicar rodapé nativo em mensagens interativas"
                       />
                     </div>
                     <div className="flex items-start justify-between gap-3">
@@ -339,6 +342,7 @@ export default function WhatsAppSettings() {
                         checked={form.use_as_template_footer_default}
                         onCheckedChange={(v) => update("use_as_template_footer_default", v)}
                         disabled={!isAdmin}
+                        aria-label="Usar como rodapé padrão para novos Templates Meta"
                       />
                     </div>
                   </div>

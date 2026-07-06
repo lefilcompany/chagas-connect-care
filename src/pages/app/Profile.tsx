@@ -99,7 +99,7 @@ export default function Profile() {
             )}
           </div>
 
-          <nav className="rounded-2xl border border-border bg-card p-2 shadow-card">
+          <nav aria-label="Seções do perfil" className="rounded-2xl border border-border bg-card p-2 shadow-card">
             {sections.map((s) => {
               const isActive = active === s.id;
               return (
@@ -140,15 +140,15 @@ export default function Profile() {
             >
               <form id="profile-form" onSubmit={saveProfile} className="space-y-5">
                 <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Nome completo</Label>
-                  <Input value={profile.full_name} onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} />
+                  <Label htmlFor="profile-full-name" className="text-xs uppercase tracking-wide text-muted-foreground">Nome completo</Label>
+                  <Input id="profile-full-name" value={profile.full_name} onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">E-mail</Label>
+                  <Label htmlFor="profile-email" className="text-xs uppercase tracking-wide text-muted-foreground">E-mail</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input value={user?.email ?? ""} disabled className="pl-9" />
+                    <Mail aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input id="profile-email" value={user?.email ?? ""} disabled className="pl-9" />
                   </div>
                   <p className="text-xs text-brand flex items-center gap-1">
                     <BadgeCheck className="h-3 w-3" /> E-mail verificado · Não pode ser alterado
@@ -157,16 +157,18 @@ export default function Profile() {
 
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Função</Label>
+                    <Label htmlFor="profile-role" className="text-xs uppercase tracking-wide text-muted-foreground">Função</Label>
                     <Input
+                      id="profile-role"
                       placeholder="Ex: Cardiologista"
                       value={profile.role_label}
                       onChange={(e) => setProfile({ ...profile, role_label: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">CRM/COREN</Label>
+                    <Label htmlFor="profile-registry" className="text-xs uppercase tracking-wide text-muted-foreground">CRM/COREN</Label>
                     <Input
+                      id="profile-registry"
                       placeholder="Ex: CRM/SP 123456"
                       value={profile.professional_registry}
                       onChange={(e) => setProfile({ ...profile, professional_registry: e.target.value })}

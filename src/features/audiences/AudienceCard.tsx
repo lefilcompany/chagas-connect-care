@@ -19,7 +19,7 @@ export function AudienceCard({
     <Card className="p-5 shadow-soft transition hover:shadow-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="font-display text-lg font-semibold text-ink">{segment.name}</h3>
+          <h2 className="font-display text-lg font-semibold text-ink">{segment.name}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {segmentSentence(segment)}
           </p>
@@ -87,7 +87,7 @@ export function AudienceCard({
           <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
             {data.sample.map((r) => (
               <li key={r.key} className="truncate">
-                • {r.name} <span className="opacity-70">({AUDIENCE_LABELS[r.relation]})</span>
+                • {r.name} <span className="text-muted-foreground">({AUDIENCE_LABELS[r.relation]})</span>
               </li>
             ))}
           </ul>

@@ -50,7 +50,7 @@ export function ChannelCard({
             <Icon className="h-5 w-5" aria-hidden />
           </div>
           <div>
-            <h3 className="font-display text-base font-semibold text-ink">{name}</h3>
+            <h2 className="font-display text-base font-semibold text-ink">{name}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
           </div>
         </div>

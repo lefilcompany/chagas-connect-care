@@ -28,7 +28,7 @@ export function DeliveryFunnel({
               <div className="flex items-baseline justify-between text-sm">
                 <span className="text-ink">{r.label}</span>
                 <span className="tabular-nums text-muted-foreground">
-                  {r.value} <span className="opacity-60">({p}%)</span>
+                  {r.value} <span className="text-muted-foreground">({p}%)</span>
                 </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-secondary" role="presentation">

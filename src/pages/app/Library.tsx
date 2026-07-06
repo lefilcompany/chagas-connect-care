@@ -43,7 +43,7 @@ function LibraryCard({
           {STATUS_LABEL[item.status]}
         </Badge>
       </div>
-      <h3 className="mt-2 font-display text-base font-semibold leading-tight text-ink">{item.title}</h3>
+      <h2 className="mt-2 font-display text-base font-semibold leading-tight text-ink">{item.title}</h2>
       <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{excerpt || "Sem corpo definido."}</p>
       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span>{formatSeconds(item.readingSeconds)}</span>

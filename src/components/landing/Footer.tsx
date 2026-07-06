@@ -19,7 +19,7 @@ export const Footer = () => (
         </div>
         <div className="grid grid-cols-2 gap-8 md:col-span-1">
           <div>
-            <h4 className="mb-3 font-display text-sm font-bold text-brand">Plataforma</h4>
+            <h2 className="mb-3 font-display text-sm font-bold text-brand">Plataforma</h2>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><a href="#funcionalidades" className="hover:text-brand">Funcionalidades</a></li>
               <li><a href="#beneficios" className="hover:text-brand">Benefícios</a></li>
@@ -27,7 +27,7 @@ export const Footer = () => (
             </ul>
           </div>
           <div>
-            <h4 className="mb-3 font-display text-sm font-bold text-brand">Legal</h4>
+            <h2 className="mb-3 font-display text-sm font-bold text-brand">Legal</h2>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link to="/politica-de-privacidade" onClick={handleLegalClick} className="hover:text-brand">Política de Privacidade</Link></li>
               <li><Link to="/termos-de-uso" onClick={handleLegalClick} className="hover:text-brand">Termos de Uso</Link></li>
@@ -38,9 +38,18 @@ export const Footer = () => (
         <div className="flex flex-col items-start gap-4 md:items-end">
           <Button variant="hero">Fale Conosco</Button>
           <div className="flex gap-2">
-            {[Instagram, Linkedin, Twitter].map((Icon, i) => (
-              <a key={i} href="#" className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-brand transition-smooth hover:bg-primary">
-                <Icon className="h-4 w-4" />
+            {[
+              { Icon: Instagram, label: "Instagram" },
+              { Icon: Linkedin, label: "LinkedIn" },
+              { Icon: Twitter, label: "Twitter" },
+            ].map(({ Icon, label }) => (
+              <a
+                key={label}
+                href="#"
+                aria-label={`Abrir perfil no ${label}`}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-brand transition-smooth hover:bg-primary"
+              >
+                <Icon className="h-4 w-4" aria-hidden />
               </a>
             ))}
           </div>

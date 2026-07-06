@@ -68,7 +68,13 @@ export function ConversationThread({
   }
 
   return (
-    <div ref={scroller} className="flex-1 overflow-y-auto bg-background/40 p-4">
+    <div
+      ref={scroller}
+      tabIndex={0}
+      role="log"
+      aria-label="Histórico da conversa"
+      className="flex-1 overflow-y-auto bg-background/40 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <ol className="flex flex-col gap-2">
         {messages.map((m) => {
           const inbound = m.direction === "inbound";
@@ -95,7 +101,7 @@ export function ConversationThread({
               )}
               {m.body && <p className="whitespace-pre-wrap">{renderWithLinks(m.body)}</p>}
               {m.last_error && (
-                <p className="mt-1 text-[11px] text-destructive-foreground/90 rounded bg-destructive/40 px-1.5 py-0.5">
+                <p className="mt-1 text-[11px] font-medium text-destructive-foreground rounded bg-destructive px-1.5 py-0.5">
                   {m.last_error}
                 </p>
               )}

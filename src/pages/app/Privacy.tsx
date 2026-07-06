@@ -146,7 +146,7 @@ export default function Privacy() {
               <div className="space-y-1.5">
                 <Label htmlFor="demo-consent">Consentimento</Label>
                 <Select value={demoConsent} onValueChange={(v) => setDemoConsent(v as ConsentValue)}>
-                  <SelectTrigger id="demo-consent"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="demo-consent" aria-label="Consentimento"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="authorized">Ativo</SelectItem>
                     <SelectItem value="pending">Pendente</SelectItem>
@@ -162,7 +162,7 @@ export default function Privacy() {
               <div className="space-y-1.5">
                 <Label htmlFor="demo-relation">Relação</Label>
                 <Select value={demoRelation} onValueChange={setDemoRelation}>
-                  <SelectTrigger id="demo-relation"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="demo-relation" aria-label="Relação"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="paciente">Paciente</SelectItem>
                     <SelectItem value="familiar">Familiar</SelectItem>

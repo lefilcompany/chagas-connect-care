@@ -47,7 +47,7 @@ function JourneyCard({ j, onDelete, onDuplicate }: {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-display text-lg font-semibold text-ink">{j.name}</h3>
+            <h2 className="font-display text-lg font-semibold text-ink">{j.name}</h2>
             <Badge variant="outline" className={STATUS_TONE[j.status]}>{STATUS_LABEL[j.status]}</Badge>
           </div>
           {j.goal ? (

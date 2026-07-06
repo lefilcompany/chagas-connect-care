@@ -23,7 +23,7 @@ const testimonials = [
 export const SocialProof = () => (
   <section id="sobre" className="py-24">
     <div className="container">
-      <p className="text-center text-sm font-semibold uppercase tracking-wider text-brand/70">Marcas de confiança</p>
+      <p className="text-center text-sm font-semibold uppercase tracking-wider text-brand">Marcas de confiança</p>
       <h2 className="mx-auto mt-3 max-w-2xl text-center font-display text-3xl font-bold text-brand md:text-4xl">
         Equipes que cuidam de pacientes e famílias com a nossa plataforma
       </h2>

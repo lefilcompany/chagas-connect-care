@@ -42,14 +42,14 @@ export function ConversationContext({
   };
 
   return (
-    <aside className="flex h-full flex-col gap-4 overflow-y-auto p-4">
+    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
       <section className="care-card p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Pessoa</p>
-            <h3 className="font-display text-base font-semibold text-ink truncate">
+            <h2 className="font-display text-base font-semibold text-ink truncate">
               {conversation.display_name}
-            </h3>
+            </h2>
             <p className="text-xs text-muted-foreground">{conversation.phone || "—"}</p>
           </div>
           <Button variant="ghost" size="icon" onClick={copyPhone} aria-label="Copiar telefone">
@@ -119,6 +119,6 @@ export function ConversationContext({
         </div>
       </section>
 
-    </aside>
+    </div>
   );
 }
