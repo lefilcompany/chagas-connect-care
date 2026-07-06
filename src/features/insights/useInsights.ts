@@ -45,7 +45,7 @@ export function useInsights(range: InsightsRange = "30d") {
     queryFn: async () => {
       const [
         sent, delivered, failed, read, inbound, outbound, batches, scheduledFuture,
-        approvedTpl, rejectedTpl, errors, msgsForResponse, interactions, dailyRows,
+        approvedTpl, rejectedTpl, errors, interactions, dailyRows,
       ] = await Promise.all([
         supabase.from("messages").select("id", { count: "exact", head: true })
           .eq("direction", "out").gte("created_at", since),
