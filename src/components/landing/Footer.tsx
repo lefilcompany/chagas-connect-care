@@ -38,9 +38,18 @@ export const Footer = () => (
         <div className="flex flex-col items-start gap-4 md:items-end">
           <Button variant="hero">Fale Conosco</Button>
           <div className="flex gap-2">
-            {[Instagram, Linkedin, Twitter].map((Icon, i) => (
-              <a key={i} href="#" className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-brand transition-smooth hover:bg-primary">
-                <Icon className="h-4 w-4" />
+            {[
+              { Icon: Instagram, label: "Instagram" },
+              { Icon: Linkedin, label: "LinkedIn" },
+              { Icon: Twitter, label: "Twitter" },
+            ].map(({ Icon, label }) => (
+              <a
+                key={label}
+                href="#"
+                aria-label={`Abrir perfil no ${label}`}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-brand transition-smooth hover:bg-primary"
+              >
+                <Icon className="h-4 w-4" aria-hidden />
               </a>
             ))}
           </div>
