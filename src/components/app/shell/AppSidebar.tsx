@@ -84,7 +84,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
       )}
 
       <ScrollArea className="min-h-0 flex-1" type="hover" scrollHideDelay={400}>
-        <nav className="px-3 py-4">
+        <nav className={cn("py-4", collapsed ? "flex flex-col items-center px-1" : "px-3")}>
           {!collapsed && (
             <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
               Cuidado
