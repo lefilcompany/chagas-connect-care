@@ -11,7 +11,7 @@ export const Benefits = () => (
   <section id="beneficios" className="bg-gradient-soft py-24">
     <div className="container grid gap-16 lg:grid-cols-2 lg:items-center">
       <div>
-        <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-brand/70">Benefícios</p>
+        <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-brand">Benefícios</p>
         <h2 className="font-display text-3xl font-bold leading-tight text-brand md:text-4xl lg:text-5xl">
           Cuidar de Chagas é cuidar de toda a rede ao redor do paciente.
         </h2>

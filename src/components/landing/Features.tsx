@@ -13,7 +13,7 @@ export const Features = () => (
   <section id="funcionalidades" className="py-24">
     <div className="container">
       <div className="mx-auto mb-16 max-w-2xl text-center">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-brand/70">Funcionalidades</p>
+        <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-brand">Funcionalidades</p>
         <h2 className="font-display text-3xl font-bold text-brand md:text-4xl lg:text-5xl">
           Ferramentas para apoiar pacientes, famílias e cuidadores
         </h2>
