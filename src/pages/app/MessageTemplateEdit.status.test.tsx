@@ -76,10 +76,15 @@ function renderPage(service: InstitutionTemplateService) {
   );
 }
 
+async function openStatusDialog() {
+  fireEvent.click(await screen.findByRole("button", { name: /Ver status na Meta/i }));
+  return screen.findByRole("dialog", { name: /Status na Meta/i });
+}
+
 describe("MessageTemplateEdit status panel", () => {
-  it('renders "Em análise" badge and "Atualizar status" button when submitted', async () => {
+  it('renders "Em análise" and the update action inside the status dialog', async () => {
     renderPage(makeService(makeTemplate()));
-    await screen.findByRole("region", { name: /status na meta/i });
+    await openStatusDialog();
     expect(screen.getAllByText(/em análise/i).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /atualizar status/i })).toBeInTheDocument();
   });
@@ -87,7 +92,8 @@ describe("MessageTemplateEdit status panel", () => {
   it("calls syncFromMeta when Atualizar status is clicked", async () => {
     const service = makeService(makeTemplate());
     renderPage(service);
-    fireEvent.click(await screen.findByRole("button", { name: /atualizar status/i }));
+    await openStatusDialog();
+    fireEvent.click(screen.getByRole("button", { name: /atualizar status/i }));
     await waitFor(() => expect(service.syncFromMeta).toHaveBeenCalledWith("t-1"));
   });
 
@@ -97,7 +103,7 @@ describe("MessageTemplateEdit status panel", () => {
       meta_rejection_reason: "INVALID_FORMAT",
     } as Partial<MessageTemplate>);
     renderPage(makeService(tpl));
-    await screen.findByRole("region", { name: /status na meta/i });
+    await openStatusDialog();
     expect(screen.getByText(/INVALID_FORMAT/)).toBeInTheDocument();
   });
 });
