@@ -108,17 +108,19 @@ export default function Profile() {
                   type="button"
                   onClick={() => setActive(s.id)}
                   className={cn(
-                    "w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors relative",
-                    isActive ? "bg-primary text-brand" : "hover:bg-muted text-foreground",
+                    "group w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200 relative",
+                    isActive
+                      ? "bg-primary/10 text-brand"
+                      : "text-foreground hover:bg-muted/60",
                   )}
                 >
                   {isActive && <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r bg-brand" />}
-                  <s.icon className={cn("h-5 w-5", isActive ? "text-brand" : "text-muted-foreground")} />
+                  <s.icon className={cn("h-5 w-5 transition-colors", isActive ? "text-brand" : "text-muted-foreground group-hover:text-brand")} />
                   <div className="flex-1 min-w-0">
-                    <div className={cn("text-sm font-semibold", isActive && "text-brand")}>{s.label}</div>
+                    <div className={cn("text-sm font-semibold", isActive ? "text-brand" : "text-foreground")}>{s.label}</div>
                     <div className="text-xs text-muted-foreground truncate">{s.description}</div>
                   </div>
-                  <ChevronRight className={cn("h-4 w-4", isActive ? "text-brand" : "text-muted-foreground")} />
+                  <ChevronRight className={cn("h-4 w-4 transition-transform", isActive ? "text-brand translate-x-0.5" : "text-muted-foreground group-hover:translate-x-0.5")} />
                 </button>
               );
             })}
