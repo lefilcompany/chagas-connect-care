@@ -7,14 +7,11 @@ export function CareAgenda() {
   const { data, isLoading } = useQuery({
     queryKey: ["today-agenda"],
     queryFn: async () => {
-      const now = new Date().toISOString();
-      const in7d = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
       const { data } = await supabase
         .from("message_batches")
-        .select("id, name, scheduled_at, status")
-        .gte("scheduled_at", now)
-        .lte("scheduled_at", in7d)
-        .order("scheduled_at", { ascending: true })
+        .select("id, name, started_at, created_at, status")
+        .in("status", ["scheduled", "pending", "processing"])
+        .order("started_at", { ascending: true, nullsFirst: false })
         .limit(8);
       return data ?? [];
     },
@@ -36,7 +33,8 @@ export function CareAgenda() {
   return (
     <ol className="space-y-2">
       {data.map((b) => {
-        const when = b.scheduled_at ? new Date(b.scheduled_at).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+        const at = b.started_at ?? b.created_at;
+        const when = at ? new Date(at).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
         return (
           <li key={b.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
             <CalendarClock className="h-4 w-4 text-care" aria-hidden />
