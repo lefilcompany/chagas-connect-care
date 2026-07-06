@@ -119,6 +119,6 @@ export function ConversationContext({
         </div>
       </section>
 
-    </aside>
+    </section>
   );
 }
