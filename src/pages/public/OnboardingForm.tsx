@@ -202,7 +202,7 @@ export default function OnboardingForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-brand/5 to-background flex items-center justify-center p-4">
+    <main className="min-h-dvh bg-gradient-to-b from-brand/5 to-background flex items-center justify-center p-4">
       <Card className="w-full max-w-lg p-6 space-y-5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-brand">
@@ -502,7 +502,7 @@ export default function OnboardingForm() {
           </div>
         ) : null}
       </Card>
-    </div>
+    </main>
   );
 }
 
