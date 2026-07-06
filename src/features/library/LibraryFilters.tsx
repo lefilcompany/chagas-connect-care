@@ -36,7 +36,7 @@ export function LibraryFilters({
           />
         </div>
         <Select value={value.folder} onValueChange={(v) => onChange({ ...value, folder: v })}>
-          <SelectTrigger><SelectValue placeholder="Pasta" /></SelectTrigger>
+          <SelectTrigger aria-label="Filtrar por pasta"><SelectValue placeholder="Pasta" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas as pastas</SelectItem>
             {folders.map((f) => (
@@ -45,7 +45,7 @@ export function LibraryFilters({
           </SelectContent>
         </Select>
         <Select value={value.audience} onValueChange={(v) => onChange({ ...value, audience: v })}>
-          <SelectTrigger><SelectValue placeholder="Público" /></SelectTrigger>
+          <SelectTrigger aria-label="Filtrar por público"><SelectValue placeholder="Público" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todos os públicos</SelectItem>
             <SelectItem value="paciente">Paciente</SelectItem>
