@@ -13,8 +13,9 @@ export function ChannelHealthPill({ collapsed = false }: { collapsed?: boolean }
     queryKey: ["channel-health-pill"],
     queryFn: async () => {
       const { data } = await supabase
-        .from("institution_whatsapp_settings")
-        .select("phone_verified, business_verification_status")
+        .from("whatsapp_channels")
+        .select("status, last_synced_at")
+        .order("last_synced_at", { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
       return data;
@@ -22,7 +23,7 @@ export function ChannelHealthPill({ collapsed = false }: { collapsed?: boolean }
     staleTime: 60_000,
   });
 
-  const ok = data?.phone_verified === true;
+  const ok = data?.status === "connected" || data?.status === "active";
   const label = ok ? "Canais operando" : data ? "Verificar canais" : "Sem canal";
 
   return (
