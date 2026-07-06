@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, BadgeCheck, MessagesSquare, Workflow, ShieldCheck } from "lucide-react";
 import { TemplateCard } from "@/components/app/messages/TemplateCard";
 import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
 import { MetaStatusDialog } from "@/components/app/messages/MetaStatusDialog";
@@ -109,24 +109,31 @@ export default function MessageTemplates() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="font-display text-2xl font-bold text-brand">Modelos de mensagem</h1>
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            Consulte todos os modelos de mensagem disponíveis para sua instituição, entenda o
-            status de análise de cada um e utilize os aprovados nas suas campanhas.
-          </p>
+      <header className="care-hero p-6 md:p-7">
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl space-y-3">
+            <div className="care-chip"><BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Biblioteca clínica + Meta</div>
+            <h1 className="font-display text-3xl md:text-4xl font-bold text-brand">Modelos que já nascem prontos para cuidado, auditoria e WhatsApp.</h1>
+            <p className="text-sm text-foreground/70">
+              Organize lembretes de consulta, preparo, educação em saúde e dados do médico em cards com status de aprovação, categoria e uso seguro em campanhas.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <span className="care-chip"><MessagesSquare className="h-3.5 w-3.5 text-primary" /> Conversa clara</span>
+              <span className="care-chip"><Workflow className="h-3.5 w-3.5 text-primary" /> Variáveis controladas</span>
+              <span className="care-chip"><ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Status Meta visível</span>
+            </div>
+          </div>
+          {identity.isAdmin && (
+            <Button asChild className="bg-brand text-brand-foreground hover:bg-brand/90">
+              <Link to="/app/modelos/novo" aria-label="Novo modelo">
+                <Plus className="h-4 w-4" /> Novo modelo
+              </Link>
+            </Button>
+          )}
         </div>
-        {identity.isAdmin && (
-          <Button asChild>
-            <Link to="/app/modelos/novo" aria-label="Novo modelo">
-              <Plus className="h-4 w-4" /> Novo modelo
-            </Link>
-          </Button>
-        )}
       </header>
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="care-card flex flex-wrap items-end gap-3 p-4">
         <div className="relative flex-1 min-w-[240px]">
           <label htmlFor="tpl-search" className="sr-only">Buscar modelo</label>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -215,7 +222,7 @@ export default function MessageTemplates() {
       )}
 
       {!loadError && !isLoading && filtered.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((t) => {
             const isMeta = t.template_kind === "meta";
             let disabledReason: string | undefined;

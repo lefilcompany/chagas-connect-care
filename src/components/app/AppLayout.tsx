@@ -7,6 +7,7 @@ import { prefetchAllAppRoutes, prefetchRoute } from "@/lib/queries";
 import {
   LayoutDashboard, Users, MessageCircle, BookOpen, BarChart3,
   UserCircle, LogOut, Menu, X, Target, Settings, Inbox, FileText,
+  ShieldCheck, HeartPulse, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -70,17 +71,25 @@ export const AppLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-muted/40 flex">
+    <div className="min-h-screen flex">
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border flex flex-col transition-transform lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 w-72 bg-card/85 backdrop-blur-xl border-r border-white/70 flex flex-col transition-transform lg:translate-x-0 shadow-soft",
         open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
       )}>
-        <div className="h-16 flex items-center justify-between px-5 border-b border-border">
+        <div className="h-20 flex items-center justify-between px-5 border-b border-border/70">
           <NavLink to="/app" className="flex items-center gap-2" aria-label="ELO2">
-            <img src={elo2Logo.url} alt="ELO2" className="h-8 w-auto" />
+            <img src={elo2Logo.url} alt="ELO2" className="h-9 w-auto" />
           </NavLink>
           <button className="lg:hidden" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
+        </div>
+        <div className="mx-3 mt-4 rounded-3xl border border-primary/20 bg-primary/10 p-3">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-brand/70"><HeartPulse className="h-3.5 w-3.5" /> Centro de cuidado</div>
+          <p className="mt-2 text-sm font-semibold text-brand">Comunicação clínica coordenada</p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-1"><ShieldCheck className="h-3 w-3 text-emerald-600" /> Seguro</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-1"><Sparkles className="h-3 w-3 text-primary" /> Meta-ready</span>
+          </div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {nav.map((n) => (
@@ -94,7 +103,7 @@ export const AppLayout = () => {
               onTouchStart={() => prefetchRoute(queryClient, n.to)}
               className={({ isActive }) => cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive ? "bg-primary text-brand" : "text-foreground/70 hover:bg-muted hover:text-brand",
+                isActive ? "bg-brand text-brand-foreground shadow-card" : "text-foreground/70 hover:bg-primary/15 hover:text-brand",
               )}
             >
               <n.icon className="h-4 w-4" />{n.label}
@@ -143,11 +152,11 @@ export const AppLayout = () => {
         <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />
       )}
 
-      <div className="flex-1 lg:ml-64 flex flex-col min-w-0">
+      <div className="flex-1 lg:ml-72 flex flex-col min-w-0">
         <header className="h-16 bg-card border-b border-border flex items-center px-4 md:px-8 lg:hidden">
           <button onClick={() => setOpen(true)}><Menu className="h-6 w-6 text-brand" /></button>
         </header>
-        <main className="flex-1 p-4 md:p-8">
+        <main className="flex-1 p-4 md:p-8 xl:p-10">
           <Outlet />
         </main>
       </div>
