@@ -270,7 +270,24 @@ export function InboxComposer({
               size="sm"
               variant="hero"
               onClick={handleSendText}
-              disabled={sending || uploading || (!text.trim() && !attachment) || !windowOpen}
+              disabled={
+                sending || uploading || (!text.trim() && !attachment) || !windowOpen ||
+                !evaluatePrivacy({
+                  consent: recipientMeta?.consent,
+                  channel: "whatsapp",
+                  phone: conversation.phone,
+                  relation: recipientMeta?.relation,
+                  hasClinicalContent: messageHasClinicalContent(text),
+                }).ok ||
+                ((messageHasClinicalContent(text) ||
+                  evaluatePrivacy({
+                    consent: recipientMeta?.consent,
+                    channel: "whatsapp",
+                    phone: conversation.phone,
+                    relation: recipientMeta?.relation,
+                    hasClinicalContent: messageHasClinicalContent(text),
+                  }).issues.some((i) => i.severity === "warn")) && !ackClinical)
+              }
             >
               {sending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
               Enviar
