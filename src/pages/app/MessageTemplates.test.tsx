@@ -3,9 +3,6 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 
-// Avoid the real UseTemplateDialog: it queries supabase + auth on open which
-// hangs in unit tests. We only need to assert the dialog opens with the
-// selected template name.
 vi.mock("@/components/app/messages/UseTemplateDialog", () => ({
   UseTemplateDialog: ({ open, template }: any) =>
     open && template ? (
@@ -57,6 +54,7 @@ type RenderOpts = {
   templates?: MessageTemplate[];
   identity?: Partial<InstitutionIdentity>;
   serviceOverride?: Partial<InstitutionTemplateService>;
+  initialEntries?: string[];
 };
 
 function renderPage(opts: RenderOpts = {}) {
@@ -81,10 +79,9 @@ function renderPage(opts: RenderOpts = {}) {
     ...opts.serviceOverride,
   };
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const initialEntries = (opts as RenderOpts & { initialEntries?: string[] }).initialEntries ?? ["/"];
   const utils = render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={initialEntries}>
+      <MemoryRouter initialEntries={opts.initialEntries ?? ["/"]}>
         <InstitutionIdentityContext.Provider value={identity}>
           <InstitutionTemplateServiceContext.Provider value={service}>
             <MessageTemplates />
@@ -104,8 +101,8 @@ describe("MessageTemplates page", () => {
         makeTemplate({ id: "2", name: "Modelo de outra clínica", institution: "Inst B" }),
       ],
     });
-    expect(await screen.findByText("Boas-vindas")).toBeInTheDocument();
-    expect(screen.queryByText("Modelo de outra clínica")).not.toBeInTheDocument();
+    expect((await screen.findAllByText("Boas-vindas")).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Modelo de outra clínica")).toHaveLength(0);
   });
 
   it("filters the list by search term", async () => {
@@ -115,12 +112,12 @@ describe("MessageTemplates page", () => {
         makeTemplate({ id: "2", name: "Boas-vindas" }),
       ],
     });
-    await screen.findByText("Lembrete de consulta");
+    await screen.findAllByText("Lembrete de consulta");
     fireEvent.change(screen.getByPlaceholderText(/Buscar por nome/i), {
       target: { value: "boas" },
     });
-    expect(screen.getByText("Boas-vindas")).toBeInTheDocument();
-    expect(screen.queryByText("Lembrete de consulta")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Boas-vindas").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Lembrete de consulta")).toHaveLength(0);
   });
 
   it("filters the list by status", async () => {
@@ -130,10 +127,10 @@ describe("MessageTemplates page", () => {
         makeTemplate({ id: "2", name: "Modelo Bravo", meta_status: "submitted" }),
       ],
     });
-    await screen.findByText("Modelo Alfa");
+    await screen.findAllByText("Modelo Alfa");
     fireEvent.change(screen.getByLabelText("Status"), { target: { value: "submitted" } });
-    expect(screen.getByText("Modelo Bravo")).toBeInTheDocument();
-    expect(screen.queryByText("Modelo Alfa")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Modelo Bravo").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Modelo Alfa")).toHaveLength(0);
   });
 
   it("enables 'Usar modelo' for approved Meta templates", async () => {
@@ -172,19 +169,19 @@ describe("MessageTemplates page", () => {
     expect(button).toHaveAttribute("title", expect.stringMatching(/Rejeitado/i));
   });
 
-  it("shows the admin management hint only for admins", async () => {
+  it("shows the model creation action only for admins", async () => {
     const { unmount } = renderPage({
       templates: [makeTemplate()],
       identity: { isAdmin: true },
     });
-    expect(await screen.findByText(/Em breve: criar e submeter modelos/i)).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Novo modelo/i })).toBeInTheDocument();
     unmount();
 
     renderPage({
       templates: [makeTemplate()],
       identity: { isAdmin: false },
     });
-    expect(screen.queryByText(/Em breve: criar e submeter modelos/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Novo modelo/i })).not.toBeInTheDocument();
   });
 
   it("shows an empty-state message when the institution has no templates", async () => {
@@ -201,7 +198,7 @@ describe("MessageTemplates page", () => {
     const retry = await screen.findByRole("button", { name: /Tentar novamente/i });
     fireEvent.click(retry);
     await waitFor(() =>
-      expect(screen.getByText("Recuperado")).toBeInTheDocument(),
+      expect(screen.getAllByText("Recuperado").length).toBeGreaterThan(0),
     );
   });
 
@@ -211,11 +208,10 @@ describe("MessageTemplates page", () => {
         makeTemplate({ id: "1", name: "Consulta A", category: "consulta" }),
         makeTemplate({ id: "2", name: "Remédio B", category: "medicacao" }),
       ],
-      // @ts-expect-error extra prop consumed by the test helper
       initialEntries: ["/app/modelos?categoria=consulta"],
     });
-    expect(await screen.findByText("Consulta A")).toBeInTheDocument();
-    expect(screen.queryByText("Remédio B")).not.toBeInTheDocument();
+    expect((await screen.findAllByText("Consulta A")).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Remédio B")).toHaveLength(0);
     expect((screen.getByLabelText("Categoria") as HTMLSelectElement).value).toBe("consulta");
   });
 });
