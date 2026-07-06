@@ -19,7 +19,7 @@ export function AudienceCard({
     <Card className="p-5 shadow-soft transition hover:shadow-card">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="font-display text-lg font-semibold text-ink">{segment.name}</h3>
+          <h2 className="font-display text-lg font-semibold text-ink">{segment.name}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {segmentSentence(segment)}
           </p>
