@@ -1,5 +1,5 @@
 import {
-  Sun, Users, Inbox, GitBranch, BookOpen, BarChart3,
+  Sun, Users, Inbox, GitBranch, Target, BookOpen, BarChart3,
   FileText, Radio, Building2, ShieldCheck, UserCircle, UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -11,6 +11,7 @@ export const careNav: NavItem[] = [
   { to: "/app/pessoas", label: "Pessoas", icon: Users },
   { to: "/app/caixa", label: "Caixa de cuidado", icon: Inbox },
   { to: "/app/jornadas", label: "Jornadas", icon: GitBranch },
+  { to: "/app/audiencias", label: "Audiências", icon: Target },
   { to: "/app/biblioteca", label: "Biblioteca", icon: BookOpen },
   { to: "/app/insights", label: "Insights", icon: BarChart3 },
 ];
