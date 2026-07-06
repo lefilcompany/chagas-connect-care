@@ -40,7 +40,7 @@ export default function Dashboard() {
             <h1 className="mt-4 font-display text-3xl md:text-5xl font-bold tracking-tight text-brand">
               Orquestração de cuidado para pacientes, família e cuidadores.
             </h1>
-            <p className="mt-3 max-w-3xl text-sm md:text-base text-foreground/70">
+            <p className="mt-3 max-w-3xl text-sm md:text-base text-muted-foreground">
               Centralize orientações de saúde, lembretes de consulta, informações do médico e templates Meta em uma experiência pensada para WhatsApp, continuidade do cuidado e ação rápida da equipe.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">

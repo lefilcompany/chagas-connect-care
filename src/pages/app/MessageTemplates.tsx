@@ -114,7 +114,7 @@ export default function MessageTemplates() {
           <div className="max-w-3xl space-y-3">
             <div className="care-chip"><BadgeCheck className="h-3.5 w-3.5 text-emerald-600" /> Biblioteca clínica + Meta</div>
             <h1 className="font-display text-3xl md:text-4xl font-bold text-brand">Modelos que já nascem prontos para cuidado, auditoria e WhatsApp.</h1>
-            <p className="text-sm text-foreground/70">
+            <p className="text-sm text-muted-foreground">
               Organize lembretes de consulta, preparo, educação em saúde e dados do médico em cards com status de aprovação, categoria e uso seguro em campanhas.
             </p>
             <div className="grid gap-2 sm:grid-cols-3">

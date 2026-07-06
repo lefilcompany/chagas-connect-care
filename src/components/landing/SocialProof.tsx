@@ -30,7 +30,7 @@ export const SocialProof = () => (
 
       <div className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
         {logos.map((l) => (
-          <div key={l} className="flex items-center justify-center rounded-xl border border-border bg-card px-4 py-6 text-center font-display text-sm font-bold text-brand/60 transition-smooth hover:text-brand">
+          <div key={l} className="flex items-center justify-center rounded-xl border border-border bg-card px-4 py-6 text-center font-display text-sm font-bold text-brand transition-smooth hover:opacity-80">
             {l}
           </div>
         ))}

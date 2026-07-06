@@ -27,7 +27,7 @@ export const Features = () => (
             key={f.title}
             className="group relative rounded-2xl border border-border bg-card p-7 shadow-card transition-smooth hover:-translate-y-1 hover:border-primary hover:shadow-soft"
           >
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/50 text-brand transition-smooth group-hover:bg-brand group-hover:text-brand-foreground">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-brand transition-smooth group-hover:bg-brand group-hover:text-brand-foreground">
               <f.icon className="h-6 w-6" />
             </div>
             <h3 className="mb-2 font-display text-xl font-bold text-brand">{f.title}</h3>
