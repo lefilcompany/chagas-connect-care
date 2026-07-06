@@ -293,7 +293,7 @@ export default function Messages() {
           </span>
           {activeFilters.length > 0 && (
             <>
-              <span className="text-muted-foreground/50 pt-2 hidden sm:inline">·</span>
+              <span className="text-muted-foreground pt-2 hidden sm:inline" aria-hidden="true">·</span>
               {activeFilters.map((f) => (
                 <button
                   key={f.key}
@@ -430,7 +430,7 @@ function TimelineView({
           <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground font-semibold">
             <ListOrdered className="h-3.5 w-3.5" />
             <span className="capitalize">{day}</span>
-            <span className="text-muted-foreground/60">· {items.length}</span>
+            <span className="text-muted-foreground">· {items.length}</span>
           </div>
           <div className="rounded-2xl border border-border bg-card overflow-hidden">
             <ul className="divide-y divide-border">
