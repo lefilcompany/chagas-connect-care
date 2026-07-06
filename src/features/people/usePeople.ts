@@ -40,11 +40,10 @@ export function usePeopleWithDerived() {
 
       if (pRes.error) throw pRes.error;
       if (cRes.error) throw cRes.error;
-      if (mRes.error) throw mRes.error;
 
       const patients = (pRes.data ?? []) as PersonRow[];
       const contacts = (cRes.data ?? []) as CareNetworkContact[];
-      const messages = mRes.data ?? [];
+      const messages = mRes.error ? [] : (mRes.data ?? []);
 
       const contactsByPatient = new Map<string, CareNetworkContact[]>();
       for (const c of contacts) {
