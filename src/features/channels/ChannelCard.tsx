@@ -1,4 +1,5 @@
 import { type LucideIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,7 +80,7 @@ export function ChannelCard({
           {actions.map((a) => (
             a.href ? (
               <Button key={a.label} asChild variant={a.variant ?? "outline"} size="sm" disabled={a.disabled}>
-                <a href={a.href}>{a.label}</a>
+                <Link to={a.href}>{a.label}</Link>
               </Button>
             ) : (
               <Button key={a.label} variant={a.variant ?? "outline"} size="sm" onClick={a.onClick} disabled={a.disabled}>
