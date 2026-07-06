@@ -34,6 +34,9 @@ import {
 import { TemplateCard, StartBlankCard } from "./TemplateCard";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 import { VariableInput } from "./VariableInput";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MessageSafetyPreview, messageHasClinicalContent } from "@/features/privacy/MessageSafetyPreview";
+import { ShieldAlert, ShieldCheck } from "lucide-react";
 
 const STEPS = ["Modelo", "Destinatários", "Revisar", "Enviar"] as const;
 
@@ -74,6 +77,7 @@ export default function CampaignTab({
   const [institution, setInstitution] = useState("");
   const [medicationMode, setMedicationMode] = useState<"all" | "first">("all");
   const [branding, setBranding] = useState<InstitutionWhatsAppSettings | null>(null);
+  const [confirmPrivacy, setConfirmPrivacy] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -331,6 +335,15 @@ export default function CampaignTab({
 
   const handleSend = async () => {
     if (finalRecipients.length === 0) return toast.error("Sem destinatários");
+    const clinical = messageHasClinicalContent(renderedBody);
+    const invalid = finalRecipients.filter((r) => !normalizeBR(r.phone)).length;
+    const thirdParty = clinical
+      ? finalRecipients.filter((r) => r.relation && r.relation !== "paciente").length
+      : 0;
+    const needsConfirm = clinical || invalid > 0 || thirdParty > 0;
+    if (needsConfirm && !confirmPrivacy) {
+      return toast.error("Confirme os avisos de privacidade antes de disparar.");
+    }
     setSending(true);
     const result = await createBatch({
       name: campaignName.trim() || (selectedTemplate?.name ?? "Campanha"),
@@ -375,6 +388,7 @@ export default function CampaignTab({
     setVars({});
     setSelected(new Set());
     setPatientIds([]);
+    setConfirmPrivacy(false);
   };
 
   return (
@@ -728,18 +742,13 @@ export default function CampaignTab({
       )}
 
       {step === 3 && (
-        <div className="space-y-4 text-center py-6">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Send className="h-7 w-7" />
-          </div>
-          <h3 className="font-display text-xl font-bold text-brand">
-            Confirmar disparo para {finalRecipients.length} destinatário(s)?
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Ao confirmar, as mensagens entram na fila e são enviadas pelo WhatsApp.
-            Você poderá acompanhar o status no Histórico.
-          </p>
-        </div>
+        <BulkPrivacyConfirm
+          recipients={finalRecipients}
+          renderedBody={renderedBody}
+          normalizeBR={normalizeBR}
+          confirmed={confirmPrivacy}
+          onConfirmChange={setConfirmPrivacy}
+        />
       )}
 
       <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">
@@ -759,12 +768,115 @@ export default function CampaignTab({
             Avançar <ChevronRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button variant="hero" onClick={handleSend} disabled={sending || finalRecipients.length === 0}>
+          <Button
+            variant="hero"
+            onClick={handleSend}
+            disabled={
+              sending || finalRecipients.length === 0 ||
+              (bulkNeedsConfirm({
+                recipients: finalRecipients,
+                body: renderedBody,
+                normalizeBR,
+              }) && !confirmPrivacy)
+            }
+          >
             <CheckCircle2 className="h-4 w-4" />
             {sending ? "Disparando..." : "Confirmar e enviar"}
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+function bulkNeedsConfirm({
+  recipients, body, normalizeBR,
+}: { recipients: Recipient[]; body: string; normalizeBR: (r: string) => string | null }) {
+  const clinical = messageHasClinicalContent(body);
+  const invalid = recipients.filter((r) => !normalizeBR(r.phone)).length;
+  const thirdParty = clinical
+    ? recipients.filter((r) => r.relation && r.relation !== "paciente").length
+    : 0;
+  return clinical || invalid > 0 || thirdParty > 0;
+}
+
+function BulkPrivacyConfirm({
+  recipients, renderedBody, normalizeBR, confirmed, onConfirmChange,
+}: {
+  recipients: Recipient[];
+  renderedBody: string;
+  normalizeBR: (r: string) => string | null;
+  confirmed: boolean;
+  onConfirmChange: (v: boolean) => void;
+}) {
+  const clinical = messageHasClinicalContent(renderedBody);
+  const invalid = recipients.filter((r) => !normalizeBR(r.phone)).length;
+  const thirdParty = clinical
+    ? recipients.filter((r) => r.relation && r.relation !== "paciente").length
+    : 0;
+  const needsConfirm = clinical || invalid > 0 || thirdParty > 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center space-y-3 py-2">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Send className="h-7 w-7" />
+        </div>
+        <h3 className="font-display text-xl font-bold text-brand">
+          Confirmar disparo para {recipients.length} destinatário(s)?
+        </h3>
+        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+          Ao confirmar, as mensagens entram na fila e são enviadas pelo WhatsApp.
+          Você poderá acompanhar o status no Histórico.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs uppercase">Verificação de segurança do conteúdo</Label>
+        <MessageSafetyPreview body={renderedBody} />
+      </div>
+
+      <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm space-y-2">
+        <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
+          <ShieldAlert className="h-4 w-4" aria-hidden />
+          Verificação de privacidade da audiência
+        </div>
+        <ul className="space-y-1 text-sm">
+          <li className="flex items-center justify-between">
+            <span>Destinatários totais</span>
+            <span className="font-semibold">{recipients.length}</span>
+          </li>
+          <li className={`flex items-center justify-between ${invalid > 0 ? "text-destructive" : ""}`}>
+            <span>Telefones inválidos (serão pulados)</span>
+            <span className="font-semibold">{invalid}</span>
+          </li>
+          <li className={`flex items-center justify-between ${thirdParty > 0 ? "text-primary" : ""}`}>
+            <span>Conteúdo clínico enviado a terceiros (não paciente)</span>
+            <span className="font-semibold">{thirdParty}</span>
+          </li>
+          {!needsConfirm && (
+            <li className="flex items-center gap-2 text-care pt-1">
+              <ShieldCheck className="h-4 w-4" aria-hidden />
+              Nenhum aviso adicional detectado.
+            </li>
+          )}
+        </ul>
+      </div>
+
+      {needsConfirm && (
+        <label className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+          <Checkbox
+            checked={confirmed}
+            onCheckedChange={(v) => onConfirmChange(!!v)}
+            className="mt-0.5"
+            aria-label="Confirmação de privacidade"
+          />
+          <span>
+            Confirmo que revisei os avisos acima, que os destinatários possuem
+            autorização adequada e assumo a responsabilidade pelo disparo.
+          </span>
+        </label>
+      )}
     </div>
   );
 }
