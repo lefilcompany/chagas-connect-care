@@ -1,112 +1,112 @@
+# Motor de execução de Jornadas — plano
 
-# Redesign Chagas Connect Care — Plano faseado
+Substitui o stub atual (localStorage) por persistência real, runner determinístico e agendador. Mantém a UI atual do `JourneyBuilder`/`JourneyList` intacta, apenas trocando a fonte de dados. Preserva contratos das edge functions de envio (`send-whatsapp`) e não altera nenhum schema existente.
 
-Execução em **6 fases**. Cada fase é entregável, testável e mantém o app 100% funcional. Nada de regressão de dados, contratos Supabase preservados, componentes shadcn reaproveitados.
+## Escopo desta fase
 
-## Princípios transversais (aplicados em todas as fases)
+Suportado no runner v1:
+- Nós **entrada** (gatilho manual + gatilho por evento `patient.created`, `patient.appointment_upcoming`), **audiencia** (aplica filtro do `audience_segments`), **condicao** (regra simples campo/operador/valor), **whatsapp** (chama `send-whatsapp` com template Meta aprovado), **aguardar** (delay em minutos/horas/dias ou até timestamp), **verificar-resposta** (checa se houve reply na janela), **criar-tarefa** (grava em `journey_tasks`), **notificar-equipe** (marca notificação interna), **encaminhar-humano** (fecha o run + abre conversa priorizada), **encerrar**.
+- Nós **sms**, **email**, **pagina-segura** ficam persistidos mas o runner os marca `skipped` com motivo "canal não habilitado" — sem quebrar o fluxo.
 
-- **Design tokens em `src/index.css` + `tailwind.config.ts`**. Nenhum `text-white`/`bg-[#...]` em componente. Tokens semânticos: `--brand-graphite #4A504A`, `--ink #29322E`, `--coral #E7877C`, `--coral-strong #B94E47` (primary de ação), `--care-green #236B5A` (confirmação), `--care-green-medium #2F7D6C`, `--mint-soft #E7F2EE`, `--coral-soft #FBE9E6`, `--background-warm #FFF8F5`, `--background-neutral #F4F7F5`, `--border-soft #DDE4E0`, `--text-muted #65716B`. Dark mode adaptado (sem azul shadcn genérico).
-- **Tipografia**: mantém Plus Jakarta Sans (títulos) e Inter (UI). Escala H1 32/40, H2 24/32, H3 20/28, body 16/24, small 14/20, caption 12/16.
-- **Acessibilidade WCAG 2.2 AA**: contraste, foco visível, alvos ≥44px, `prefers-reduced-motion`, sem cor como único indicador (sempre ícone+texto), `aria-live` para status.
-- **Organização**: cada área nova em `src/features/<area>/{components,hooks,services,types.ts}`. Nada de arquivos > ~300 linhas.
-- **Sem métricas fictícias**: componentes de dashboard usam `useQuery` real; quando faltar dado, `EmptyState` explícito.
-- **Rotas antigas → `<Navigate replace>`** para novas URLs; nenhum bookmark quebra.
+Fora do escopo (fica para uma próxima fase):
+- Editor visual de arestas condicionais complexas (a v1 usa a ordem das colunas + ramificação binária "sim/não" só no `verificar-resposta` e `condicao`).
+- Retry exponencial configurável por nó (v1 tem retry fixo: 3 tentativas, backoff 1min/5min/30min).
 
----
+## Modelo de dados (nova migração)
 
-## Fase 1 — Fundação: tokens, tipografia, shell, "Hoje"
+Quatro tabelas novas, todas com `institution` para RLS por instituição via `get_user_institution(auth.uid())`:
 
-**Objetivo**: base visual + navegação nova + primeira página operacional.
+```
+journeys                — 1 linha por jornada
+  id, institution, name, goal, status ('rascunho'|'ativa'|'pausada'|'arquivada'),
+  trigger jsonb,        — { kind: 'manual'|'event', event?: 'patient.created'|... }
+  audience_id uuid null → audience_segments.id,
+  graph jsonb,          — { columns: [{id,title,nodes:[...]}] }  (mesma forma do stub)
+  version int,          — incrementa a cada publish
+  created_by, created_at, updated_at
 
-Entregas:
-1. `src/index.css`: reescrever camada `:root` e `.dark` com a paleta acima em HSL; remover cores hardcoded remanescentes.
-2. `tailwind.config.ts`: mapear tokens (`brand`, `coral`, `coralStrong`, `careGreen`, `mintSoft`, `warm`, `borderSoft`, `mutedText`), radius, sombras suaves.
-3. `src/components/ui/button.tsx`: variantes `primary` (coral-strong), `care` (care-green), `soft`, `ghost` — sem `text-white` fixo, tudo via tokens.
-4. **App shell novo** (`src/components/app/shell/`):
-   - `AppSidebar.tsx` (264px, colapsável 80px) com grupos: **Cuidado** (Hoje, Pessoas, Caixa de cuidado, Jornadas, Biblioteca, Insights) e **Administração** recolhível (Modelos Meta, Canais, Instituição, Equipe, Privacidade, Perfil).
-   - `InstitutionSwitcher.tsx`, `ChannelHealthPill.tsx` (compacto no rodapé da sidebar), `UserFooter.tsx`.
-   - Mobile: header 64px + drawer; sem bottom nav.
-   - Substitui `src/components/app/AppLayout.tsx` mas mantém a mesma API de `<Outlet />`.
-5. **Rotas** em `src/App.tsx`:
-   - Novas: `/app/hoje`, `/app/pessoas`, `/app/pessoas/:id`, `/app/caixa`, `/app/jornadas`, `/app/biblioteca`, `/app/insights`, `/app/admin/modelos-meta`, `/app/admin/canais`, `/app/admin/instituicao`, `/app/admin/equipe`, `/app/admin/privacidade`, `/app/admin/perfil`.
-   - Redirects: `/app` → `/app/hoje`, `/app/pacientes*` → `/app/pessoas*`, `/app/mensagens` + `/app/conversas` → `/app/caixa`, `/app/conteudos*` → `/app/biblioteca*`, `/app/conteudos/campanha` → `/app/jornadas`, `/app/segmentos*` → `/app/jornadas` (aba Audiências), `/app/modelos*` → `/app/admin/modelos-meta*`, `/app/relatorios` → `/app/insights`, `/app/configuracoes/whatsapp` → `/app/admin/canais`, `/app/perfil` → `/app/admin/perfil`.
-6. **Página `Hoje`** (`src/features/today/`):
-   - `TodayHeader` (saudação + data + instituição + `ChannelHealth` + botão "Nova ação de cuidado").
-   - `AttentionQueue` com `CareActionCard` para: respostas pendentes, consultas sem confirmação, falhas de envio, pessoas sem contato recente, jornadas interrompidas, templates rejeitados, cadastros incompletos. Cada card: ícone + contagem + explicação + prioridade + CTA. Contagens vêm de queries reais em `messages`, `patients`, `message_templates`; quando 0, estado vazio positivo.
-   - `CareAgenda` timeline de eventos programados (a partir de `message_batches` scheduled + medications próximas).
-   - `CommunicationSummary` (alcançadas/entregues/respondidas/falhas/tempo — todos derivados de `messages` do dia).
-7. **Componentes base** criados nesta fase: `AttentionQueue`, `CareActionCard`, `ChannelHealth`, `ChannelBadge`, `EmptyState`, `ErrorState`, `SkeletonState`.
+journey_runs            — 1 linha por pessoa entrando na jornada
+  id, journey_id, journey_version, institution, patient_id,
+  status ('queued'|'running'|'waiting'|'completed'|'failed'|'stopped'|'handoff'),
+  current_node_id text, entered_at, ended_at, error text,
+  context jsonb         — variáveis acumuladas (ex: last_message_id)
 
-Critério de aceite: build passa, todas as rotas antigas redirecionam, "Hoje" renderiza com dados reais, contraste AA verificado em botões primários.
+journey_run_steps       — trilha de auditoria imutável
+  id, run_id, node_id, node_kind, status ('ok'|'skipped'|'failed'|'waiting'),
+  started_at, finished_at, attempt int, detail jsonb, error text
 
----
+journey_tasks           — tarefas criadas pelo nó criar-tarefa
+  id, institution, run_id, patient_id, title, description,
+  assignee_id uuid null, priority ('baixa'|'media'|'alta'),
+  status ('aberta'|'concluida'|'cancelada'), due_at, created_at, updated_at
+```
 
-## Fase 2 — Pessoas + Perfil 360°
+Todas seguem o padrão do projeto: GRANT `authenticated`+`service_role`, RLS ligado, políticas via `has_role('admin')` OU `institution = get_user_institution(auth.uid())`. `service_role` tem `ALL` para o runner rodar sem sessão.
 
-Entregas:
-1. `src/features/people/` com `PeopleList` (avatar, nome, idade, cidade, estágio, responsável, canal, último contato, próxima ação, rede, pendências), `PeopleFilters` (quick filters: precisa atenção / sem contato / sem consentimento / sem canal / consulta próxima / medicação ativa / sem cuidador / jornada interrompida), toggle lista/cards, paginação.
-2. `PatientSummaryHeader` fixo (nome, ID mascarado, idade, status, responsável, canal, consentimento, último contato, botão "Comunicar").
-3. Tabs do perfil: **Resumo**, **Linha do tempo**, **Próxima melhor ação**.
-4. `CareOrbit` v1 usando `contacts` existentes vinculados ao paciente. Campo `relationship` já existe em contacts; complemento visual com `role` derivado. Versões: full / compact / read-only / selectable. Mobile: lista hierárquica.
-5. `CareTimeline` unificando `messages`, `medications`, `adherence_events`, mudanças cadastrais.
-6. `NextBestAction` — regras explícitas (não IA): consulta em <48h sem confirmação → "Confirmar consulta"; canal inválido → "Atualizar contato"; sem cuidador → "Incluir cuidador"; última mensagem falhou → "Revisar falha".
+Índices: `journey_runs(status, journey_id)`, `journey_runs(patient_id)`, `journey_run_steps(run_id, started_at)`, `journey_tasks(institution, status)`.
 
----
+## Runner (edge function)
 
-## Fase 3 — Caixa de Cuidado (unificação Mensagens + Conversas)
+`supabase/functions/journey-runner/index.ts` — executor único, idempotente, chamado tanto pelo cron quanto por invocação manual.
 
-Entregas:
-1. `src/features/inbox/` com layout 3 colunas (desktop): `QueueList` (Todas/Não lidas/Precisa resposta/Aguardando paciente/Aguardando equipe/Agendamentos/Falhas/Encerradas), `ConversationList` (nome, relação, paciente, canal, última msg, tempo aguardando, responsável, prioridade, status janela WhatsApp), `ConversationContext` (dados mínimos + `CareOrbit` compact + consentimento + próxima consulta + jornada + últimas interações + ações rápidas).
-2. `Composer` com tabs Texto / Template / Conteúdo aprovado / Anexo; chips de variáveis; preview; seletor de canal e remetente; toggle nota interna vs mensagem externa.
-3. Reaproveita edge functions existentes (`send-whatsapp`, `approvedTemplatePayload`). Zero mudança em contratos.
-4. Mobile: pilha (lista → conversa → contexto em sheet).
+Fluxo por invocação:
+1. Seleciona até 25 `journey_runs` com `status IN ('queued','running')` OU `status='waiting' AND resume_at <= now()` (novo campo `resume_at timestamptz` em `journey_runs`, incluso na migração).
+2. Para cada run, resolve o próximo nó a partir de `current_node_id` percorrendo `graph` em ordem coluna→nó. Ramifica em `condicao`/`verificar-resposta` via campo `config.branch_true_node_id` / `config.branch_false_node_id`.
+3. Aplica o handler do nó (dispatch por `kind`). Grava `journey_run_steps`. Atualiza `current_node_id`.
+4. Nó `aguardar` seta `status='waiting'` + `resume_at`. Nó `whatsapp` chama `send-whatsapp` (mesma interface hoje usada pelo `InboxComposer`). Falha marca `status='failed'` após 3 tentativas.
+5. Nó `encerrar`/fim de grafo → `status='completed'`, `ended_at=now()`.
 
----
+Segurança: função usa `SUPABASE_SERVICE_ROLE_KEY`, valida payload com Zod, verifica assinatura HMAC do cron via header `x-runner-secret` (novo secret `JOURNEY_RUNNER_SECRET` — vou pedir com `add_secret`).
 
-## Fase 4 — Jornadas (stub visual) + Audiências + Biblioteca
+## Enfileirador de eventos
 
-Entregas:
-1. `src/features/journeys/`:
-   - `JourneyList` (cards com status/ativas/conclusões/interrupções/falhas/taxa resposta/última execução).
-   - `JourneyBuilder` visual em **colunas** (sem react-flow para evitar dep pesada): entrada → eventos → ramificações. Nós: Entrada, Evento, Audiência, Condição, WhatsApp, SMS, E-mail, Página segura, Aguardar, Verificar resposta, Criar tarefa, Notificar equipe, Encaminhar humano, Encerrar. Cada nó tem alternativa em formulário/lista (a11y).
-   - **Marcado explicitamente como preview**: banner "Motor de execução em breve. Estrutura salva mas não executada." Dados persistem em localStorage por enquanto (schema definido em fase futura).
-2. `src/features/audiences/` reaproveitando `audience_segments`. Regras renderizadas como **frase legível** ("Pessoas em acompanhamento crônico, com consulta nos próximos 7 dias, consentimento ativo e WhatsApp válido"). Contadores: elegíveis, excluídos (com motivos), distribuição por papel, amostra, última atualização. Filtros avançados em accordion.
-3. `src/features/content-library/` reaproveitando `content_library` + `content_folders`. Cada item: título, objetivo, público, estágio, assunto, resumo, corpo, CTA, fonte, revisor, data revisão, validade, versão, nível de leitura, canais, templates relacionados, status (Rascunho/Revisão clínica/Revisão privacidade/Aprovado/Expirando/Arquivado).
+`supabase/functions/journey-enroll/index.ts` — recebe `{ journey_id, patient_ids[] }` (enroll manual) ou `{ event, patient_id }` (enroll por evento). Cria `journey_runs` com `status='queued'` respeitando: consentimento válido, canal disponível, não já ativo na mesma jornada (dedupe por `journey_id + patient_id + status IN queued/running/waiting`).
 
----
+Gatilhos por evento **nesta fase** são disparados explicitamente pelo app (ex: após `INSERT` em `patients` o front chama `journey-enroll` com `event='patient.created'`). Trigger SQL fica marcado como TODO — evita acoplamento pesado agora.
 
-## Fase 5 — Modelos Meta (2 colunas) + Insights + Canais
+## Agendador
 
-Entregas:
-1. `src/features/meta-templates/` reorganizando `MessageTemplateEdit.tsx` (atualmente monolítico):
-   - Coluna esquerda: acordeões Identificação, Categoria, Cabeçalho, Corpo, Variáveis (com `TemplateParameterOrder` existente), Rodapé, Botões, Exemplos, Público, Revisão.
-   - Coluna direita fixa: `WhatsAppPreview` + `TemplateLifecycle` stepper (Rascunho→Validado→Enviado→Em análise→Aprovado, com estado Rejeitado exibindo motivo/parte/orientação/CTA nova versão).
-   - Preserva: upload mídia, sincronização, realtime, polling, bloqueio pós-envio, histórico, duplicação, versionamento, botão "Sincronizar com Meta" já adicionado.
-2. `src/features/insights/` (era Relatórios) em 3 seções: **Entrega** (enviadas/entregues/falhas/motivos/fallback), **Engajamento** (respostas/tempo resposta/cliques/confirmações/opt-outs/escalonamentos), **Jornada** (iniciadas/concluídas/interrompidas/tarefas resolvidas/consultas confirmadas/tempo). Gráficos com alternativa textual. Sem confundir entrega com resultado clínico.
-3. `src/features/settings/channels/` — centro de saúde dos canais. Cards WhatsApp / SMS (placeholder desabilitado) / E-mail (placeholder) / Página segura (placeholder) / Voz (futuro) / Prontuário FHIR (futuro). Cada card: status, última sync, remetente, falhas recentes, ações Configurar/Testar/Diagnóstico. Reaproveita `whatsapp-diagnostics`, `institution_whatsapp_settings`.
+Ativa `pg_cron` + `pg_net` e agenda via `supabase--insert` (não migração, pois carrega URL+anon key específicas do projeto):
 
----
+```
+cron.schedule('journey-runner-tick', '* * * * *',
+  select net.http_post(url:='.../functions/v1/journey-runner',
+    headers:=jsonb com Content-Type + apikey + x-runner-secret,
+    body:='{"tick":true}'))
+```
 
-## Fase 6 — Onboarding público + Privacidade + polimento
+Tick de 1 minuto. Idempotência: cada run tem `SELECT ... FOR UPDATE SKIP LOCKED` para evitar processamento duplo.
 
-Entregas:
-1. `src/pages/public/OnboardingForm.tsx` refeito como formulário progressivo 8 passos: Confiança/contexto → Identificação → Papel no cuidado → Contato → Preferências → Consentimentos (separados por finalidade e canal) → Revisão → Confirmação. Exibe instituição, quem convidou, finalidade, tempo estimado, link privacidade, contato, próximos passos.
-2. `src/features/admin/privacy/`: página de auditoria (apenas perfis autorizados via `has_role('admin')`), `AuditEvent` component, mascaramento de identificadores, `ConsentStatus`, `PrivacyCheck` em fluxos de envio, `MessageSafetyPreview` (alerta de conteúdo sensível), confirmação reforçada para disparos em massa, bloqueio de variável vazia, bloqueio de envio para relação não autorizada.
-3. Componentes finais criados: `AuditEvent`, `ConsentStatus`, `PrivacyCheck`, `MessageSafetyPreview`, `DeliveryFunnel`, `RecipientSummary`, `TemplateLifecycle`, `ClinicalReviewBadge`, `JourneyNode`, `JourneyProgress`, `CareNetworkMember`.
-4. Passada final de a11y (axe manual em cada rota principal), responsividade (desktop / tablet / mobile), verificação contraste, revisão de estados loading/vazio/erro/sucesso em toda tela.
+## Camada de acesso no front
 
----
+- `src/features/journeys/api.ts` — funções `listJourneys/getJourney/saveJourney/publishJourney/pauseJourney/enrollPatients/listRuns/listTasks` usando o client Supabase.
+- `useJourneys.ts` reescrito com `@tanstack/react-query`, mantendo a assinatura (`journeys`, `create`, `update`, `remove`, `duplicate`) e adicionando `publish`, `pause`, `enroll`.
+- `useJourney(id)` idem, mantendo `addNode/removeNode/patchNode/addColumn/...`.
+- Migração one-shot: se existir `localStorage['ccc:journeys:v1']`, um botão discreto "Importar rascunhos locais" no `JourneyList` copia para o banco e limpa o storage. Nada é migrado automaticamente para evitar duplicação silenciosa.
 
-## Detalhes técnicos-chave
+## Mudanças de UI
 
-- **Preservado sem toque**: `supabase/functions/*`, `src/integrations/supabase/{client,types}.ts`, contratos de dados, RLS, edge functions, hooks `useQuery` e chaves de cache existentes.
-- **Reaproveitado**: `TemplateParameterOrder`, `TemplateEditorForm`, `WhatsAppPreview`, `VariableInput`, `UseTemplateDialog`, `MetaStatusDialog`, `SegmentFilters`, `PatientMultiSelect`, `NewPatientWizard`, `useFolders`, `useInstitutionDefaultFooter`, `metaVariables`, `templateDraft`, `whatsapp*` libs.
-- **Refatorado** (dividido em subcomponentes, sem mudar comportamento): `MessageTemplateEdit.tsx`, `Messages.tsx`, `Conversas.tsx`, `Dashboard.tsx`, `Patients.tsx`, `PatientDetail.tsx`.
-- **Removido**: nada. Todos os arquivos antigos ou viram redirect, ou são recompostos como feature.
-- **Dependências novas**: nenhuma nesta fase 1. React Flow não será adicionado (builder de jornadas usa colunas). `framer-motion` só se necessário para transição do drawer mobile.
+Mínimas, focadas em expor o motor:
+- `JourneyList`: badges de `status` reais (`ativa`/`pausada`/`rascunho`/`arquivada`) + botões `Publicar`/`Pausar`/`Duplicar`. Métricas do card puxam `count()` real de `journey_runs` por status nas últimas 30 dias.
+- `JourneyBuilder`: novo header com `Salvar rascunho`, `Publicar`, `Pausar`, seletor de audiência (dropdown com `audience_segments`), gatilho (manual|evento). Substitui o `PreviewBanner` por um `RunStatusBanner` mostrando "N pessoas ativas / M aguardando / K concluídas hoje".
+- Nova aba lateral **Execuções** no builder: tabela paginada de `journey_runs` com filtro por status + drawer com `journey_run_steps` do run selecionado (auditoria).
+- Nova página `/app/jornadas/tarefas` listando `journey_tasks` da instituição (assumir / concluir / cancelar).
 
-## Ordem de execução proposta
+## Ordem de execução
 
-Fase 1 primeiro (fundação sem a qual tudo colide). Ao final de cada fase eu peço sua validação antes de iniciar a próxima, para você conseguir revisar o que mudou visualmente e no fluxo antes de acumular.
+1. Migração (tabelas + RLS + GRANTs + índices + campo `resume_at`).
+2. Solicitar secret `JOURNEY_RUNNER_SECRET`.
+3. Edge functions `journey-runner` e `journey-enroll`.
+4. Habilitar `pg_cron`+`pg_net` e agendar tick via `supabase--insert`.
+5. Camada de acesso (`api.ts` + hooks reescritos).
+6. Ajustes de UI (header do builder, status reais, aba Execuções, página Tarefas).
+7. Verificação: criar jornada de teste "Boas-vindas" → publicar → enroll manual em 1 paciente → observar `journey_runs` avançar pelos nós → conferir mensagem WhatsApp enviada em `messages`.
 
-Posso começar pela Fase 1?
+## Detalhes técnicos
+
+- Contratos preservados: nenhuma alteração em `messages`, `patients`, `audience_segments`, `send-whatsapp`, `approvedTemplatePayload`. O runner é consumidor puro dessas APIs.
+- Formato `graph` idêntico ao `Journey.columns` atual, então o `JourneyBuilder` continua funcionando sem refatoração estrutural — só troca a fonte de dados.
+- Retenção: `journey_run_steps` só cresce; incluir cleanup manual (documentado, não implementado) em `> 180 dias`.
+- Observabilidade: cada step grava `detail jsonb` com o request/response resumido; página `/app/insights` ganhará seção "Jornada" alimentada por `journey_runs` (fase posterior — não neste plano).
+
+Posso começar pela migração?
