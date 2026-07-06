@@ -139,11 +139,11 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
             <div className="truncate text-muted-foreground">{email}</div>
           </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
           <button
             onClick={onToggleCollapse}
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-            className="hidden lg:inline-flex tap-target items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+            className="hidden lg:inline-flex tap-target h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
           </button>
