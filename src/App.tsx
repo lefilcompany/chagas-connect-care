@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,6 +30,12 @@ import MessageTemplateNew from "./pages/app/MessageTemplateNew";
 import MessageTemplateEdit from "./pages/app/MessageTemplateEdit";
 import OnboardingForm from "./pages/public/OnboardingForm";
 import { InstitutionIdentityProvider } from "@/services/institutionIdentityProvider";
+
+function LegacyRedirect({ to }: { from: string; to: string }) {
+  const params = useParams();
+  const first = Object.values(params)[0];
+  return <Navigate to={`/app/${to}${first ? `/${first}` : ""}`} replace />;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
