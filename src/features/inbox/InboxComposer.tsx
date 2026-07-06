@@ -4,6 +4,7 @@ import { AlertCircle, BookOpen, FileText, Loader2, Paperclip, Send, X } from "lu
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { queueAndSend, getWindowStatus } from "@/lib/whatsapp";
@@ -12,6 +13,8 @@ import { UseTemplateDialog } from "@/components/app/messages/UseTemplateDialog";
 import { fetchers, qk } from "@/lib/queries";
 import type { MessageTemplate } from "@/lib/templates";
 import type { InboxConversation } from "./useInbox";
+import { evaluatePrivacy, PrivacyCheck } from "@/features/privacy/PrivacyCheck";
+import { MessageSafetyPreview, messageHasClinicalContent } from "@/features/privacy/MessageSafetyPreview";
 
 const MAX_TEXT = 4096;
 
@@ -44,6 +47,30 @@ export function InboxComposer({
 
   const windowStatus = getWindowStatus(conversation.service_window_expires_at);
   const windowOpen = windowStatus.state === "open";
+  const [ackClinical, setAckClinical] = useState(false);
+
+  // Fetch consent + relation for the destinatário associado à conversa.
+  const { data: recipientMeta } = useQuery({
+    queryKey: ["inbox-recipient-meta", conversation.contact_id, conversation.patient_id],
+    enabled: !!(conversation.contact_id || conversation.patient_id),
+    queryFn: async () => {
+      if (conversation.contact_id) {
+        const { data } = await supabase
+          .from("contacts")
+          .select("authorization_status, relation")
+          .eq("id", conversation.contact_id)
+          .maybeSingle();
+        return {
+          consent: (data as any)?.authorization_status ?? null,
+          relation: (data as any)?.relation ?? null,
+        };
+      }
+      if (conversation.patient_id) {
+        return { consent: "authorized", relation: "paciente" as string };
+      }
+      return { consent: null, relation: null };
+    },
+  });
 
   const { data: activeTemplates = [] } = useQuery({
     queryKey: qk.templates,
@@ -86,6 +113,24 @@ export function InboxComposer({
       toast.error("Janela de 24h fechada. Use um Template Meta para reabrir a conversa.");
       return;
     }
+    const bodyForCheck = text.trim();
+    const clinical = messageHasClinicalContent(bodyForCheck);
+    const privacy = evaluatePrivacy({
+      consent: recipientMeta?.consent,
+      channel: "whatsapp",
+      phone: conversation.phone,
+      relation: recipientMeta?.relation,
+      hasClinicalContent: clinical,
+    });
+    if (!privacy.ok) {
+      toast.error(privacy.issues.find((i) => i.severity === "block")?.message ?? "Envio bloqueado por política");
+      return;
+    }
+    const hasWarn = privacy.issues.some((i) => i.severity === "warn") || clinical;
+    if (hasWarn && !ackClinical) {
+      toast.error("Confirme os avisos de privacidade abaixo antes de enviar.");
+      return;
+    }
     setSending(true);
     const res = await queueAndSend({
       patient_id: conversation.patient_id,
@@ -106,6 +151,7 @@ export function InboxComposer({
     setText("");
     setAttachment(null);
     setAttachmentName("");
+    setAckClinical(false);
     qc.invalidateQueries({ queryKey: ["inbox-thread", conversation.identity_id] });
     qc.invalidateQueries({ queryKey: ["inbox-conversations", conversation.institution] });
     toast.success("Mensagem enviada");
@@ -188,6 +234,14 @@ export function InboxComposer({
                 handleSendText();
               }
             }}
+          />
+          <InboxPrivacyGate
+            body={text}
+            consent={recipientMeta?.consent}
+            relation={recipientMeta?.relation}
+            phone={conversation.phone}
+            ack={ackClinical}
+            onAckChange={setAckClinical}
           />
           <div className="mt-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
