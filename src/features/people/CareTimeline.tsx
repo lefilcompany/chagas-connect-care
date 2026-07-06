@@ -1,4 +1,4 @@
-import { Activity, MessageCircle, Pill, AlertTriangle, CheckCircle2, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Activity, Pill, AlertTriangle, CheckCircle2, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { EmptyState, SkeletonState } from "@/components/care/EmptyState";
 import { useCareTimeline } from "./usePeople";
 import { formatDateTime } from "./format";
@@ -59,5 +59,3 @@ export function CareTimeline({ patientId }: { patientId: string }) {
     </ol>
   );
 }
-
-export function MessageCircleIcon() { return <MessageCircle /> } // keep import used elsewhere if tree-shaken
