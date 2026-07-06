@@ -1,0 +1,46 @@
+/*
+ * Unified scrollbar styling for native overflow regions.
+ * The component-based ScrollArea uses the same brand/care palette in
+ * src/components/ui/scroll-area.tsx.
+ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--brand) / 0.38) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 40px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-color: hsl(var(--brand) / 0.32);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--care) / 0.56);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background-color: hsl(var(--primary) / 0.76);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-button,
+*::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
