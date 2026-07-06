@@ -1,3 +1,3 @@
-export function ChannelHealthPill() {
+export function ChannelHealthPill(_props: { collapsed?: boolean }) {
   return null;
 }
