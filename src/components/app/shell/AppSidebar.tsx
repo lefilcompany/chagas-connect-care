@@ -31,7 +31,7 @@ function NavItemLink({ item, collapsed, onClick }: { item: NavItem; collapsed: b
           : "px-3 py-2.5",
         isActive
           ? "bg-mint-soft text-care"
-          : "text-foreground/80 hover:bg-secondary hover:ring-1 hover:ring-border/50 hover:text-foreground",
+          : "text-foreground/80 hover:bg-secondary hover:shadow-sm hover:text-foreground",
       )}
     >
       <item.icon className={cn("shrink-0", collapsed ? "h-[18px] w-[18px]" : "h-4 w-4")} aria-hidden />
