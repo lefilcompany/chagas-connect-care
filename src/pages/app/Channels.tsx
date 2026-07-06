@@ -43,7 +43,15 @@ function useWhatsAppHealth() {
   });
 }
 
-export default function Channels() {
+type ChannelsProps = {
+  configureHref?: string;
+  diagnosticsHref?: string;
+};
+
+export default function Channels({
+  configureHref = "/app/configuracoes/whatsapp",
+  diagnosticsHref = "/app/configuracoes/whatsapp?tab=diagnostics",
+}: ChannelsProps = {}) {
   const { data: wa } = useWhatsAppHealth();
 
   return (
@@ -66,8 +74,8 @@ export default function Channels() {
           lastSync={wa?.lastSync}
           recentFailures={wa?.recentFailures}
           actions={[
-            { label: "Configurar", href: "/app/configuracoes/whatsapp", variant: "default" },
-            { label: "Diagnóstico", href: "/app/configuracoes/whatsapp?tab=diagnostics" },
+            { label: "Configurar", href: configureHref, variant: "default" },
+            { label: "Diagnóstico", href: diagnosticsHref },
           ]}
         />
 
