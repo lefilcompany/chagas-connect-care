@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { PersonRow, PersonWithDerived, PersonDerived } from "./types";
+import type {
+  CareNetworkContact,
+  PersonRow,
+  PersonWithDerived,
+  PersonDerived,
+} from "./types";
 
 function ageFromBirth(birth: string | null): number | null {
   if (!birth) return null;
@@ -23,7 +28,8 @@ export function usePeopleWithDerived() {
           .order("full_name", { ascending: true }),
         supabase
           .from("contacts")
-          .select("id, patient_id, relation, phone, authorization_status"),
+          .select("id, patient_id, full_name, phone, relation, channel_pref, authorization_status, receives_reminders")
+          .order("full_name", { ascending: true }),
         supabase
           .from("messages")
           .select("id, patient_id, direction, status, sent_at, failed_at, last_error")
@@ -31,12 +37,17 @@ export function usePeopleWithDerived() {
           .limit(2000),
       ]);
 
+      if (pRes.error) throw pRes.error;
+      if (cRes.error) throw cRes.error;
+      if (mRes.error) throw mRes.error;
+
       const patients = (pRes.data ?? []) as PersonRow[];
-      const contacts = cRes.data ?? [];
+      const contacts = (cRes.data ?? []) as CareNetworkContact[];
       const messages = mRes.data ?? [];
 
-      const contactsByPatient = new Map<string, typeof contacts>();
+      const contactsByPatient = new Map<string, CareNetworkContact[]>();
       for (const c of contacts) {
+        if (!c.patient_id) continue;
         const arr = contactsByPatient.get(c.patient_id) ?? [];
         arr.push(c);
         contactsByPatient.set(c.patient_id, arr);
@@ -56,10 +67,10 @@ export function usePeopleWithDerived() {
 
       return patients.map<PersonWithDerived>((p) => {
         const cts = contactsByPatient.get(p.id) ?? [];
-        const hasCaregiver = cts.some((c: any) => c.relation === "cuidador" || c.relation === "familiar");
+        const hasCaregiver = cts.some((c) => c.relation === "cuidador" || c.relation === "familiar");
         const hasConsent = cts.length === 0
-          ? true // pacientes sem contatos ainda: pendência tratada via cuidador
-          : cts.some((c: any) => c.authorization_status === "authorized" || c.authorization_status === "ativo");
+          ? true
+          : cts.some((c) => c.authorization_status === "authorized" || c.authorization_status === "ativo");
         const hasValidChannel = !!(p.phone && p.phone.replace(/\D/g, "").length >= 10);
 
         const lastMsg = lastMsgByPatient.get(p.id) ?? null;
@@ -99,7 +110,7 @@ export function usePeopleWithDerived() {
           pendencies,
           nextActionKey,
         };
-        return { ...p, derived };
+        return { ...p, contacts: cts, derived };
       });
     },
   });
