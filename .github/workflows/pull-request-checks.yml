@@ -28,6 +28,18 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
       - name: Run tests
-        run: npm test
+        shell: bash
+        run: |
+          npm test > test-output.log 2>&1 || {
+            cat test-output.log
+            exit 1
+          }
+          cat test-output.log
       - name: Build application
-        run: npm run build
+        shell: bash
+        run: |
+          npm run build > build-output.log 2>&1 || {
+            cat build-output.log
+            exit 1
+          }
+          cat build-output.log
