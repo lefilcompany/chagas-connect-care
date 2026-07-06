@@ -417,3 +417,63 @@ export function InboxComposer({
     </div>
   );
 }
+
+function InboxPrivacyGate({
+  body,
+  consent,
+  relation,
+  phone,
+  ack,
+  onAckChange,
+}: {
+  body: string;
+  consent: string | null | undefined;
+  relation: string | null | undefined;
+  phone: string;
+  ack: boolean;
+  onAckChange: (v: boolean) => void;
+}) {
+  const hasBody = body.trim().length > 0;
+  const clinical = hasBody && messageHasClinicalContent(body);
+  const evaluation = evaluatePrivacy({
+    consent: consent ?? undefined,
+    channel: "whatsapp",
+    phone,
+    relation: relation ?? undefined,
+    hasClinicalContent: clinical,
+  });
+  const needsAck =
+    hasBody && (clinical || evaluation.issues.some((i) => i.severity === "warn"));
+
+  if (!hasBody && evaluation.issues.length === 0) return null;
+
+  return (
+    <div className="mt-2 space-y-2">
+      {(evaluation.issues.length > 0 || hasBody) && (
+        <PrivacyCheck
+          consent={consent ?? undefined}
+          channel="whatsapp"
+          phone={phone}
+          relation={relation ?? undefined}
+          hasClinicalContent={clinical}
+          className="text-xs"
+        />
+      )}
+      {hasBody && <MessageSafetyPreview body={body} />}
+      {needsAck && (
+        <label className="flex items-start gap-2 text-xs text-muted-foreground">
+          <Checkbox
+            checked={ack}
+            onCheckedChange={(v) => onAckChange(!!v)}
+            className="mt-0.5"
+            aria-label="Confirmar avisos de privacidade"
+          />
+          <span>
+            Confirmo que revisei os avisos acima e o destinatário possui autorização
+            adequada para este conteúdo.
+          </span>
+        </label>
+      )}
+    </div>
+  );
+}
