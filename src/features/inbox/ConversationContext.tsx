@@ -42,7 +42,7 @@ export function ConversationContext({
   };
 
   return (
-    <aside aria-label="Contexto da conversa" className="flex h-full flex-col gap-4 overflow-y-auto p-4">
+    <section aria-label="Contexto da conversa" className="flex h-full flex-col gap-4 overflow-y-auto p-4">
       <section className="care-card p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
