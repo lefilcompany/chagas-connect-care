@@ -47,13 +47,16 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: roleRow } = await admin
-    .from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    .from("user_roles").select("role").eq("user_id", userId).eq("role", "superadmin").maybeSingle();
   if (!roleRow) return json(403, { error: "Forbidden" });
 
-  // Scope every check to the admin's institution.
+  // Optional institution override from body; defaults to the caller's profile institution.
+  let bodyJson: any = {};
+  try { bodyJson = req.method === "POST" ? await req.json() : {}; } catch { bodyJson = {}; }
+  const institutionParam = typeof bodyJson?.institution === "string" ? bodyJson.institution.trim() : "";
   const { data: prof } = await admin
     .from("profiles").select("institution").eq("id", userId).maybeSingle();
-  const institution = (prof as any)?.institution ?? "";
+  const institution = institutionParam || (prof as any)?.institution || "";
 
   const checks: Array<{ id: string; label: string; state: State; detail?: string }> = [];
   const flag = (id: string, label: string, present: boolean) =>

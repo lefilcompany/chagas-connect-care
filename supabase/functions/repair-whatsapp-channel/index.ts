@@ -42,13 +42,14 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   const { data: roleRow } = await admin
-    .from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    .from("user_roles").select("role").eq("user_id", userId).eq("role", "superadmin").maybeSingle();
   if (!roleRow) return json(403, { error: "Forbidden" });
 
-  const { data: prof } = await admin
-    .from("profiles").select("institution").eq("id", userId).maybeSingle();
-  const institution: string = (prof as any)?.institution ?? "";
-  if (!institution) return json(400, { ok: false, error: "Instituição do usuário não definida." });
+  // Superadmin must specify which institution to repair; do NOT trust profile.institution.
+  let bodyJson: any = {};
+  try { bodyJson = await req.json(); } catch { bodyJson = {}; }
+  const institution: string = typeof bodyJson?.institution === "string" ? bodyJson.institution.trim() : "";
+  if (!institution) return json(400, { ok: false, error: "Parâmetro 'institution' é obrigatório." });
 
   if (!WHATSAPP_PHONE_NUMBER_ID || !WHATSAPP_WABA_ID || !WHATSAPP_TOKEN) {
     return json(503, { ok: false, error: "Credenciais do WhatsApp não estão completamente configuradas no servidor." });
