@@ -86,6 +86,8 @@ export default {
       backgroundImage: {
         "gradient-warm": "var(--gradient-warm)",
         "gradient-care": "var(--gradient-care)",
+        "gradient-soft": "var(--gradient-care)",
+        "gradient-brand": "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--care)) 100%)",
       },
       boxShadow: {
         soft: "var(--shadow-soft)",
