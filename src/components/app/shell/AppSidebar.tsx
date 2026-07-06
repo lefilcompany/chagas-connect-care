@@ -104,7 +104,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
             aria-expanded={adminOpen}
             aria-controls="admin-nav"
             className={cn(
-              "flex items-center rounded-xl text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-all duration-200 hover:bg-secondary hover:ring-1 hover:ring-border/50 hover:text-foreground",
+              "flex items-center rounded-xl text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-all duration-200 hover:bg-secondary hover:shadow-sm hover:text-foreground",
               collapsed
                 ? "h-11 w-11 shrink-0 justify-center self-center rounded-2xl p-0"
                 : "w-full justify-between px-3 py-2",
