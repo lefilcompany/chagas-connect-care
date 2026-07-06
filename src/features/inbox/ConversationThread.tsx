@@ -68,7 +68,13 @@ export function ConversationThread({
   }
 
   return (
-    <div ref={scroller} className="flex-1 overflow-y-auto bg-background/40 p-4">
+    <div
+      ref={scroller}
+      tabIndex={0}
+      role="log"
+      aria-label="Histórico da conversa"
+      className="flex-1 overflow-y-auto bg-background/40 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <ol className="flex flex-col gap-2">
         {messages.map((m) => {
           const inbound = m.direction === "inbound";
