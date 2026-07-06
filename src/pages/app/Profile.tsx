@@ -109,7 +109,7 @@ export default function Profile() {
                   onClick={() => setActive(s.id)}
                   className={cn(
                     "w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors relative",
-                    isActive ? "bg-primary/40 text-brand" : "hover:bg-muted text-foreground/80",
+                    isActive ? "bg-primary text-brand" : "hover:bg-muted text-foreground",
                   )}
                 >
                   {isActive && <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r bg-brand" />}
@@ -118,7 +118,7 @@ export default function Profile() {
                     <div className={cn("text-sm font-semibold", isActive && "text-brand")}>{s.label}</div>
                     <div className="text-xs text-muted-foreground truncate">{s.description}</div>
                   </div>
-                  <ChevronRight className={cn("h-4 w-4", isActive ? "text-brand" : "text-muted-foreground/50")} />
+                  <ChevronRight className={cn("h-4 w-4", isActive ? "text-brand" : "text-muted-foreground")} />
                 </button>
               );
             })}
