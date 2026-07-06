@@ -1,5 +1,4 @@
-import { Link } from "react-router-dom";
-import { ArrowRight, Clock, MessageCircle, User } from "lucide-react";
+import { Clock, MessageCircle, User } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { getWindowStatus } from "@/lib/whatsapp";
@@ -10,24 +9,31 @@ function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
-export function ConversationList({ conversations }: { conversations: InboxConversation[] }) {
+export function ConversationList({
+  conversations,
+  activeId,
+  onSelect,
+}: {
+  conversations: InboxConversation[];
+  activeId: string | null;
+  onSelect: (identityId: string) => void;
+}) {
   return (
-    <ul className="care-card divide-y divide-border/70 p-0" aria-label="Lista de conversas">
+    <ul className="divide-y divide-border/70" aria-label="Lista de conversas">
       {conversations.map((c) => {
         const ws = getWindowStatus(c.service_window_expires_at);
-        const target = c.patient_id ? `/app/pessoas/${c.patient_id}` : "#";
         const pending = c.last_direction === "inbound" && c.unread > 0;
+        const active = activeId === c.identity_id;
         return (
           <li key={c.identity_id}>
-            <Link
-              to={target}
+            <button
+              type="button"
+              onClick={() => onSelect(c.identity_id)}
+              aria-current={active ? "true" : undefined}
               className={cn(
-                "flex items-start gap-3 px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                target === "#" ? "cursor-default" : "hover:bg-secondary/40",
+                "flex w-full items-start gap-3 px-4 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                active ? "bg-secondary" : "hover:bg-secondary/40",
               )}
-              onClick={(e) => {
-                if (target === "#") e.preventDefault();
-              }}
             >
               <Avatar className="h-10 w-10 shrink-0">
                 <AvatarFallback className="bg-secondary text-muted-foreground">
@@ -71,15 +77,9 @@ export function ConversationList({ conversations }: { conversations: InboxConver
                       Aguardando resposta · {c.unread}
                     </span>
                   )}
-                  {c.phone && (
-                    <span className="text-[11px] text-muted-foreground">{c.phone}</span>
-                  )}
                 </div>
               </div>
-              {target !== "#" && (
-                <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-              )}
-            </Link>
+            </button>
           </li>
         );
       })}
