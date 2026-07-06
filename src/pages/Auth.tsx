@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Heart } from "lucide-react";
+import elo2Logo from "@/assets/elo2-logo.png.asset.json";
 
 const signupSchema = z.object({
   full_name: z.string().trim().min(2, "Informe seu nome").max(120),
@@ -72,11 +72,8 @@ export default function AuthPage() {
     <main className="min-h-dvh bg-gradient-soft flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <h1 className="sr-only">Acessar Chagas Cuidado Digital</h1>
-        <Link to="/" className="mb-8 flex items-center justify-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-brand-foreground">
-            <Heart className="h-5 w-5" fill="currentColor" />
-          </span>
-          <span className="font-display text-xl font-bold text-brand">Chagas Cuidado Digital</span>
+        <Link to="/" className="mb-8 flex items-center justify-center" aria-label="ELO2 — Início">
+          <img src={elo2Logo.url} alt="ELO2" className="h-12 w-auto" />
         </Link>
         <div className="rounded-2xl border border-border bg-card p-8 shadow-card">
           <Tabs value={tab} onValueChange={setTab}>
