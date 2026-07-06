@@ -35,12 +35,12 @@ export function nodeMeta(kind: JourneyNodeKind): NodeMeta {
 }
 
 export const TONE_STYLES: Record<NodeMeta["tone"], string> = {
-  entry: "bg-mint-soft text-care-green-strong border-care-green/30",
-  signal: "bg-coral-soft text-coral-strong border-coral/30",
-  audience: "bg-warm text-ink border-border-soft",
-  logic: "bg-background-neutral text-ink border-border-soft",
-  channel: "bg-mint-soft text-care-green-strong border-care-green/30",
-  wait: "bg-background-neutral text-muted-foreground border-border-soft",
-  task: "bg-warm text-ink border-border-soft",
-  end: "bg-muted text-muted-foreground border-border-soft",
+  entry: "bg-mint-soft text-care border-care/30",
+  signal: "bg-coral-soft text-primary border-coral/40",
+  audience: "bg-secondary text-ink border-border",
+  logic: "bg-secondary text-ink border-border",
+  channel: "bg-mint-soft text-care border-care/30",
+  wait: "bg-secondary text-muted-foreground border-border",
+  task: "bg-coral-soft text-primary border-coral/40",
+  end: "bg-muted text-muted-foreground border-border",
 };
