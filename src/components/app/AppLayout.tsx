@@ -6,15 +6,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchAllAppRoutes } from "@/lib/queries";
 import { Menu } from "lucide-react";
 import { AppSidebar } from "./shell/AppSidebar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-/**
- * App shell: 264px sidebar (collapsible to 80px) on desktop, drawer on mobile.
- * Content clamped to ~1600px with generous side padding.
- */
 export const AppLayout = () => {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
@@ -46,9 +43,8 @@ export const AppLayout = () => {
   const askSignOut = () => setLogoutOpen(true);
 
   return (
-    <div className="min-h-dvh flex bg-background">
-      {/* Desktop sidebar */}
-      <div className="hidden lg:block sticky top-0 h-dvh">
+    <div className="flex h-dvh overflow-hidden bg-background">
+      <div className="hidden h-dvh shrink-0 lg:block">
         <AppSidebar
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((v) => !v)}
@@ -58,14 +54,13 @@ export const AppLayout = () => {
         />
       </div>
 
-      {/* Mobile drawer */}
       {drawerOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-ink/40 lg:hidden" onClick={() => setDrawerOpen(false)} aria-hidden />
           <div className="fixed inset-y-0 left-0 z-50 lg:hidden animate-slide-in-down">
             <AppSidebar
               collapsed={false}
-              onToggleCollapse={() => {}}
+              onToggleCollapse={() => undefined}
               onCloseMobile={() => setDrawerOpen(false)}
               profileName={profileName}
               email={user.email ?? ""}
@@ -75,8 +70,8 @@ export const AppLayout = () => {
         </>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="lg:hidden h-16 bg-card border-b border-border flex items-center px-4">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="flex h-16 shrink-0 items-center border-b border-border bg-card px-4 lg:hidden">
           <button
             onClick={() => setDrawerOpen(true)}
             aria-label="Abrir menu"
@@ -86,10 +81,13 @@ export const AppLayout = () => {
           </button>
           <span className="ml-3 font-display text-base font-bold text-ink">Chagas Connect Care</span>
         </header>
-        <main className="flex-1">
-          <div className="mx-auto w-full max-w-[1600px] px-4 py-6 md:px-8 md:py-8 xl:px-10">
-            <Outlet />
-          </div>
+
+        <main className="min-h-0 flex-1 overflow-hidden">
+          <ScrollArea className="h-full w-full" type="hover" scrollHideDelay={400}>
+            <div className="mx-auto w-full max-w-[1600px] px-4 py-6 md:px-8 md:py-8 xl:px-10">
+              <Outlet />
+            </div>
+          </ScrollArea>
         </main>
       </div>
 

@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { ChevronDown, ChevronsLeft, ChevronsRight, HeartPulse, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { adminNav, careNav, type NavItem } from "./nav";
 import { ChannelHealthPill } from "./ChannelHealthPill";
 import elo2Logo from "@/assets/elo2-logo.png.asset.json";
@@ -41,12 +42,12 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
   return (
     <aside
       className={cn(
-        "flex h-full flex-col border-r border-border bg-sidebar transition-[width] duration-200",
+        "flex h-full min-h-0 flex-col overflow-hidden border-r border-border bg-sidebar transition-[width] duration-200",
         collapsed ? "w-20" : "w-[264px]",
       )}
       aria-label="Navegação principal"
     >
-      <div className="flex h-16 items-center justify-between border-b border-border px-4">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-4">
         <NavLink to="/app/hoje" className="flex items-center gap-2" aria-label="Chagas Connect Care — Início">
           <img src={elo2Logo.url} alt="" aria-hidden className="h-8 w-auto" />
         </NavLink>
@@ -62,7 +63,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
       </div>
 
       {!collapsed && (
-        <div className="mx-3 mt-4 rounded-xl bg-mint-soft/70 p-3">
+        <div className="mx-3 mt-4 shrink-0 rounded-xl bg-mint-soft/70 p-3">
           <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-care">
             <HeartPulse className="h-3 w-3" aria-hidden /> Centro de cuidado
           </div>
@@ -70,49 +71,51 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
         </div>
       )}
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {!collapsed && (
-          <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            Cuidado
-          </p>
-        )}
-        <ul className="space-y-0.5">
-          {careNav.map((n) => (
-            <li key={n.to}>
-              <NavItemLink item={n} collapsed={collapsed} onClick={onCloseMobile} />
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-6">
-          <button
-            onClick={() => setAdminOpen((v) => !v)}
-            aria-expanded={adminOpen}
-            aria-controls="admin-nav"
-            className={cn(
-              "flex w-full items-center justify-between rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground",
-              collapsed && "justify-center",
-            )}
-          >
-            {!collapsed && <span>Administração</span>}
-            <ChevronDown
-              aria-hidden
-              className={cn("h-3.5 w-3.5 transition-transform", adminOpen && "rotate-180")}
-            />
-          </button>
-          {adminOpen && (
-            <ul id="admin-nav" className="mt-1 space-y-0.5">
-              {adminNav.map((n) => (
-                <li key={n.to}>
-                  <NavItemLink item={n} collapsed={collapsed} onClick={onCloseMobile} />
-                </li>
-              ))}
-            </ul>
+      <ScrollArea className="min-h-0 flex-1" type="hover" scrollHideDelay={400}>
+        <nav className="px-3 py-4">
+          {!collapsed && (
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Cuidado
+            </p>
           )}
-        </div>
-      </nav>
+          <ul className="space-y-0.5">
+            {careNav.map((n) => (
+              <li key={n.to}>
+                <NavItemLink item={n} collapsed={collapsed} onClick={onCloseMobile} />
+              </li>
+            ))}
+          </ul>
 
-      <div className="border-t border-border p-3">
+          <div className="mt-6">
+            <button
+              onClick={() => setAdminOpen((v) => !v)}
+              aria-expanded={adminOpen}
+              aria-controls="admin-nav"
+              className={cn(
+                "flex w-full items-center justify-between rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground",
+                collapsed && "justify-center",
+              )}
+            >
+              {!collapsed && <span>Administração</span>}
+              <ChevronDown
+                aria-hidden
+                className={cn("h-3.5 w-3.5 transition-transform", adminOpen && "rotate-180")}
+              />
+            </button>
+            {adminOpen && (
+              <ul id="admin-nav" className="mt-1 space-y-0.5">
+                {adminNav.map((n) => (
+                  <li key={n.to}>
+                    <NavItemLink item={n} collapsed={collapsed} onClick={onCloseMobile} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </nav>
+      </ScrollArea>
+
+      <div className="shrink-0 border-t border-border p-3">
         <div className={cn("mb-3", collapsed && "flex justify-center")}>
           <ChannelHealthPill collapsed={collapsed} />
         </div>
