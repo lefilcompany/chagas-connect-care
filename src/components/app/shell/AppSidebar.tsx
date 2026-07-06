@@ -99,21 +99,23 @@ export function AppSidebar({ collapsed, onToggleCollapse, onCloseMobile, profile
           </ul>
 
           <div className="mt-6">
-            <button
-              onClick={() => setAdminOpen((v) => !v)}
-              aria-expanded={adminOpen}
-              aria-controls="admin-nav"
-              className={cn(
-                "flex w-full items-center justify-between rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground",
-                collapsed && "justify-center",
-              )}
-            >
-              {!collapsed && <span>Administração</span>}
-              <ChevronDown
-                aria-hidden
-                className={cn("h-3.5 w-3.5 transition-transform", adminOpen && "rotate-180")}
-              />
-            </button>
+          <button
+            onClick={() => setAdminOpen((v) => !v)}
+            aria-expanded={adminOpen}
+            aria-controls="admin-nav"
+            className={cn(
+              "flex items-center rounded-xl text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground",
+              collapsed
+                ? "h-11 w-11 shrink-0 justify-center self-center rounded-2xl p-0"
+                : "w-full justify-between px-3 py-2",
+            )}
+          >
+            {!collapsed && <span>Administração</span>}
+            <ChevronDown
+              aria-hidden
+              className={cn("shrink-0", collapsed ? "h-[18px] w-[18px]" : "h-3.5 w-3.5 transition-transform", adminOpen && !collapsed && "rotate-180")}
+            />
+          </button>
             {adminOpen && (
               <ul id="admin-nav" className="mt-1 space-y-0.5">
                 {adminNav.map((n) => (
