@@ -47,7 +47,7 @@ export function ConversationContext({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Pessoa</p>
-            <h3 className="font-display text-base font-semibold text-ink truncate">
+            <h2 className="font-display text-base font-semibold text-ink truncate">
               {conversation.display_name}
             </h3>
             <p className="text-xs text-muted-foreground">{conversation.phone || "—"}</p>
