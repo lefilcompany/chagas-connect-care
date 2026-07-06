@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/care/EmptyState";
-import { useFolders, iconByName } from "@/hooks/useFolders";
+import { useFolders } from "@/hooks/useFolders";
+import type { LucideIcon } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import { useLibrary } from "@/features/library/useLibrary";
 import { LibraryFilters, type LibraryFiltersValue } from "@/features/library/LibraryFilters";
 import { LibraryDetail } from "@/features/library/LibraryDetail";
@@ -17,14 +19,13 @@ function formatSeconds(s: number) {
 }
 
 function LibraryCard({
-  item, folderIconName, folderLabel, onOpen,
+  item, Icon, folderLabel, onOpen,
 }: {
   item: LibraryItem;
-  folderIconName: string;
+  Icon: LucideIcon;
   folderLabel: string;
   onOpen: () => void;
 }) {
-  const Icon = iconByName(folderIconName);
   const excerpt = (item.body ?? "").slice(0, 180);
   return (
     <Card
@@ -122,8 +123,7 @@ export default function Library() {
         <div className="space-y-8">
           {[...grouped.entries()].map(([category, list]) => {
             const folder = folders.find((f) => f.value === category);
-            const iconName = folder?.icon.displayName ?? "FolderOpen";
-            const Icon = iconByName(iconName);
+            const Icon: LucideIcon = folder?.icon ?? FolderOpen;
             return (
               <section key={category} aria-label={`Pasta ${folder?.label ?? "Geral"}`}>
                 <header className="mb-3 flex items-center gap-2 text-sm">
@@ -136,7 +136,7 @@ export default function Library() {
                     <LibraryCard
                       key={it.id}
                       item={it}
-                      folderIconName={iconName}
+                      Icon={Icon}
                       folderLabel={folder?.label ?? "Geral"}
                       onOpen={() => setSelected(it)}
                     />

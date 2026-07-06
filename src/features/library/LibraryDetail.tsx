@@ -4,7 +4,8 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { iconByName, type FolderDef } from "@/hooks/useFolders";
+import { FolderOpen } from "lucide-react";
+import type { FolderDef } from "@/hooks/useFolders";
 import { STATUS_LABEL, STATUS_TONE, type LibraryItem } from "./types";
 
 function formatSeconds(s: number) {
@@ -32,7 +33,7 @@ export function LibraryDetail({
 }) {
   if (!item) return null;
   const folder = folders.find((f) => f.value === item.category);
-  const FolderIcon = iconByName(folder ? (folder.icon.displayName ?? "FolderOpen") : "FolderOpen");
+  const FolderIcon = folder?.icon ?? FolderOpen;
   const created = new Date(item.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
   return (
