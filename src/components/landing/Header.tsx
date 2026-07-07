@@ -106,7 +106,7 @@ export const Header = () => {
                 <Link to="/auth" onClick={closeMenu}>Entrar</Link>
               </Button>
               <Button variant="hero" className="w-full" asChild>
-                <a href="#plataforma" onClick={closeMenu}>Conhecer a plataforma</a>
+                <a href="#plataforma" onClick={(e) => handleAnchorClick(e, "#plataforma")}>Conhecer a plataforma</a>
               </Button>
             </div>
           </div>
