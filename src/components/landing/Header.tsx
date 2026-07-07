@@ -21,10 +21,6 @@ export const Header = () => {
       <div className="container flex min-h-16 items-center justify-between gap-6 py-3">
         <a href="#topo" className="flex min-w-0 items-center gap-3" aria-label="ELO2 Chagas Connect Care — início">
           <img src={elo2Logo.url} alt="ELO2" className="h-9 w-auto shrink-0" />
-          <div className="hidden min-w-0 border-l border-border pl-3 sm:block">
-            <p className="truncate font-display text-sm font-bold text-ink">Chagas Connect Care</p>
-            <p className="truncate text-[11px] text-muted-foreground">Comunicação para cuidado contínuo</p>
-          </div>
         </a>
 
         <nav className="hidden items-center gap-7 lg:flex" aria-label="Navegação da página inicial">
