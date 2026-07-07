@@ -1,62 +1,70 @@
-import { Instagram, Linkedin, Twitter } from "lucide-react";
+import { HeartPulse, LogIn } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import elo2Logo from "@/assets/elo2-logo.png.asset.json";
+
+const platformLinks = [
+  { label: "Plataforma", href: "#plataforma" },
+  { label: "Jornadas", href: "#jornadas" },
+  { label: "Segurança", href: "#seguranca" },
+  { label: "Para quem", href: "#para-quem" },
+];
 
 const handleLegalClick = () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
 
 export const Footer = () => (
-  <footer className="border-t border-border bg-card">
-    <div className="container py-14">
-      <div className="grid gap-10 md:grid-cols-3">
-        <div>
-          <img src={elo2Logo.url} alt="ELO2" className="h-10 w-auto" />
-          <p className="mt-4 max-w-xs text-sm text-muted-foreground">
-            Plataforma digital dedicada ao cuidado contínuo da Doença de Chagas.
+  <footer className="border-t border-border bg-background">
+    <div className="container py-12 sm:py-14">
+      <div className="grid gap-10 lg:grid-cols-[1.25fr_0.75fr_0.75fr]">
+        <div className="max-w-md">
+          <div className="flex items-center gap-3">
+            <img src={elo2Logo.url} alt="ELO2" className="h-10 w-auto" />
+            <div className="border-l border-border pl-3">
+              <p className="font-display text-sm font-bold text-ink">Chagas Connect Care</p>
+              <p className="text-xs text-muted-foreground">Centro de cuidado conectado</p>
+            </div>
+          </div>
+          <p className="mt-5 text-sm leading-6 text-muted-foreground">
+            Plataforma para organizar comunicação, rede de apoio e acompanhamento de pessoas com doença de Chagas, com WhatsApp como canal principal.
+          </p>
+          <p className="mt-4 inline-flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+            <HeartPulse className="mt-0.5 h-4 w-4 shrink-0 text-care" aria-hidden />
+            Apoio à coordenação e educação em saúde. Não substitui atendimento ou decisão clínica.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-8 md:col-span-1">
-          <div>
-            <h2 className="mb-3 font-display text-sm font-bold text-brand">Plataforma</h2>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="#funcionalidades" className="hover:text-brand">Funcionalidades</a></li>
-              <li><a href="#beneficios" className="hover:text-brand">Benefícios</a></li>
-              <li><a href="#sobre" className="hover:text-brand">Sobre</a></li>
-            </ul>
-          </div>
-          <div>
-            <h2 className="mb-3 font-display text-sm font-bold text-brand">Legal</h2>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link to="/politica-de-privacidade" onClick={handleLegalClick} className="hover:text-brand">Política de Privacidade</Link></li>
-              <li><Link to="/termos-de-uso" onClick={handleLegalClick} className="hover:text-brand">Termos de Uso</Link></li>
-              <li><Link to="/exclusao-de-dados" onClick={handleLegalClick} className="hover:text-brand">Exclusão de Dados</Link></li>
-            </ul>
-          </div>
-        </div>
-        <div className="flex flex-col items-start gap-4 md:items-end">
-          <Button variant="hero">Fale Conosco</Button>
-          <div className="flex gap-2">
-            {[
-              { Icon: Instagram, label: "Instagram" },
-              { Icon: Linkedin, label: "LinkedIn" },
-              { Icon: Twitter, label: "Twitter" },
-            ].map(({ Icon, label }) => (
-              <a
-                key={label}
-                href="#"
-                aria-label={`Abrir perfil no ${label}`}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-brand transition-smooth hover:bg-primary"
-              >
-                <Icon className="h-4 w-4" aria-hidden />
-              </a>
+
+        <div>
+          <h2 className="font-display text-sm font-bold text-ink">Conheça</h2>
+          <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
+            {platformLinks.map((item) => (
+              <li key={item.href}>
+                <a href={item.href} className="rounded-md hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  {item.label}
+                </a>
+              </li>
             ))}
-          </div>
+          </ul>
+        </div>
+
+        <div>
+          <h2 className="font-display text-sm font-bold text-ink">Acesso e privacidade</h2>
+          <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
+            <li>
+              <Link to="/auth" className="inline-flex items-center gap-2 rounded-md hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <LogIn className="h-4 w-4" aria-hidden /> Entrar na plataforma
+              </Link>
+            </li>
+            <li><Link to="/politica-de-privacidade" onClick={handleLegalClick} className="hover:text-primary">Política de Privacidade</Link></li>
+            <li><Link to="/termos-de-uso" onClick={handleLegalClick} className="hover:text-primary">Termos de Uso</Link></li>
+            <li><Link to="/exclusao-de-dados" onClick={handleLegalClick} className="hover:text-primary">Exclusão de Dados</Link></li>
+          </ul>
         </div>
       </div>
-      <div className="mt-10 border-t border-border pt-6 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Chagas Cuidado Digital. Todos os direitos reservados.
+
+      <div className="mt-10 flex flex-col gap-2 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <span>© {new Date().getFullYear()} ELO2 — Chagas Connect Care.</span>
+        <span>Comunicação em saúde com clareza, contexto e responsabilidade.</span>
       </div>
     </div>
   </footer>
