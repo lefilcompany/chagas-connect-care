@@ -7,7 +7,7 @@ import { CTA } from "@/components/landing/CTA";
 import { Footer } from "@/components/landing/Footer";
 
 const Index = () => (
-  <div className="min-h-screen bg-background font-sans">
+  <div className="min-h-screen overflow-x-hidden bg-background font-sans text-foreground">
     <Header />
     <main>
       <Hero />
