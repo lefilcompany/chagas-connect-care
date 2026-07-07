@@ -50,7 +50,7 @@ export const Header = () => {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-background/90 backdrop-blur-xl">
       <div className="container flex min-h-16 items-center justify-between gap-6 py-3">
-        <a href="#topo" className="flex min-w-0 items-center gap-3" aria-label="ELO2 Chagas Connect Care — início">
+        <a href="#topo" className="flex min-w-0 items-center gap-3" aria-label="ELO2 Chagas Connect Care — início" onClick={(e) => handleAnchorClick(e, "#topo")}>
           <img src={elo2Logo.url} alt="ELO2" className="h-9 w-auto shrink-0" />
         </a>
 
