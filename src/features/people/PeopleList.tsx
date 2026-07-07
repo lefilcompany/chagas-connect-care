@@ -171,8 +171,9 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
               <TooltipProvider delayDuration={150}>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="cursor-help border-b border-dotted border-muted-foreground/50">
-                      Pendências
+                    <span className="inline-flex cursor-help items-center gap-1 border-b border-dotted border-muted-foreground/50">
+                      <AlertCircle className="h-4 w-4" aria-hidden />
+                      <span className="sr-only">Pendências</span>
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs text-xs">
