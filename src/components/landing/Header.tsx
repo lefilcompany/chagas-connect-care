@@ -72,7 +72,7 @@ export const Header = () => {
             <Link to="/auth">Entrar</Link>
           </Button>
           <Button variant="hero" asChild>
-            <a href="#plataforma">Conhecer a plataforma</a>
+            <a href="#plataforma" onClick={(e) => handleAnchorClick(e, "#plataforma")}>Conhecer a plataforma</a>
           </Button>
         </div>
 
