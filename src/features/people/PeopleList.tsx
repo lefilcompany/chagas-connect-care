@@ -16,6 +16,16 @@ import type { CareNetworkContact, PersonWithDerived } from "./types";
 import { ChannelBadge } from "@/components/care/ChannelBadge";
 import { formatDistanceToNowStrict } from "./format";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+const pendencyLabels: Record<string, string> = {
+  canal: "Sem canal válido (telefone ausente ou inválido)",
+  consentimento: "Sem consentimento registrado",
+  cuidador: "Sem cuidador ou familiar vinculado",
+  falha: "Última mensagem falhou no envio",
+  "sem-contato": "Sem contato há mais de 30 dias",
+  "aguardando-resposta": "Mensagem recebida aguardando resposta",
+};
 
 const stageLabels: Record<string, string> = {
   diagnostico: "Diagnóstico",
@@ -157,7 +167,20 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
             <th scope="col" className="px-4 py-2">Canal</th>
             <th scope="col" className="px-4 py-2">Último contato</th>
             <th scope="col" className="px-4 py-2">Rede</th>
-            <th scope="col" className="px-4 py-2">Pendências</th>
+            <th scope="col" className="px-4 py-2">
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help border-b border-dotted border-muted-foreground/50">
+                      Pendências
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    Itens que precisam de atenção nesta pessoa: canal, consentimento, cuidador, falhas de envio, contato antigo ou resposta pendente.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </th>
             <th scope="col" className="px-4 py-2 sr-only">Mostrar rede de cuidado</th>
           </tr>
         </thead>
@@ -216,10 +239,30 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
                     {p.derived.pendencies.length === 0 ? (
                       <span className="text-xs text-care">Em dia</span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-coral-soft px-2 py-0.5 text-xs font-medium text-coral-strong">
-                        <AlertCircle className="h-3 w-3" aria-hidden />
-                        {p.derived.pendencies.length}
-                      </span>
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded-full bg-coral-soft px-2 py-0.5 text-xs font-medium text-coral-strong hover:bg-coral-soft/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label={`${p.derived.pendencies.length} pendência(s): ${p.derived.pendencies.map((k) => pendencyLabels[k] ?? k).join(", ")}`}
+                            >
+                              <AlertCircle className="h-3 w-3" aria-hidden />
+                              {p.derived.pendencies.length} {p.derived.pendencies.length === 1 ? "pendência" : "pendências"}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs text-xs">
+                            <ul className="space-y-1">
+                              {p.derived.pendencies.map((k) => (
+                                <li key={k} className="flex items-start gap-1.5">
+                                  <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                                  <span>{pendencyLabels[k] ?? k}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </td>
                   <td className="px-4 py-2 align-middle text-right">
