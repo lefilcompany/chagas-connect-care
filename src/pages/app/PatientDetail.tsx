@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   ArrowLeft, Plus, CheckCircle2, XCircle,
   Users, Pill, MessageSquare, Activity, Phone, Building2,
   Save, Trash2, Check, CheckCheck, Clock, Send, ChevronDown,
+  UserRound,
 } from "lucide-react";
 import { z } from "zod";
 import { queueAndSend } from "@/lib/whatsapp";
@@ -40,12 +41,27 @@ function formatPhone(v: string) {
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [patient, setPatient] = useState<any>(null);
   const [contacts, setContacts] = useState<any[]>([]);
   const [meds, setMeds] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [adherence, setAdherence] = useState<any[]>([]);
-  const [tab, setTab] = useState<"familia" | "medicacao" | "mensagens" | "adesao">("familia");
+  type PatientTab = "dados" | "familia" | "medicacao" | "mensagens" | "adesao";
+  const validTabs: PatientTab[] = ["dados", "familia", "medicacao", "mensagens", "adesao"];
+  const initialTab = (searchParams.get("tab") as PatientTab) || "dados";
+  const [tab, setTab] = useState<PatientTab>(
+    validTabs.includes(initialTab) ? initialTab : "dados",
+  );
+  useEffect(() => {
+    const current = searchParams.get("tab");
+    if (current !== tab) {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", tab);
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [contactPhone, setContactPhone] = useState("");
@@ -220,6 +236,7 @@ export default function PatientDetail() {
   const adhRate = adherence.length ? Math.round((okCount / adherence.length) * 100) : 0;
 
   const tabs = [
+    { v: "dados", label: "Dados do paciente", icon: UserRound, count: undefined as number | undefined },
     { v: "familia", label: "Família & Cuidadores", icon: Users, count: contacts.length },
     { v: "medicacao", label: "Medicação", icon: Pill, count: meds.length },
     { v: "mensagens", label: "Mensagens", icon: MessageSquare, count: messages.length },
@@ -258,12 +275,55 @@ export default function PatientDetail() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button size="sm" variant="hero" onClick={savePatient} disabled={saving || !hasChanges}>
-              <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar alterações"}
-            </Button>
+            {tab === "dados" ? (
+              <Button size="sm" variant="hero" onClick={savePatient} disabled={saving || !hasChanges}>
+                <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar alterações"}
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => setTab("dados")}>
+                <UserRound className="h-4 w-4" /> Editar paciente
+              </Button>
+            )}
+            {tab !== "familia" && (
+              <Button size="sm" variant="hero" onClick={() => setTab("familia")}>
+                <Users className="h-4 w-4" /> Gerenciar vínculos
+              </Button>
+            )}
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        {tab === "familia" && (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
+            <p className="font-semibold text-brand">Gerenciando vínculos</p>
+            <p className="text-xs text-muted-foreground">
+              Adicione, edite e organize familiares, cuidadores e profissionais vinculados a este paciente.
+              Para alterar os dados clínicos, use <strong>Editar paciente</strong>.
+            </p>
+          </div>
+        )}
+      </header>
+
+      <div className="-mx-1 overflow-x-auto">
+        <div className="inline-flex min-w-full sm:min-w-0 rounded-full border border-border bg-card p-1 shadow-sm">
+          {tabs.map(({ v, label, icon: Icon, count }) => (
+            <button
+              key={v}
+              onClick={() => setTab(v)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+                tab === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span>{label}</span>
+              {typeof count === "number" && (
+                <span className={`ml-1 rounded-full px-1.5 text-[10px] ${tab === v ? "bg-primary-foreground/20" : "bg-muted"}`}>{count}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "dados" && (
+        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-card grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Nome completo</Label>
             <Input value={form.full_name ?? ""} onChange={(e) => setForm({ ...form, full_name: e.target.value })} maxLength={160} />
@@ -336,26 +396,13 @@ export default function PatientDetail() {
               maxLength={2000}
             />
           </div>
+          <div className="sm:col-span-2 flex justify-end pt-2 border-t border-border">
+            <Button size="sm" variant="hero" onClick={savePatient} disabled={saving || !hasChanges}>
+              <Save className="h-4 w-4" /> {saving ? "Salvando..." : "Salvar alterações"}
+            </Button>
+          </div>
         </div>
-      </header>
-
-      <div className="-mx-1 overflow-x-auto">
-        <div className="inline-flex min-w-full sm:min-w-0 rounded-full border border-border bg-card p-1 shadow-sm">
-          {tabs.map(({ v, label, icon: Icon, count }) => (
-            <button
-              key={v}
-              onClick={() => setTab(v)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
-                tab === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              <span>{label}</span>
-              <span className={`ml-1 rounded-full px-1.5 text-[10px] ${tab === v ? "bg-primary-foreground/20" : "bg-muted"}`}>{count}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
       {tab === "familia" && (
         <div className="space-y-4">
