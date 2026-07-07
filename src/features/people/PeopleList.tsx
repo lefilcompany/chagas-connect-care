@@ -249,12 +249,22 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
                               Familiares, cuidadores e médicos vinculados a esta pessoa.
                             </p>
                           </div>
-                          <Link
-                            to={`/app/pacientes/${p.id}`}
-                            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            Gerenciar vínculos
-                          </Link>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              to={`/app/pacientes/${p.id}?tab=familia`}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <Users className="h-3.5 w-3.5" aria-hidden />
+                              Gerenciar vínculos
+                            </Link>
+                            <Link
+                              to={`/app/pacientes/${p.id}?tab=dados`}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <UserRound className="h-3.5 w-3.5" aria-hidden />
+                              Editar paciente
+                            </Link>
+                          </div>
                         </div>
 
                         {contacts.length === 0 ? (
