@@ -95,7 +95,7 @@ export const Header = () => {
               <a
                 key={item.href}
                 href={item.href}
-                onClick={closeMenu}
+                onClick={(e) => handleAnchorClick(e, item.href)}
                 className="rounded-xl px-3 py-3 text-sm font-medium text-foreground/80 hover:bg-secondary hover:text-foreground"
               >
                 {item.label}
