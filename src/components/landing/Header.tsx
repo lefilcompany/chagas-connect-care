@@ -40,7 +40,7 @@ export const Header = () => {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Button variant="ghost" className="text-brand" asChild>
+          <Button variant="ghost" className="text-brand hover:text-care" asChild>
             <Link to="/auth">Entrar</Link>
           </Button>
           <Button variant="hero" asChild>
