@@ -167,11 +167,11 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
             <th scope="col" className="px-4 py-2">Canal</th>
             <th scope="col" className="px-4 py-2">Último contato</th>
             <th scope="col" className="px-4 py-2">Rede</th>
-            <th scope="col" className="px-4 py-2">
+            <th scope="col" className="px-4 py-2 text-center">
               <TooltipProvider delayDuration={150}>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="inline-flex cursor-help items-center gap-1 border-b border-dotted border-muted-foreground/50">
+                    <span className="inline-flex cursor-help items-center justify-center gap-1 border-b border-dotted border-muted-foreground/50">
                       <AlertCircle className="h-4 w-4" aria-hidden />
                       <span>Pendências</span>
                     </span>
@@ -236,16 +236,16 @@ export function PeopleList({ people }: { people: PersonWithDerived[] }) {
                       {p.derived.contactsCount}
                     </span>
                   </td>
-                  <td className="px-4 py-2 align-middle">
+                  <td className="px-4 py-2 align-middle text-center">
                     {p.derived.pendencies.length === 0 ? (
-                      <span className="text-xs text-care">Em dia</span>
+                      <span className="inline-flex items-center justify-center text-xs text-care">Em dia</span>
                     ) : (
                       <TooltipProvider delayDuration={150}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
                               type="button"
-                              className="inline-flex items-center gap-1 rounded-full bg-coral-soft px-2 py-0.5 text-xs font-medium text-coral-strong hover:bg-coral-soft/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="inline-flex items-center justify-center gap-1 rounded-full bg-coral-soft px-2 py-0.5 text-xs font-medium text-coral-strong hover:bg-coral-soft/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               aria-label={`${p.derived.pendencies.length} pendência(s): ${p.derived.pendencies.map((k) => pendencyLabels[k] ?? k).join(", ")}`}
                             >
                               <AlertCircle className="h-3 w-3" aria-hidden />
