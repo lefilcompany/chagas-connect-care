@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "knownFeatureRoots": [
     "audiences",
     "channels",
@@ -40,15 +40,14 @@
         "src/components/landing/**"
       ],
       "unitTests": ["src/test/unit/route-contracts.test.ts"],
-      "e2eTests": ["tests/e2e/public.spec.ts"]
+      "e2eTests": ["tests/e2e/public.spec.ts", "tests/e2e/auth.setup.ts"]
     },
     {
       "id": "identity-access",
-      "description": "Sessão, papéis, guards, instituição e modo E2E.",
+      "description": "Sessão real, papéis, guards, instituição e RLS.",
       "sources": [
         "src/lib/auth.tsx",
         "src/lib/access.tsx",
-        "src/lib/e2e.ts",
         "src/components/auth/**",
         "src/integrations/lovable/**"
       ],
@@ -57,7 +56,8 @@
         "src/test/unit/routing-guards.test.tsx"
       ],
       "e2eTests": [
-        "tests/e2e/public.spec.ts",
+        "tests/e2e/auth.setup.ts",
+        "tests/e2e/data-access.spec.ts",
         "tests/e2e/institutional.spec.ts",
         "tests/e2e/superadmin.spec.ts"
       ]
@@ -74,7 +74,11 @@
         "src/components/app/patients/**"
       ],
       "unitTests": ["src/test/unit/route-contracts.test.ts"],
-      "e2eTests": ["tests/e2e/institutional.spec.ts", "tests/e2e/legacy.spec.ts"]
+      "e2eTests": [
+        "tests/e2e/data-access.spec.ts",
+        "tests/e2e/institutional.spec.ts",
+        "tests/e2e/legacy.spec.ts"
+      ]
     },
     {
       "id": "today-priorities",
@@ -182,7 +186,7 @@
         "src/test/unit/routing-guards.test.tsx",
         "src/test/unit/route-contracts.test.ts"
       ],
-      "e2eTests": ["tests/e2e/institutional.spec.ts"]
+      "e2eTests": ["tests/e2e/data-access.spec.ts", "tests/e2e/institutional.spec.ts"]
     },
     {
       "id": "superadmin-operation",
@@ -195,11 +199,15 @@
         "src/test/unit/routing-guards.test.tsx",
         "src/test/unit/route-contracts.test.ts"
       ],
-      "e2eTests": ["tests/e2e/superadmin.spec.ts", "tests/e2e/legacy.spec.ts"]
+      "e2eTests": [
+        "tests/e2e/data-access.spec.ts",
+        "tests/e2e/superadmin.spec.ts",
+        "tests/e2e/legacy.spec.ts"
+      ]
     },
     {
       "id": "public-onboarding",
-      "description": "Convite e cadastro público de paciente/rede.",
+      "description": "Convite e cadastro público com Edge Function e banco reais.",
       "sources": [
         "src/pages/public/**",
         "supabase/functions/public-onboarding/**",
