@@ -133,7 +133,7 @@ jobs:
           - name: whatsapp-e-lotes
             file: src/test/unit/whatsapp.test.ts
           - name: identidade-e-acesso
-            file: src/test/unit/e2e-context.test.ts
+            file: src/test/unit/e2e-context.test.tsx
           - name: guards-e-papeis
             file: src/test/unit/routing-guards.test.tsx
           - name: jornadas
@@ -226,10 +226,10 @@ jobs:
           retention-days: 14
 
   e2e:
-    name: E2E — ${{ matrix.project }}
+    name: E2E funcional — ${{ matrix.project }}
     needs: governance
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -253,14 +253,14 @@ jobs:
       - name: Instalar Chromium e dependências do sistema
         run: npx playwright install --with-deps chromium
 
-      - name: Executar projeto Playwright ${{ matrix.project }}
+      - name: Executar Supabase local, migrations, seed e Playwright ${{ matrix.project }}
         run: npm run test:e2e -- --project=${{ matrix.project }}
 
-      - name: Publicar relatório, traces, screenshots e vídeos
+      - name: Publicar relatório, traces, logs, screenshots e vídeos
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-${{ matrix.project }}
+          name: playwright-functional-${{ matrix.project }}
           path: |
             playwright-report/
             test-results/
@@ -295,7 +295,7 @@ jobs:
             unit-tests "$UNIT_TESTS" \
             coverage "$COVERAGE" \
             build "$BUILD" \
-            e2e "$E2E"
+            e2e-functional "$E2E"
 
           for result in "$GOVERNANCE" "$STATIC_ANALYSIS" "$UNIT_TESTS" "$COVERAGE" "$BUILD" "$E2E"; do
             if [ "$result" != "success" ]; then
