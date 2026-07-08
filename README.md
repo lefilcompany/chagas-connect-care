@@ -1,72 +1,126 @@
 # Chagas Digital Care
 
-Plataforma para instituições de saúde acompanharem a **jornada de
-cuidado do paciente** — da entrada na rede até a alta clínica — com
-comunicação multicanal (WhatsApp, SMS, e-mail), automações de jornada,
-biblioteca clínica versionada, inbox unificada e rotina da equipe.
+Plataforma multi-instituição para coordenar comunicação, acompanhamento,
+automações e trabalho humano ao redor da jornada de cuidado.
 
 > Idioma oficial do produto e da documentação: **pt-BR**.
+
+## Estado do produto
+
+O repositório implementa, entre outras capacidades:
+
+- pacientes e contatos da rede de cuidado;
+- dados clínicos limitados para contexto e adesão;
+- WhatsApp bidirecional, identidades, conversas, mídia e templates Meta;
+- audiências e envios em lote;
+- jornadas em grafo, execuções, passos e tarefas;
+- área institucional e área de superadmin;
+- backend Supabase/Lovable Cloud com RLS e Edge Functions.
+
+SMS aparece no schema, mas deve ser tratado como capacidade parcial até validação
+ponta a ponta. E-mail é visão futura e não faz parte do enum atual.
 
 ---
 
 ## Documentação canônica
 
-Antes de qualquer alteração, leia — nesta ordem:
+Leia nesta ordem:
 
-1. [`CONTEXT.md`](./CONTEXT.md) — glossário do domínio, fronteiras e
-   stack técnica detalhada. **Fonte da verdade** para nomenclatura.
-2. [`AGENTS.md`](./AGENTS.md) — regras de comportamento para qualquer
-   agente (humano ou LLM) que edite este repositório: issue-first,
-   guard-rails de design, segurança (RLS/GRANT/policies), arquivos
-   intocáveis.
-3. [`docs/architecture.md`](./docs/architecture.md) — visão C4 nível 1,
-   módulos frontend, edge functions, modelo de dados essencial, fluxos
-   críticos e matriz de permissões.
-4. [`docs/issue-tracker/`](./docs/issue-tracker/) — issues locais
-   versionados em Markdown (um arquivo por issue). Ver
-   [README do tracker](./docs/issue-tracker/README.md).
-5. [`docs/adr/`](./docs/adr/) — Architecture Decision Records (MADR
-   em pt-BR). Ver [regra dos 3](./docs/adr/README.md).
+1. [`CONTEXT.md`](./CONTEXT.md) — propósito, fronteiras, estado atual, decisões,
+   invariantes e mapa dos documentos.
+2. [`AGENTS.md`](./AGENTS.md) — autonomia proporcional ao risco, fluxo de
+   trabalho, segurança, validação e Definition of Done.
+3. [`docs/domain/`](./docs/domain/) — glossário, modelo, consentimento, estados,
+   estado atual versus alvo e perguntas abertas.
+4. [`docs/architecture.md`](./docs/architecture.md) — containers, rotas, dados,
+   tenancy, edge functions, fluxos, segurança e observabilidade.
+5. [`docs/risks.md`](./docs/risks.md) — registro de riscos e dívidas.
+6. [`docs/adr/`](./docs/adr/) — decisões arquiteturais e de processo.
+7. [`docs/issue-tracker/`](./docs/issue-tracker/) — trabalho versionado em
+   Markdown.
 
----
+### Como interpretar afirmações
 
-## Stack
+- **[ATUAL]** — comprovado pelo código/schema;
+- **[DECISÃO]** — ADR aceito;
+- **[ALVO]** — direção futura;
+- **[HIPÓTESE]** — questão ainda não validada.
 
-- **Frontend:** React 18 + TypeScript 5 + Vite 5, Tailwind CSS v3 com
-  tokens semânticos em `src/index.css`, shadcn/ui (Radix), TanStack
-  Query v5, React Router, Vitest + Testing Library.
-- **Backend (Lovable Cloud):** Postgres com RLS em todas as tabelas de
-  `public`, Auth gerenciado, Storage (bucket privado
-  `whatsapp-media`), Edge Functions em Deno (`supabase/functions/*`).
-- **Integrações externas:** Meta WhatsApp Cloud API (Graph v25.0),
-  resolução de CEP.
-
-Detalhes completos em [`CONTEXT.md §4`](./CONTEXT.md).
+Quando houver divergência, migrations, tipos gerados e código executável têm
+precedência sobre documentação desatualizada.
 
 ---
 
-## Estrutura do repositório
+## Decisões principais
+
+| ADR | Estado | Decisão |
+| --- | --- | --- |
+| [0001](./docs/adr/0001-adotar-supabase-lovable-como-backend.md) | aceito | Supabase/Lovable como backend gerenciado. |
+| [0002](./docs/adr/0002-isolar-instituicoes-com-rls.md) | aceito | Isolamento multi-instituição com RLS. |
+| [0003](./docs/adr/0003-armazenar-papeis-em-user-roles.md) | aceito | Papéis autorizativos em `user_roles`. |
+| [0004](./docs/adr/0004-representar-jornadas-como-grafos-versionados.md) | aceito | Jornadas como grafos JSON versionados. |
+| [0005](./docs/adr/0005-separar-identidade-conversa-e-pessoa-no-whatsapp.md) | aceito | Identidade, conversa, mensagem e pessoa separadas. |
+| [0006](./docs/adr/0006-limitar-dados-clinicos-ao-cuidado-coordenado.md) | proposto | Limite dos dados clínicos. |
+| [0007](./docs/adr/0007-manter-issue-tracker-local-em-markdown.md) | aceito | Issue tracker local em Markdown. |
+
+---
+
+## Stack atual
+
+### Frontend
+
+- React 18;
+- TypeScript 5;
+- Vite 5;
+- React Router 6;
+- TanStack Query 5;
+- Tailwind CSS 3;
+- shadcn/ui + Radix;
+- Vitest + Testing Library.
+
+### Backend
+
+- Supabase/Lovable Cloud;
+- Postgres;
+- Supabase Auth;
+- Row-Level Security;
+- Storage privado;
+- Edge Functions Deno;
+- Meta WhatsApp Cloud API.
+
+Detalhes e fontes: [`docs/architecture.md`](./docs/architecture.md).
+
+---
+
+## Estrutura relevante
 
 ```text
 .
-├── CONTEXT.md              # Glossário do domínio + stack
-├── AGENTS.md               # Regras para agentes (humano ou LLM)
-├── README.md               # Este arquivo
+├── CONTEXT.md
+├── AGENTS.md
+├── README.md
 ├── docs/
-│   ├── architecture.md     # Onboarding técnico (C4, fluxos, permissões)
-│   ├── issue-tracker/      # Issues locais (NNNN-slug.md)
-│   └── adr/                # Architecture Decision Records
+│   ├── architecture.md
+│   ├── risks.md
+│   ├── domain/
+│   │   ├── README.md
+│   │   ├── glossary.md
+│   │   ├── model.md
+│   │   ├── consent-and-privacy.md
+│   │   ├── state-machines.md
+│   │   ├── current-vs-target.md
+│   │   └── open-questions.md
+│   ├── adr/
+│   └── issue-tracker/
 ├── src/
-│   ├── features/           # Slices por área (people, journeys, inbox, ...)
-│   ├── pages/              # Rotas (app/, superadmin/, legal/, public/)
-│   ├── components/         # UI compartilhada e shell da aplicação
-│   ├── integrations/       # Clientes auto-gerados (NÃO editar)
-│   ├── lib/                # Utilitários (auth, queries, templates, ...)
-│   └── index.css           # Tokens semânticos (HSL) — única fonte de cores
+│   ├── pages/
+│   ├── features/
+│   ├── components/
+│   ├── lib/
+│   └── integrations/supabase/   # gerado; não editar manualmente
 ├── supabase/
-│   ├── functions/          # Edge functions em Deno
-│   └── migrations/         # SQL versionado (GRANT + RLS + POLICY juntos)
-├── public/                 # Assets estáticos
+│   ├── functions/
+│   └── migrations/
 └── package.json
 ```
 
@@ -74,46 +128,55 @@ Detalhes completos em [`CONTEXT.md §4`](./CONTEXT.md).
 
 ## Rodando localmente
 
-Pré-requisitos: Node 18+ e [Bun](https://bun.sh) ou npm.
+Pré-requisitos: Node.js 18+ e Bun ou npm.
 
 ```bash
-bun install        # ou: npm install
-bun run dev        # sobe o Vite em http://localhost:8080
-bun run test       # roda a suíte Vitest
+bun install        # ou npm install
+bun run dev        # Vite
+bun run test       # Vitest
 bun run lint       # ESLint
 bun run build      # build de produção
 ```
 
-### Variáveis de ambiente
+---
 
-`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` e
-`VITE_SUPABASE_PROJECT_ID` são **auto-gerenciados** pela Lovable Cloud
-em `.env` — não edite manualmente. Segredos sensíveis (tokens Meta,
-`JOURNEY_RUNNER_SECRET`, etc.) vivem **somente** no ambiente das edge
-functions, nunca em `VITE_*` (ver [`AGENTS.md §6`](./AGENTS.md)).
+## Variáveis e segredos
+
+Valores `VITE_SUPABASE_*` são gerenciados pela plataforma e podem ser
+publicáveis conforme o contrato do Supabase. Segredos como token Meta, app
+secret, verify token, service role e segredo do runner vivem somente no
+ambiente das edge functions.
+
+Nunca coloque segredo em `VITE_*`, código, issue, log ou documentação.
 
 ---
 
-## Fluxo de contribuição (resumo)
+## Fluxo de contribuição
 
 1. Leia `CONTEXT.md` e `AGENTS.md`.
-2. **Issue-first:** crie/abra o issue em `docs/issue-tracker/` antes
-   de escrever código.
-3. Implemente respeitando os guard-rails (design tokens, RLS, papéis
-   em `user_roles`, arquivos auto-gerados intocáveis).
-4. Ao concluir: atualize o issue (`status`, `atualizado_em`,
-   critérios de aceitação) e, se afetou o domínio, edite
-   `CONTEXT.md` na mesma tarefa. Se surgiu decisão arquitetural
-   difícil de reverter, proponha um ADR.
+2. Abra/localize o issue em `docs/issue-tracker/`.
+3. Leia domínio, riscos e ADRs afetados.
+4. Valide afirmações no código/schema.
+5. Implemente a menor mudança completa e segura.
+6. Execute e registre validações proporcionais.
+7. Atualize documentação e ADRs na mesma entrega.
+8. Conclua o issue e referencie-o no PR.
 
-Fluxo completo em [`AGENTS.md §2`](./AGENTS.md).
+Mudanças em domínio, dados clínicos, consentimento, RLS, service role, estados,
+integrações ou arquitetura exigem atenção especial conforme `AGENTS.md`.
 
 ---
 
-## Deploy
+## Questões ainda não decididas
 
-Preview e versão publicada são hospedados pela Lovable. Edge functions
-em `supabase/functions/` são versionadas no repositório e implantadas
-pela plataforma. Migrations em `supabase/migrations/` — cada
-`CREATE TABLE` em `public` **exige** `GRANT` + `ENABLE ROW LEVEL
-SECURITY` + `CREATE POLICY` na **mesma** migration.
+A lista completa está em
+[`docs/domain/open-questions.md`](./docs/domain/open-questions.md). Prioridades:
+
+- posicionamento: vertical de Chagas, genérico ou núcleo + vertical;
+- fronteira de dados clínicos;
+- precedência entre autorização do contato e opt-in da identidade;
+- telefone compartilhado;
+- semântica de pausa, versão e handoff de jornadas;
+- tenancy da biblioteca de conteúdo.
+
+Essas questões não devem ser resolvidas silenciosamente por implementação.
