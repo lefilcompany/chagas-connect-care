@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, createWriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
@@ -8,14 +8,29 @@ const supabaseArgs = ["--yes", "supabase@latest"];
 const playwrightArgs = ["playwright", "test", ...process.argv.slice(2)];
 const resultsDir = resolve(root, "test-results");
 const functionsLogPath = resolve(resultsDir, "supabase-functions.log");
+const bootstrapLogPath = resolve(resultsDir, "e2e-bootstrap.log");
 
 mkdirSync(resultsDir, { recursive: true });
+writeFileSync(bootstrapLogPath, "", "utf8");
 
 function sanitize(text = "") {
   return text
     .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[JWT_LOCAL_OCULTO]")
     .replace(/postgres(?:ql)?:\/\/[^\s"']+/g, "[DB_URL_LOCAL_OCULTA]")
     .replace(/(ANON_KEY|SERVICE_ROLE_KEY|JWT_SECRET)=[^\s]+/g, "$1=[OCULTO]");
+}
+
+function log(message) {
+  const safe = sanitize(String(message));
+  console.log(safe);
+  appendFileSync(bootstrapLogPath, `${new Date().toISOString()} ${safe}\n`, "utf8");
+}
+
+function logCommandFailure(command, args, result) {
+  const output = sanitize(`${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim());
+  const message = `Falha em ${command} ${args.join(" ")} (exit ${result.status})\n${output}`;
+  appendFileSync(bootstrapLogPath, `${new Date().toISOString()} ${message}\n`, "utf8");
+  return message;
 }
 
 function run(command, args, options = {}) {
@@ -27,10 +42,12 @@ function run(command, args, options = {}) {
     stdio: options.inherit ? "inherit" : "pipe",
   });
 
-  if (result.error) throw result.error;
+  if (result.error) {
+    appendFileSync(bootstrapLogPath, `${new Date().toISOString()} ${sanitize(result.error.message)}\n`, "utf8");
+    throw result.error;
+  }
   if (result.status !== 0 && !options.allowFailure) {
-    const output = sanitize(`${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim());
-    throw new Error(`Falha em ${command} ${args.join(" ")} (exit ${result.status})\n${output}`);
+    throw new Error(logCommandFailure(command, args, result));
   }
   return result;
 }
@@ -87,10 +104,10 @@ let functionsProcess = null;
 let exitCode = 1;
 
 try {
-  console.log("[e2e] Iniciando Supabase local...");
+  log("[e2e] Iniciando Supabase local...");
   runSupabase(["start"], { timeout: 15 * 60_000 });
 
-  console.log("[e2e] Aplicando migrations em banco limpo...");
+  log("[e2e] Aplicando migrations em banco limpo...");
   runSupabase(["db", "reset"], { timeout: 15 * 60_000 });
 
   const status = runSupabase(["status", "-o", "env"]);
@@ -116,10 +133,10 @@ try {
     VITE_SUPABASE_PROJECT_ID: "local-e2e",
   };
 
-  console.log("[e2e] Criando usuários e dados sintéticos reais...");
+  log("[e2e] Criando usuários e dados sintéticos reais...");
   run(process.execPath, ["scripts/e2e/seed-functional.mjs"], { env: functionalEnv });
 
-  console.log("[e2e] Servindo Edge Functions locais...");
+  log("[e2e] Servindo Edge Functions locais...");
   const logStream = createWriteStream(functionsLogPath, { flags: "w" });
   functionsProcess = spawn(npx, [...supabaseArgs, "functions", "serve"], {
     cwd: root,
@@ -129,7 +146,7 @@ try {
 
   await waitForFunctions(apiUrl, anonKey, functionsProcess);
 
-  console.log("[e2e] Executando Playwright contra Auth, Postgres, RLS e Functions reais...");
+  log("[e2e] Executando Playwright contra Auth, Postgres, RLS e Functions reais...");
   const result = run(npx, playwrightArgs, {
     env: functionalEnv,
     inherit: true,
@@ -137,14 +154,17 @@ try {
     timeout: 45 * 60_000,
   });
   exitCode = result.status ?? 1;
+  log(`[e2e] Playwright finalizado com exit code ${exitCode}.`);
 } catch (error) {
-  console.error(error instanceof Error ? error.message : error);
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(sanitize(message));
+  appendFileSync(bootstrapLogPath, `${new Date().toISOString()} ${sanitize(message)}\n`, "utf8");
   exitCode = 1;
 } finally {
   if (functionsProcess && functionsProcess.exitCode == null) {
     functionsProcess.kill("SIGTERM");
   }
-  console.log("[e2e] Encerrando Supabase local...");
+  log("[e2e] Encerrando Supabase local...");
   runSupabase(["stop", "--no-backup"], { allowFailure: true, timeout: 5 * 60_000 });
 }
 
