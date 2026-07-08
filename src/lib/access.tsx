@@ -2,7 +2,6 @@ import { createContext, useContext, ReactNode, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { getE2EMockContext } from "@/lib/e2e";
 
 export type AppRole = "superadmin" | "admin" | "equipe";
 
@@ -30,11 +29,10 @@ const Ctx = createContext<CurrentUserAccess>({
 
 export function AccessProvider({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
-  const e2e = getE2EMockContext();
 
   const { data, isLoading } = useQuery({
     queryKey: ["current-user-access", user?.id],
-    enabled: !!user?.id && !e2e.enabled,
+    enabled: !!user?.id,
     staleTime: 5 * 60_000,
     queryFn: async () => {
       if (!user?.id) return { roles: [] as AppRole[], institution: null as string | null };
@@ -42,26 +40,25 @@ export function AccessProvider({ children }: { children: ReactNode }) {
         supabase.from("user_roles").select("role").eq("user_id", user.id),
         supabase.from("profiles").select("institution").eq("id", user.id).maybeSingle(),
       ]);
-      const roles = ((rolesRes.data ?? []) as Array<{ role: AppRole }>).map((r) => r.role);
+      const roles = ((rolesRes.data ?? []) as Array<{ role: AppRole }>).map((row) => row.role);
       const institution = (profRes.data as { institution?: string } | null)?.institution ?? null;
       return { roles, institution };
     },
   });
 
   const value = useMemo<CurrentUserAccess>(() => {
-    const roles: AppRole[] = e2e.enabled && user ? [e2e.role] : data?.roles ?? [];
-    const institution = e2e.enabled && user ? e2e.institution : data?.institution ?? null;
+    const roles = data?.roles ?? [];
     return {
       userId: user?.id ?? null,
       email: user?.email ?? null,
-      institution,
+      institution: data?.institution ?? null,
       roles,
       isSuperAdmin: roles.includes("superadmin"),
       isInstitutionAdmin: roles.includes("admin"),
       isTeamMember: roles.includes("equipe"),
-      loadingAccess: e2e.enabled ? false : loading || (!!user && isLoading),
+      loadingAccess: loading || (!!user && isLoading),
     };
-  }, [user, loading, data, isLoading, e2e.enabled, e2e.role, e2e.institution]);
+  }, [user, loading, data, isLoading]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
