@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const fromMock = vi.fn();
+const { fromMock } = vi.hoisted(() => ({ fromMock: vi.fn() }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: fromMock },
