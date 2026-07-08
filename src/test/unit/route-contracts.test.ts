@@ -58,19 +58,19 @@ const legacyRoutes = [
 
 describe("route contracts", () => {
   it.each(publicRoutes)("mantém a rota pública %s", (route) => {
-    expect(appSource).toContain(`path=\"${route}\"`);
+    expect(appSource).toContain(`path="${route}"`);
   });
 
   it.each(institutionalRoutes)("mantém a rota institucional %s", (route) => {
-    expect(appSource).toContain(`path=\"${route}\"`);
+    expect(appSource).toContain(`path="${route}"`);
   });
 
   it.each(superadminRoutes)("mantém a rota superadmin %s", (route) => {
-    expect(appSource).toContain(`path=\"${route}\"`);
+    expect(appSource).toContain(`path="${route}"`);
   });
 
   it.each(legacyRoutes)("mantém contrato ou redirect legado %s", (route) => {
-    expect(appSource).toContain(`path=\"${route}\"`);
+    expect(appSource).toContain(`path="${route}"`);
   });
 
   it("mantém catch-all após as rotas customizadas", () => {
