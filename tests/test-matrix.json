@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "knownFeatureRoots": [
+    "audiences",
+    "channels",
+    "inbox",
+    "insights",
+    "journeys",
+    "library",
+    "meta-templates",
+    "people",
+    "privacy",
+    "today"
+  ],
+  "knownEdgeFunctions": [
+    "create-onboarding-invite",
+    "create-whatsapp-template",
+    "delete-account",
+    "journey-enroll",
+    "journey-runner",
+    "process-message-batch",
+    "public-onboarding",
+    "repair-whatsapp-channel",
+    "send-whatsapp",
+    "sync-whatsapp-templates",
+    "upload-whatsapp-media",
+    "upload-whatsapp-template-media",
+    "whatsapp-diagnostics",
+    "whatsapp-webhook"
+  ],
+  "functionalities": [
+    {
+      "id": "public-entry-auth-legal",
+      "description": "Landing, autenticação, documentos legais e 404.",
+      "sources": [
+        "src/pages/Index.tsx",
+        "src/pages/Auth.tsx",
+        "src/pages/NotFound.tsx",
+        "src/pages/legal/**",
+        "src/components/landing/**"
+      ],
+      "unitTests": ["src/test/unit/route-contracts.test.ts"],
+      "e2eTests": ["tests/e2e/public.spec.ts"]
+    },
+    {
+      "id": "identity-access",
+      "description": "Sessão, papéis, guards, instituição e modo E2E.",
+      "sources": [
+        "src/lib/auth.tsx",
+        "src/lib/access.tsx",
+        "src/lib/e2e.ts",
+        "src/components/auth/**",
+        "src/integrations/lovable/**"
+      ],
+      "unitTests": [
+        "src/test/unit/e2e-context.test.ts",
+        "src/test/unit/routing-guards.test.tsx"
+      ],
+      "e2eTests": [
+        "tests/e2e/public.spec.ts",
+        "tests/e2e/institutional.spec.ts",
+        "tests/e2e/superadmin.spec.ts"
+      ]
+    },
+    {
+      "id": "people-care",
+      "description": "Pessoas, pacientes, rede de cuidado e ficha clínica.",
+      "sources": [
+        "src/features/people/**",
+        "src/pages/app/People.tsx",
+        "src/pages/app/PersonDetail.tsx",
+        "src/pages/app/Patients.tsx",
+        "src/pages/app/PatientDetail.tsx",
+        "src/components/app/patients/**"
+      ],
+      "unitTests": ["src/test/unit/route-contracts.test.ts"],
+      "e2eTests": ["tests/e2e/institutional.spec.ts", "tests/e2e/legacy.spec.ts"]
+    },
+    {
+      "id": "today-priorities",
+      "description": "Rotina Hoje, prioridades e prefetch operacional.",
+      "sources": [
+        "src/features/today/**",
+        "src/pages/app/Today.tsx",
+        "src/lib/queries.ts"
+      ],
+      "unitTests": ["src/test/unit/route-contracts.test.ts"],
+      "e2eTests": ["tests/e2e/institutional.spec.ts"]
+    },
+    {
+      "id": "inbox-messaging",
+      "description": "Caixa, conversas, mensagens e composer.",
+      "sources": [
+        "src/features/inbox/**",
+        "src/pages/app/Inbox.tsx",
+        "src/pages/app/Messages.tsx",
+        "src/lib/whatsapp.ts",
+        "src/lib/whatsapp-*.ts"
+      ],
+      "unitTests": [
+        "src/test/unit/whatsapp.test.ts",
+        "src/test/unit/route-contracts.test.ts"
+      ],
+      "e2eTests": ["tests/e2e/institutional.spec.ts", "tests/e2e/legacy.spec.ts"]
+    },
+    {
+      "id": "journeys-tasks",
+      "description": "Editor, execução, tarefas e handoff de jornadas.",
+      "sources": [
+        "src/features/journeys/**",
+        "src/pages/app/Journeys.tsx",
+        "src/pages/app/JourneyEditor.tsx",
+        "src/pages/app/JourneyTasks.tsx"
+      ],
+      "unitTests": [
+        "src/test/unit/journey-routing.test.tsx",
+        "src/test/unit/route-contracts.test.ts"
+      ],
+      "e2eTests": ["tests/e2e/institutional.spec.ts", "tests/e2e/legacy.spec.ts"]
+    },
+    {
+      "id": "content-templates",
+      "description": "Biblioteca, conteúdo, respostas e templates Meta.",
+      "sources": [
+        "src/features/library/**",
+        "src/features/meta-templates/**",
+        "src/pages/app/Library.tsx",
+        "src/pages/app/Content.tsx",
+        "src/pages/app/MessageTemplates.tsx",
+        "src/pages/app/MessageTemplateNew.tsx",
+        "src/pages/app/MessageTemplateEdit.tsx",
+        "src/lib/templates.ts"
+      ],
+      "unitTests": [
+        "src/test/unit/templates.test.ts",
+        "src/test/unit/route-contracts.test.ts"
+      ],
+      "e2eTests": ["tests/e2e/institutional.spec.ts", "tests/e2e/legacy.spec.ts"]
+    },
+    {
+      "id": "audiences-batches",
+      "description": "Audiências, filtros, destinatários e envios em lote.",
+      "sources": [
+        "src/features/audiences/**",
+        "src/pages/app/Audiences.tsx",
+        "src/pages/app/SegmentEditor.tsx",
+        "src/pages/app/Campaign.tsx",
+        "src/lib/segments.ts"
+      ],
+      "unitTests": [
+        "src/test/unit/segments.test.ts",
+        "src/test/unit/whatsapp.test.ts",
+        "src/test/unit/route-contracts.test.ts"
+      ],
+      "e2eTests": ["tests/e2e/institutional.spec.ts", "tests/e2e/legacy.spec.ts"]
+    },
+    {
+      "id": "insights-reports",
+      "description": "Insights, relatórios e indicadores operacionais.",
+      "sources": [
+        "src/features/insights/**",
+        "src/pages/app/Insights.tsx",
+        "src/pages/app/Reports.tsx"
+      ],
+      "unitTests": ["src/test/unit/route-contracts.test.ts"],
+      "e2eTests": ["tests/e2e/institutional.spec.ts", "tests/e2e/legacy.spec.ts"]
+    },
+    {
+      "id": "institution-administration",
+      "description": "Instituição, equipe, perfil, privacidade e integrações.",
+      "sources": [
+        "src/features/privacy/**",
+        "src/features/channels/**",
+        "src/pages/app/Instituicao.tsx",
+        "src/pages/app/Equipe.tsx",
+        "src/pages/app/Profile.tsx",
+        "src/pages/app/Privacy.tsx",
+        "src/pages/app/Integrations.tsx",
+        "src/services/**"
+      ],
+      "unitTests": [
+        "src/test/unit/routing-guards.test.tsx",
+        "src/test/unit/route-contracts.test.ts"
+      ],
+      "e2eTests": ["tests/e2e/institutional.spec.ts"]
+    },
+    {
+      "id": "superadmin-operation",
+      "description": "Instituições, canais, diagnóstico e auditoria global.",
+      "sources": [
+        "src/pages/superadmin/**",
+        "src/components/superadmin/**"
+      ],
+      "unitTests": [
+        "src/test/unit/routing-guards.test.tsx",
+        "src/test/unit/route-contracts.test.ts"
+      ],
+      "e2eTests": ["tests/e2e/superadmin.spec.ts", "tests/e2e/legacy.spec.ts"]
+    },
+    {
+      "id": "public-onboarding",
+      "description": "Convite e cadastro público de paciente/rede.",
+      "sources": [
+        "src/pages/public/**",
+        "supabase/functions/public-onboarding/**",
+        "supabase/functions/create-onboarding-invite/**"
+      ],
+      "unitTests": [
+        "src/test/unit/route-contracts.test.ts",
+        "src/test/unit/edge-function-contracts.test.ts"
+      ],
+      "e2eTests": ["tests/e2e/public.spec.ts"]
+    },
+    {
+      "id": "whatsapp-edge-integration",
+      "description": "Envio, webhook, templates, mídia, diagnóstico e reparo WhatsApp.",
+      "sources": [
+        "supabase/functions/send-whatsapp/**",
+        "supabase/functions/whatsapp-webhook/**",
+        "supabase/functions/whatsapp-diagnostics/**",
+        "supabase/functions/create-whatsapp-template/**",
+        "supabase/functions/sync-whatsapp-templates/**",
+        "supabase/functions/upload-whatsapp-template-media/**",
+        "supabase/functions/upload-whatsapp-media/**",
+        "supabase/functions/repair-whatsapp-channel/**"
+      ],
+      "unitTests": [
+        "src/test/unit/whatsapp.test.ts",
+        "src/test/unit/edge-function-contracts.test.ts"
+      ],
+      "e2eTests": ["tests/e2e/institutional.spec.ts", "tests/e2e/superadmin.spec.ts"]
+    },
+    {
+      "id": "journey-edge-processing",
+      "description": "Inscrição, runner e processamento de lote.",
+      "sources": [
+        "supabase/functions/journey-enroll/**",
+        "supabase/functions/journey-runner/**",
+        "supabase/functions/process-message-batch/**"
+      ],
+      "unitTests": [
+        "src/test/unit/journey-routing.test.tsx",
+        "src/test/unit/edge-function-contracts.test.ts"
+      ],
+      "e2eTests": ["tests/e2e/institutional.spec.ts"]
+    },
+    {
+      "id": "account-lifecycle",
+      "description": "Exclusão de conta e ciclo de vida do usuário.",
+      "sources": ["supabase/functions/delete-account/**"],
+      "unitTests": [
+        "src/test/unit/routing-guards.test.tsx",
+        "src/test/unit/edge-function-contracts.test.ts"
+      ],
+      "e2eTests": ["tests/e2e/institutional.spec.ts", "tests/e2e/public.spec.ts"]
+    },
+    {
+      "id": "shared-platform-ui",
+      "description": "Shell, componentes compartilhados, estilos e bootstrap da SPA.",
+      "sources": [
+        "src/App.tsx",
+        "src/main.tsx",
+        "src/index.css",
+        "src/styles/**",
+        "src/components/ui/**",
+        "src/components/care/**",
+        "src/components/app/AppLayout.tsx",
+        "src/components/app/shell/**",
+        "src/hooks/**"
+      ],
+      "unitTests": [
+        "src/test/unit/route-contracts.test.ts",
+        "src/test/unit/routing-guards.test.tsx"
+      ],
+      "e2eTests": [
+        "tests/e2e/public.spec.ts",
+        "tests/e2e/institutional.spec.ts",
+        "tests/e2e/superadmin.spec.ts",
+        "tests/e2e/legacy.spec.ts"
+      ]
+    }
+  ]
+}
