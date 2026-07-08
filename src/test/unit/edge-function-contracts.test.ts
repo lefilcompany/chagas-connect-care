@@ -7,13 +7,16 @@ function read(path: string) {
 }
 
 describe("edge function contracts", () => {
-  it("send-whatsapp autentica o chamador antes de usar service role", () => {
+  it("send-whatsapp autentica e autoriza o chamador antes de usar o client admin", () => {
     const source = read("supabase/functions/send-whatsapp/index.ts");
+    const claimsIndex = source.indexOf("auth.getClaims");
+    const rlsLookupIndex = source.indexOf('authClient\n    .from("messages")');
+    const adminFullReadIndex = source.indexOf('admin\n    .from("messages")');
 
-    expect(source).toContain("auth.getClaims");
-    expect(source).toContain('.from("messages")');
+    expect(claimsIndex).toBeGreaterThanOrEqual(0);
+    expect(rlsLookupIndex).toBeGreaterThan(claimsIndex);
+    expect(adminFullReadIndex).toBeGreaterThan(rlsLookupIndex);
     expect(source).toContain("SUPABASE_SERVICE_ROLE_KEY");
-    expect(source.indexOf("auth.getClaims")).toBeLessThan(source.indexOf("SUPABASE_SERVICE_ROLE_KEY"));
     expect(source).toContain("WHATSAPP_GRAPH_VERSION");
   });
 
