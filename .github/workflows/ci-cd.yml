@@ -1,0 +1,301 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cd-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  VITE_SUPABASE_URL: "https://example.supabase.co"
+  VITE_SUPABASE_PUBLISHABLE_KEY: "ci-public-anon-key"
+  VITE_SUPABASE_PROJECT_ID: "ci-project"
+
+jobs:
+  governance:
+    name: Governança documental e mapa de testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout completo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validar issue, ADR e ordem de implementação
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: npm run ci:governance
+
+      - name: Validar matriz funcional e atualização dos testes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: npm run ci:test-map
+
+  static-analysis:
+    name: Lint e TypeScript
+    needs: governance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      - name: Executar ESLint
+        run: npm run lint
+
+      - name: Verificar tipos da aplicação, configurações e testes
+        run: npm run typecheck
+
+  unit-tests:
+    name: Unitários — ${{ matrix.name }}
+    needs: governance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: templates-e-medicacoes
+            file: src/test/unit/templates.test.ts
+          - name: audiencias-e-destinatarios
+            file: src/test/unit/segments.test.ts
+          - name: whatsapp-e-lotes
+            file: src/test/unit/whatsapp.test.ts
+          - name: identidade-e-acesso
+            file: src/test/unit/e2e-context.test.ts
+          - name: guards-e-papeis
+            file: src/test/unit/routing-guards.test.tsx
+          - name: jornadas
+            file: src/test/unit/journey-routing.test.tsx
+          - name: contratos-de-rotas
+            file: src/test/unit/route-contracts.test.ts
+          - name: contratos-edge-functions
+            file: src/test/unit/edge-function-contracts.test.ts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      - name: Executar suíte ${{ matrix.name }}
+        run: npm run test:unit -- ${{ matrix.file }}
+
+      - name: Publicar resultado JUnit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-junit-${{ matrix.name }}
+          path: test-results/unit-junit.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  coverage:
+    name: Cobertura unitária
+    needs: governance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      - name: Executar cobertura e thresholds
+        run: npm run test:coverage
+
+      - name: Publicar relatório de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage
+          path: |
+            coverage/
+            test-results/unit-junit.xml
+          if-no-files-found: warn
+          retention-days: 21
+
+  build:
+    name: Build de produção
+    needs: governance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      - name: Gerar bundle Vite
+        run: npm run build
+
+      - name: Publicar bundle validado
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  e2e:
+    name: E2E — ${{ matrix.project }}
+    needs: governance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - public
+          - institutional
+          - superadmin
+          - legacy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      - name: Instalar Chromium e dependências do sistema
+        run: npx playwright install --with-deps chromium
+
+      - name: Executar projeto Playwright ${{ matrix.project }}
+        run: npm run test:e2e -- --project=${{ matrix.project }}
+
+      - name: Publicar relatório, traces, screenshots e vídeos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.project }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  quality-gate:
+    name: Quality gate
+    if: always()
+    needs:
+      - governance
+      - static-analysis
+      - unit-tests
+      - coverage
+      - build
+      - e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Consolidar checks obrigatórios
+        env:
+          GOVERNANCE: ${{ needs.governance.result }}
+          STATIC_ANALYSIS: ${{ needs.static-analysis.result }}
+          UNIT_TESTS: ${{ needs.unit-tests.result }}
+          COVERAGE: ${{ needs.coverage.result }}
+          BUILD: ${{ needs.build.result }}
+          E2E: ${{ needs.e2e.result }}
+        run: |
+          printf '%-20s %s\n' \
+            governance "$GOVERNANCE" \
+            static-analysis "$STATIC_ANALYSIS" \
+            unit-tests "$UNIT_TESTS" \
+            coverage "$COVERAGE" \
+            build "$BUILD" \
+            e2e "$E2E"
+
+          for result in "$GOVERNANCE" "$STATIC_ANALYSIS" "$UNIT_TESTS" "$COVERAGE" "$BUILD" "$E2E"; do
+            if [ "$result" != "success" ]; then
+              echo "Quality gate bloqueado: existe job sem sucesso."
+              exit 1
+            fi
+          done
+
+          echo "Todos os checks obrigatórios foram aprovados."
+
+  delivery-artifact:
+    name: Artefato validado da main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - quality-gate
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Baixar bundle aprovado
+        uses: actions/download-artifact@v5
+        with:
+          name: production-dist
+          path: release/dist
+
+      - name: Criar manifesto de entrega
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          cat > release/manifest.json <<EOF
+          {
+            "repository": "$REPOSITORY",
+            "commit": "$COMMIT_SHA",
+            "workflowRunId": "$RUN_ID",
+            "validatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "deploymentProvider": "Lovable"
+          }
+          EOF
+
+      - name: Publicar artefato de entrega
+        uses: actions/upload-artifact@v4
+        with:
+          name: validated-main-${{ github.sha }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
