@@ -36,13 +36,8 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
-      name: "data-access",
-      testMatch: /data-access\.spec\.ts/,
-      use: { ...devices["Desktop Chrome"] },
-    },
-    {
       name: "institutional",
-      testMatch: /institutional\.spec\.ts/,
+      testMatch: /(institutional|data-access)\.spec\.ts/,
       dependencies: ["auth-setup"],
       use: { ...devices["Desktop Chrome"], storageState: authStates.adminA },
     },
