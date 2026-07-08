@@ -22,14 +22,14 @@ ancorar futuras decisões de UI e regras de derivação
 
 ## O que fazer
 
-- Adicionar o termo **Pendência** ao glossário em `docs/CONTEXT.md`
+- Adicionar o termo **Pendência** ao glossário em `CONTEXT.md`
   com definição, categorias e sinônimos proibidos.
 - Servir como referência viva para novos agentes de como um issue
   preenchido se parece.
 
 ## Critérios de aceitação
 
-- [x] `docs/CONTEXT.md` contém entrada "Pendência" no glossário.
+- [x] `CONTEXT.md` contém entrada "Pendência" no glossário.
 - [x] Entrada lista as categorias derivadas (canal, cuidador,
       consentimento, falha de envio, sem contato recente).
 - [x] Entrada lista pelo menos um sinônimo proibido.

@@ -14,7 +14,7 @@ substitui: null            # id do ADR substituído por este, se aplicável
 
 _Qual é o problema? Que forças estão em jogo (restrições técnicas, de
 produto, de prazo, regulatórias)? Referencie termos do
-`docs/CONTEXT.md` — não invente vocabulário novo aqui._
+`CONTEXT.md` — não invente vocabulário novo aqui._
 
 ## Decisão
 
@@ -52,7 +52,7 @@ provavelmente não precisava ser um ADR — reveja a regra dos 3.)_
 
 ### Impacto em outros ADRs / documentos
 
-- _Ex.: substitui `0003-...`; exige atualização de `docs/CONTEXT.md`
+- _Ex.: substitui `0003-...`; exige atualização de `CONTEXT.md`
   seção 4.3; abre necessidade de novo ADR sobre ..._
 
 ## Notas

@@ -1,7 +1,7 @@
 # Arquitetura — Chagas Digital Care
 
 > Documento único e denso, pensado como **onboarding técnico**. Leia
-> antes `docs/CONTEXT.md` — este arquivo assume o glossário.
+> antes `CONTEXT.md` — este arquivo assume o glossário.
 
 ---
 
