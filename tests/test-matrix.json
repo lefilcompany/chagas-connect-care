@@ -52,7 +52,7 @@
         "src/integrations/lovable/**"
       ],
       "unitTests": [
-        "src/test/unit/e2e-context.test.ts",
+        "src/test/unit/e2e-context.test.tsx",
         "src/test/unit/routing-guards.test.tsx"
       ],
       "e2eTests": [
