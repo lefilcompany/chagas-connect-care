@@ -1,4 +1,4 @@
-import { e2eUrl, expect, expectRouteLoaded, test } from "./fixtures";
+import { expect, expectRouteLoaded, patients, test } from "./fixtures";
 
 const institutionalRoutes = [
   { path: "/app/hoje", label: "Hoje" },
@@ -17,16 +17,40 @@ const institutionalRoutes = [
 ] as const;
 
 for (const route of institutionalRoutes) {
-  test(`${route.label}: rota institucional carrega sem exceções`, async ({ page }) => {
-    await page.goto(e2eUrl(route.path, { role: "admin" }));
-
+  test(`${route.label}: rota institucional usa sessão e backend reais`, async ({ page }) => {
+    await page.goto(route.path);
     await expectRouteLoaded(page, route.path);
     await expect(page.locator("main")).toBeVisible();
   });
 }
 
-test("usuário institucional não acessa a área superadmin", async ({ page }) => {
-  await page.goto(e2eUrl("/superadmin/dashboard", { role: "admin" }));
+test("lista somente pacientes permitidos pela RLS da instituição", async ({ page }) => {
+  await page.goto("/app/pessoas");
 
-  await expect(page).toHaveURL(/\/app\/hoje/);
+  await expect(page.getByText(patients.a.name, { exact: true })).toBeVisible();
+  await expect(page.getByText(patients.b.name, { exact: true })).toHaveCount(0);
+});
+
+test("tarefa persistida no banco aparece na jornada institucional", async ({ page }) => {
+  await page.goto("/app/jornadas/tarefas");
+
+  await expect(page.getByText("Confirmar retorno E2E", { exact: true })).toBeVisible();
+});
+
+test("alteração de perfil é persistida e sobrevive ao reload", async ({ page }) => {
+  await page.goto("/app/admin/perfil");
+  const nameInput = page.getByLabel("Nome completo");
+
+  await expect(nameInput).toHaveValue("Admin A E2E");
+  await nameInput.fill("Admin A E2E Atualizado");
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+  await expect(page.getByText("Perfil atualizado")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Nome completo")).toHaveValue("Admin A E2E Atualizado");
+});
+
+test("usuário institucional não acessa área superadmin", async ({ page }) => {
+  await page.goto("/superadmin/dashboard");
+  await expect(page).toHaveURL(/\/app\/hoje$/);
 });
