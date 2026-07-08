@@ -76,8 +76,8 @@ export const fixtures = {
     description: "Tarefa sintética criada para validação funcional.",
     institution: "hospital-e2e-a",
     patient_id: "11111111-1111-4111-8111-111111111111",
-    status: "pending",
-    priority: "high",
+    status: "aberta",
+    priority: "alta",
   },
   onboardingInvite: {
     id: "44444444-4444-4444-8444-444444444444",
@@ -128,7 +128,10 @@ async function createAccount(account) {
 
   await ensureNoError(
     `Criar papel ${account.email}`,
-    await admin.from("user_roles").insert({ user_id: userId, role: account.role }),
+    await admin.from("user_roles").upsert(
+      { user_id: userId, role: account.role },
+      { onConflict: "user_id,role" },
+    ),
   );
 
   return userId;
