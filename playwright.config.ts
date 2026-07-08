@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { authStates } from "./tests/e2e/fixtures";
 
 const isCI = Boolean(process.env.CI);
 
@@ -6,10 +7,10 @@ export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: isCI ? 2 : 0,
+  retries: isCI ? 1 : 0,
   workers: isCI ? 2 : undefined,
-  timeout: 30_000,
-  expect: { timeout: 10_000 },
+  timeout: 45_000,
+  expect: { timeout: 15_000 },
   reporter: [
     ["list"],
     ["html", { outputFolder: "playwright-report", open: "never" }],
@@ -20,29 +21,42 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
-    actionTimeout: 10_000,
-    navigationTimeout: 15_000,
+    actionTimeout: 12_000,
+    navigationTimeout: 20_000,
   },
   projects: [
+    {
+      name: "auth-setup",
+      testMatch: /auth\.setup\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
     {
       name: "public",
       testMatch: /public\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     {
+      name: "data-access",
+      testMatch: /data-access\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
       name: "institutional",
       testMatch: /institutional\.spec\.ts/,
-      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["auth-setup"],
+      use: { ...devices["Desktop Chrome"], storageState: authStates.adminA },
     },
     {
       name: "superadmin",
       testMatch: /superadmin\.spec\.ts/,
-      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["auth-setup"],
+      use: { ...devices["Desktop Chrome"], storageState: authStates.superadmin },
     },
     {
       name: "legacy",
       testMatch: /legacy\.spec\.ts/,
-      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["auth-setup"],
+      use: { ...devices["Desktop Chrome"], storageState: authStates.adminA },
     },
   ],
   webServer: {
