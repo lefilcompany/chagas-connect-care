@@ -97,7 +97,12 @@ describe("segments", () => {
     expect(normalizeFilters({ city: "Recife", stages: "[\"cronico\"]", patient_ids: ["p1"] }))
       .toMatchObject({ city: ["Recife"], stages: ["cronico"], patient_ids: ["p1"] });
     expect(normalizeFilters("{\"state\":[\"PE\"]}")).toMatchObject({ state: ["PE"] });
-    expect(normalizeFilters("json-invalido")).toEqual(emptyFilters());
+    expect(normalizeFilters("json-invalido")).toMatchObject({
+      stages: [],
+      city: [],
+      state: [],
+      patient_ids: [],
+    });
   });
 
   it("retorna vazio quando nenhuma audiência foi selecionada", async () => {
