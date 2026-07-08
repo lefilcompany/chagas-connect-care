@@ -1,7 +1,7 @@
 # Testes e CI/CD
 
 Este documento descreve a estratégia executável de qualidade do repositório. A
-decisão arquitetural está no ADR [`0008`](adr/0008-adotar-ci-cd-com-testes-por-funcionalidade.md) e o trabalho inicial no issue [`0003`](issue-tracker/0003-configurar-ci-cd-e-testes.md).
+decisão está no ADR [`0008`](adr/0008-adotar-ci-cd-com-testes-por-funcionalidade.md) e o trabalho inicial no issue [`0003`](issue-tracker/0003-configurar-ci-cd-e-testes.md).
 
 ---
 
@@ -10,8 +10,8 @@ decisão arquitetural está no ADR [`0008`](adr/0008-adotar-ci-cd-com-testes-por
 Toda nova funcionalidade segue esta ordem:
 
 1. criar ou atualizar o issue em `docs/issue-tracker/`;
-2. criar o ADR da funcionalidade/decisão antes do primeiro commit funcional;
-3. registrar os arquivos do domínio em `tests/test-matrix.json`;
+2. criar o ADR antes do primeiro commit funcional;
+3. registrar os arquivos em `tests/test-matrix.json`;
 4. definir cenários unitários, integração mockada e E2E;
 5. implementar;
 6. criar/atualizar testes unitários;
@@ -19,14 +19,14 @@ Toda nova funcionalidade segue esta ordem:
 8. executar lint, typecheck, cobertura, build e E2E;
 9. concluir o issue somente depois do **Quality gate** verde.
 
-Para bugs e refatorações locais, issue é sempre obrigatório; ADR é obrigatório
-quando a mudança altera decisão, contrato, domínio ou satisfaz a regra dos três.
-A CI exige ADR em qualquer diff funcional para impedir que uma feature seja
-introduzida sem decisão documentada.
+Para bugs/refatorações locais, issue é obrigatório; ADR é obrigatório quando a
+mudança altera decisão, contrato, domínio, segurança ou satisfaz a regra dos
+três. A CI exige ADR em qualquer diff funcional para impedir introdução de
+feature sem decisão documentada.
 
 ---
 
-## 2. Eventos que executam a pipeline
+## 2. Eventos da pipeline
 
 Workflow: `.github/workflows/ci-cd.yml`.
 
@@ -37,46 +37,31 @@ push:
 workflow_dispatch: {}
 ```
 
-Consequências:
-
-- qualquer PR roda, independentemente da branch de origem ou destino;
-- todo push direto ou merge na `main` roda novamente;
+- qualquer PR roda, independentemente da branch de origem/destino;
+- push direto ou merge na `main` roda novamente;
 - execução manual permite diagnóstico;
-- execuções antigas do mesmo PR/ref são canceladas por `concurrency`.
+- execuções obsoletas do mesmo PR/ref são canceladas.
 
-O workflow usa permissões mínimas (`contents: read`) e não acessa secrets de
-produção.
+O workflow usa `contents: read` e não acessa secrets de produção.
 
 ---
 
 ## 3. Jobs da CI
 
-### 3.1 Governança documental e mapa de testes
-
-Executa antes dos demais jobs:
+### 3.1 Governança e mapa de testes
 
 - valida IDs, status e responsável dos issues;
-- valida IDs e status dos ADRs;
+- valida IDs/status dos ADRs;
 - exige issue e ADR no diff funcional;
-- em PR, verifica se issue e ADR apareceram no histórico antes da primeira
-  alteração funcional;
-- valida se todo feature root e edge function está cadastrado;
-- exige mapeamento de fonte → unitário → E2E;
-- exige atualização de teste unitário e E2E quando uma funcionalidade mapeada é
-  alterada.
-
-Scripts:
+- verifica que issue/ADR precederam o código no histórico do PR;
+- valida feature roots e edge functions conhecidas;
+- exige mapeamento fonte → unitário → E2E;
+- exige atualização de unitário e E2E quando uma funcionalidade muda.
 
 ```bash
 npm run ci:governance
 npm run ci:test-map
 ```
-
-Variáveis usadas no Actions:
-
-- `BASE_SHA`;
-- `HEAD_SHA`;
-- `GITHUB_EVENT_NAME`.
 
 ### 3.2 Lint e TypeScript
 
@@ -85,164 +70,127 @@ npm run lint
 npm run typecheck
 ```
 
-O typecheck cobre:
+O typecheck cobre aplicação, configurações Node e testes.
 
-- aplicação (`tsconfig.app.json`);
-- configs Node (`tsconfig.node.json`);
-- testes unitários/E2E (`tsconfig.tests.json`).
+#### Baseline de `no-explicit-any`
+
+O código existente possui uso amplo de `any`. Ativar
+`@typescript-eslint/no-explicit-any` como erro quebraria a CI por dívida anterior
+e transformaria este PR em uma refatoração transversal de alto risco. Por isso:
+
+- a regra permanece desativada no baseline;
+- TypeScript, `no-undef`, hooks, sintaxe e demais regras continuam ativos;
+- código novo deve evitar `any` e preferir `unknown`, tipos gerados, guards e
+  contratos explícitos;
+- a eliminação do legado deve ocorrer por issues incrementais;
+- a regra só poderá ser reativada quando o inventário estiver corrigido ou por
+  escopos/diretórios progressivos.
+
+Isso é dívida controlada, não autorização para ampliar o uso.
 
 ### 3.3 Unitários por funcionalidade
 
-GitHub Actions executa uma matriz separada:
+Matriz separada:
 
-- templates e medicações;
-- audiências e destinatários;
-- WhatsApp e lotes;
+- templates/medicações;
+- audiências/destinatários;
+- WhatsApp/lotes;
 - identidade E2E;
-- guards e papéis;
+- guards/papéis;
 - jornadas;
 - contratos de rotas;
 - contratos de edge functions.
 
-Cada item aparece como check separado e publica JUnit.
+Cada item vira check independente e publica JUnit.
 
 ### 3.4 Cobertura
-
-Executa a suíte completa com V8:
 
 ```bash
 npm run test:coverage
 ```
 
-Baseline inicial:
-
-| Métrica | Threshold |
+| Métrica | Threshold inicial |
 | --- | ---: |
 | Statements | 45% |
 | Branches | 35% |
 | Functions | 45% |
 | Lines | 45% |
 
-Esses limites são piso, não objetivo. Devem subir gradualmente (“ratchet”) e
-nunca ser reduzidos apenas para deixar um PR verde. Uma redução exige issue, ADR
-e justificativa de dívida.
+Os limites são piso e devem subir progressivamente. Redução exige issue, ADR e
+justificativa.
 
-Artefatos:
+Artefatos: HTML, LCOV, JSON summary e JUnit.
 
-- HTML;
-- LCOV;
-- JSON summary;
-- JUnit.
-
-### 3.5 Build de produção
+### 3.5 Build
 
 ```bash
 npm run build
 ```
 
-Valida bundling, imports, assets e transformação Vite. Publica `dist/` como
-`production-dist`.
+Valida bundle Vite e publica `dist/` como `production-dist`.
 
 ### 3.6 E2E Playwright
 
-Quatro projetos Chromium independentes:
+Projetos Chromium:
 
 | Projeto | Escopo |
 | --- | --- |
-| `public` | landing, auth, documentos legais, proteção anônima e 404 |
-| `institutional` | rotas e shell da instituição |
-| `superadmin` | rotas e proteção da operação transversal |
-| `legacy` | redirects e compatibilidade de bookmarks |
+| `public` | landing, auth, legais, anônimo e 404 |
+| `institutional` | rotas/shell institucional |
+| `superadmin` | operação transversal e proteção |
+| `legacy` | redirects e bookmarks antigos |
 
 Cada projeto:
 
-- gera JUnit e relatório HTML;
-- guarda screenshot somente em falha;
-- guarda vídeo em falha;
-- cria trace no primeiro retry;
-- possui duas tentativas adicionais na CI;
-- falha se a página lançar exceção JavaScript.
+- JUnit + HTML;
+- screenshot somente em falha;
+- vídeo retido em falha;
+- trace no primeiro retry;
+- retries na CI;
+- falha em exceção JavaScript da página.
 
 ### 3.7 Quality gate
 
-Consolida:
-
-- governança;
-- lint/typecheck;
-- unitários;
-- cobertura;
-- build;
-- E2E.
-
-Se qualquer dependência não terminar com `success`, o gate falha. Este é o check
-principal recomendado para branch protection.
+Consolida governança, análise estática, unitários, cobertura, build e E2E. Se
+qualquer dependência não terminar com `success`, falha.
 
 ### 3.8 Artefato validado da `main`
 
-Em push na `main`, depois do Quality gate:
+Após push na `main` e Quality gate:
 
-- baixa `production-dist`;
-- cria `manifest.json` com repositório, SHA, run e timestamp;
+- baixa o bundle aprovado;
+- cria `manifest.json` com SHA/run/timestamp;
 - publica `validated-main-<sha>` por 30 dias.
 
-Isso é **continuous delivery do artefato**, não publicação direta. O deploy de
-produção continua sob o fluxo Lovable já adotado no ADR 0001. Uma integração
-direta futura exige contrato oficial, ambiente e novo ADR.
+É continuous delivery de artefato. A publicação efetiva continua no Lovable.
 
 ---
 
 ## 4. Comandos locais
-
-### Instalação
 
 ```bash
 npm install --no-audit --no-fund --legacy-peer-deps
 npx playwright install chromium
 ```
 
-O repositório possui `bun.lockb`, mas a alteração inicial de CI não consegue
-regenerar binário pelo conector. Por isso o Actions usa `npm install`. A equipe
-deve, em ambiente local, decidir e versionar um lockfile atualizado; após isso,
-a CI deve migrar para instalação congelada (`npm ci` ou equivalente Bun).
-
-### Qualidade rápida
+O repositório possui `bun.lockb`, mas a alteração por conector não consegue
+regenerar o binário. A CI usa `npm install` até a equipe versionar lockfile
+atualizado; então deve migrar para instalação congelada.
 
 ```bash
 npm run lint
 npm run typecheck
 npm run test:unit
-npm run build
-```
-
-### Cobertura
-
-```bash
 npm run test:coverage
-```
-
-### E2E
-
-```bash
+npm run build
 npm run test:e2e
-npm run test:e2e:headed
-npm run test:e2e:ui
-```
-
-### Pipeline completa local
-
-```bash
 npm run test:ci
 ```
 
-### Um teste unitário
+Executar uma suíte:
 
 ```bash
 npm run test:unit -- src/test/unit/templates.test.ts
-```
-
-### Um projeto E2E
-
-```bash
 npm run test:e2e -- --project=institutional
 ```
 
@@ -250,59 +198,32 @@ npm run test:e2e -- --project=institutional
 
 ## 5. Ambiente E2E sintético
 
-Arquivo: `.env.e2e`.
-
-O modo é ativado exclusivamente por:
+`.env.e2e` ativa exclusivamente:
 
 ```env
 VITE_E2E_MOCK=true
 ```
 
-O build normal não ativa esse comportamento.
-
-### Autenticação e papéis
-
-Parâmetros usados pelos testes:
+Parâmetros:
 
 - `__e2e_role=admin|equipe|superadmin`;
 - `__e2e_auth=authenticated|anonymous`;
 - `__e2e_institution=<slug-sintetico>`.
 
-`src/lib/e2e.ts` cria usuário e sessão sintéticos. `AuthProvider` e
-`AccessProvider` só usam esses dados quando o modo E2E está explicitamente
-ligado.
+`src/lib/e2e.ts` cria sessão sintética. `AuthProvider` e `AccessProvider` só a
+usam em modo E2E.
 
-### Backend
+`tests/e2e/fixtures.ts` intercepta o host Supabase sintético e retorna REST,
+Functions, Auth e Storage mockados. Nenhum teste de PR lê/escreve banco real.
 
-`tests/e2e/fixtures.ts` intercepta o host Supabase sintético e responde:
-
-- REST com arrays/objetos vazios;
-- functions com `{ ok: true }`;
-- Auth sem sessão real;
-- Storage vazio;
-- CORS/OPTIONS adequados.
-
-Nenhum teste de PR lê ou escreve banco real.
-
-### Segurança dos artefatos
-
-É proibido usar em fixtures:
-
-- nomes ou identificadores reais;
-- telefone/CPF real;
-- conteúdo clínico real;
-- access token, service role ou segredo Meta;
-- URL de produção.
-
-Traces, screenshots, vídeos e JUnit devem conter somente dados sintéticos.
+É proibido usar nome, telefone, CPF, conteúdo clínico, token ou URL de produção
+em fixture, trace, screenshot, vídeo ou JUnit.
 
 ---
 
 ## 6. Matriz de funcionalidades
 
 Fonte: `tests/test-matrix.json`.
-
-Cada entrada contém:
 
 ```json
 {
@@ -314,130 +235,101 @@ Cada entrada contém:
 }
 ```
 
-### Ao criar uma funcionalidade
+Ao criar feature:
 
-- adicione o novo feature root a `knownFeatureRoots`, quando aplicável;
-- adicione edge function a `knownEdgeFunctions`;
-- crie uma entrada funcional ou amplie uma existente;
-- liste todos os arquivos de fonte relevantes;
-- liste pelo menos um unitário e um E2E;
-- altere esses testes no mesmo PR.
+- cadastrar feature root/edge function;
+- criar entrada ou ampliar existente;
+- listar fontes;
+- listar ao menos um unitário e um E2E;
+- alterar esses testes no mesmo PR.
 
-### Cobertura por tipo
+Cobertura por tipo:
 
-- **regra pura:** teste unitário comportamental;
-- **hook/componente:** teste com Testing Library e dependências mockadas;
-- **rota/shell:** contrato unitário + Playwright;
-- **edge function:** teste unitário de helpers quando extraíveis, contrato
-  estrutural e teste de integração protegido quando existir ambiente;
-- **RLS/migration:** testes com Supabase local/staging são o alvo; contratos
-  estáticos não substituem execução real;
-- **integração externa:** mock no PR e contract test separado com secrets.
+- regra pura → unitário comportamental;
+- hook/componente → Testing Library;
+- rota/shell → contrato unitário + Playwright;
+- edge function → helpers testáveis + contrato + integração protegida futura;
+- RLS/migration → Supabase local/staging como alvo;
+- integração externa → mock no PR + contract test protegido.
 
 ---
 
-## 7. Política de testes por funcionalidade
+## 7. Política de testes
 
-### Teste unitário obrigatório
+### Unitário
 
-Deve verificar regra, estado, erro ou contrato específico. Não é aceito:
+Não é aceito:
 
 - `expect(true).toBe(true)`;
-- snapshot sem asserção de comportamento;
-- teste que apenas importa o arquivo;
-- mock que replica literalmente a própria implementação.
+- teste que só importa;
+- snapshot sem comportamento;
+- mock que replica literalmente a implementação.
 
-### E2E obrigatório
+### E2E
 
-Deve verificar ao menos um caminho do usuário ou contrato de navegação da
-funcionalidade. Para features críticas, cobrir:
+Verificar caminho do usuário/contrato, incluindo quando aplicável:
 
-- caminho principal;
+- sucesso;
 - autorização/papel;
 - vazio/erro;
-- compatibilidade/redirect, quando houver;
-- ausência de exceção JavaScript.
+- redirect/compatibilidade;
+- ausência de exceção JS.
 
-### Integração e contrato
+### Integração
 
-Mock não comprova integração real. WhatsApp, Supabase, Storage e cron precisam
-de suíte separada em ambiente protegido antes de mudanças de contrato ou
-produção de alto risco.
+Mock não comprova contrato real. WhatsApp, Supabase, Storage e cron precisam de
+suíte separada em ambiente protegido para mudanças de alto risco.
 
 ---
 
 ## 8. Branch protection recomendada
 
-Após o merge do workflow, configurar em **Settings → Branches ou Rulesets** para
-`main`:
+Em **Settings → Branches/Rulesets** para `main`:
 
-- exigir pull request;
-- exigir branch atualizada antes do merge;
-- exigir aprovação de review;
+- exigir PR;
+- exigir branch atualizada;
+- exigir aprovação;
 - exigir resolução de conversations;
-- bloquear force push e delete;
-- exigir o check **Quality gate**;
-- opcionalmente exigir checks individuais para diagnóstico mais rígido;
-- impedir bypass, exceto break-glass auditado;
-- exigir linear history se for política do time.
+- bloquear force push/delete;
+- exigir **Quality gate**;
+- impedir bypass, exceto break-glass auditado.
 
-O conector usado nesta tarefa não possui ação administrativa de branch
-protection; portanto a regra precisa ser ativada na interface do GitHub.
+O conector desta tarefa não oferece ação administrativa para rulesets; essa
+ativação deve ser feita na interface do GitHub.
 
 ---
 
-## 9. Secrets e ambientes futuros
+## 9. Secrets e ambiente futuro
 
 A CI de PR não precisa de secrets.
 
-Um workflow separado de contrato/staging poderá usar:
-
-- environment protegido (`staging`);
-- approvals;
-- secrets de staging;
-- banco descartável ou tenant exclusivo;
-- número WhatsApp de teste;
-- dados totalmente sintéticos;
-- limpeza após execução.
-
-Nunca disponibilizar secrets de produção a PR de fork ou workflow não confiável.
-Não usar `pull_request_target` para executar código do PR.
+Contract tests reais devem usar workflow separado, environment `staging`,
+aprovações, tenant/número de teste, dados sintéticos e limpeza posterior.
+Nunca usar `pull_request_target` para executar código não confiável com secrets.
 
 ---
 
-## 10. Flakiness e manutenção
+## 10. Flakiness
 
-Quando um teste falhar:
+1. consultar JUnit/trace/screenshot/vídeo;
+2. reproduzir com o mesmo projeto;
+3. corrigir causa/seletor/sincronização;
+4. não usar timeout fixo como solução permanente;
+5. não aumentar retries para esconder falha;
+6. não usar skip/fixme sem issue, owner e prazo.
 
-1. consultar JUnit, trace, screenshot e vídeo;
-2. reproduzir localmente com o mesmo projeto;
-3. corrigir causa, seletor ou sincronização;
-4. não adicionar `waitForTimeout` como solução permanente;
-5. não aumentar retries para esconder instabilidade;
-6. não usar `.skip`/`.fixme` sem issue, owner e prazo;
-7. teste flaky crítico bloqueia merge.
-
-Seletores preferidos:
-
-1. role + accessible name;
-2. label;
-3. texto estável;
-4. `data-testid` quando não há semântica adequada;
-5. nunca classe Tailwind como contrato E2E.
+Seletores: role/name, label, texto estável, `data-testid`; nunca classe Tailwind.
 
 ---
 
-## 11. Limitações conhecidas do baseline
+## 11. Limitações conhecidas
 
-- E2E valida composição e navegação com backend mockado;
-- testes de RLS ainda precisam de Supabase local/staging;
-- contratos das edge functions incluem baseline estrutural, não cobertura de
-  todos os handlers Deno;
-- thresholds iniciais são moderados;
-- `npm install` ainda não é instalação congelada;
-- Chromium é o browser obrigatório inicial; Firefox/WebKit podem ser adicionados
-  após definir suporte e custo.
+- E2E usa backend mockado;
+- RLS precisa de Supabase local/staging;
+- edge functions têm baseline estrutural, não todos os handlers Deno;
+- thresholds são moderados;
+- instalação ainda não é congelada;
+- Chromium é o browser obrigatório inicial;
+- `no-explicit-any` permanece dívida controlada.
 
-Essas limitações são explícitas para evitar a falsa afirmação de que “todas as
-funcionalidades estão completamente testadas”. A matriz cria a obrigação e o
-baseline; a profundidade deve crescer a cada alteração.
+A matriz cria obrigação e baseline; a profundidade cresce a cada alteração.
