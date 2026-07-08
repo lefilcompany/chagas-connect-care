@@ -13,13 +13,12 @@ type AuthCtx = {
 const Ctx = createContext<AuthCtx>({ user: null, session: null, loading: true, signOut: async () => {} });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const e2e = getE2EMockContext();
+  const [e2e] = useState(() => getE2EMockContext());
   const [session, setSession] = useState<Session | null>(() => (e2e.enabled ? e2e.session : null));
   const [loading, setLoading] = useState(() => !e2e.enabled);
 
   useEffect(() => {
     if (e2e.enabled) {
-      setSession(e2e.session);
       setLoading(false);
       return;
     }
@@ -33,7 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
     return () => sub.subscription.unsubscribe();
-  }, [e2e.enabled, e2e.session]);
+  }, [e2e.enabled]);
 
   return (
     <Ctx.Provider
