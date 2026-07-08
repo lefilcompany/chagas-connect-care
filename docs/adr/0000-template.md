@@ -4,41 +4,51 @@ titulo: Título curto e imperativo da decisão
 status: proposto           # proposto | aceito | substituido-por: NNNN | descartado
 data: 2026-07-08
 decisores: []              # nomes/logins de quem participou da decisão
-substitui: null            # id do ADR substituído por este, se aplicável
+substitui: null            # id substituído por este ADR, se aplicável
+issue: null                # id do issue principal
 ---
 
-> **Este é o template. Não é um ADR aceito.** Copie este arquivo para
-> `docs/adr/NNNN-titulo-kebab.md` antes de preencher.
+> **Template, não decisão aceita.** Copie para
+> `docs/adr/NNNN-titulo-kebab.md`.
 
 ## Contexto
 
-_Qual é o problema? Que forças estão em jogo (restrições técnicas, de
-produto, de prazo, regulatórias)? Referencie termos do
-`CONTEXT.md` — não invente vocabulário novo aqui._
+_Qual problema exige decisão? Quais forças estão em tensão: domínio, segurança,
+privacidade, custo, prazo, operação, regulação, lock-in e legado?_
+
+### Evidências
+
+- _Código, schema, dados, métricas, incidentes, pesquisa ou restrições que
+  sustentam o contexto._
+
+### Critérios de decisão
+
+- _O que a solução precisa otimizar ou preservar?_
 
 ## Decisão
 
-_A escolha feita, em uma ou duas frases. Escreva no presente
-afirmativo: "Adotamos X para Y."_
+_Escreva no presente afirmativo: “Adotamos X para Y”. Delimite escopo e o que a
+decisão não cobre._
 
 ## Alternativas consideradas
 
-### Alternativa A — _nome curto_
+### Alternativa A — nome
 
 - **O que é:** ...
 - **Prós:** ...
 - **Contras:** ...
+- **Riscos:** ...
 - **Por que não foi escolhida:** ...
 
-### Alternativa B — _nome curto_
+### Alternativa B — nome
 
 - **O que é:** ...
 - **Prós:** ...
 - **Contras:** ...
+- **Riscos:** ...
 - **Por que não foi escolhida:** ...
 
-_(Adicione quantas forem relevantes; se só havia uma opção séria, este
-provavelmente não precisava ser um ADR — reveja a regra dos 3.)_
+_Se não havia alternativa séria, reavalie se precisa de ADR._
 
 ## Consequências
 
@@ -50,11 +60,34 @@ provavelmente não precisava ser um ADR — reveja a regra dos 3.)_
 
 - ...
 
-### Impacto em outros ADRs / documentos
+### Riscos residuais
 
-- _Ex.: substitui `0003-...`; exige atualização de `CONTEXT.md`
-  seção 4.3; abre necessidade de novo ADR sobre ..._
+- ...
+
+## Guard-rails e invariantes
+
+- _Regras que mantêm a decisão segura e coerente._
+
+## Plano de adoção ou migração
+
+1. ...
+2. ...
+
+_Para ADR retrospectivo, descreva o estado existente e as dívidas, sem inventar
+aprovações passadas._
+
+## Critério de revisão
+
+_Reavaliar quando qual condição mudar?_
+
+## Impacto
+
+- Documentos atualizados: ...
+- ADRs relacionados/substituídos: ...
+- Issues de implementação: ...
+- Dados/migrations: ...
+- Operação/observabilidade: ...
 
 ## Notas
 
-_Links, referências externas, discussões relevantes. Opcional._
+_Links e discussões relevantes. Não incluir segredo ou dado pessoal._
