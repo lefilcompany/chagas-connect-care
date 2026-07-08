@@ -1,17 +1,14 @@
 # CONTEXT — Chagas Digital Care
 
 > Mapa canônico do produto e porta de entrada da documentação. Este arquivo
-> explica **por que o produto existe, qual é seu domínio, quais afirmações estão
-> comprovadas e onde encontrar os detalhes**. Não substitui o schema, os ADRs
-> nem os documentos especializados em `docs/`.
+> explica por que o produto existe, qual é seu domínio, quais afirmações estão
+> comprovadas e quais regras governam novas funcionalidades.
 
 Idioma oficial do produto e da documentação: **pt-BR**.
 
 ---
 
 ## 1. Como interpretar esta documentação
-
-Toda afirmação relevante deve ser classificada em uma destas categorias:
 
 | Marcador | Significado | Fonte de verdade |
 | --- | --- | --- |
@@ -22,17 +19,17 @@ Toda afirmação relevante deve ser classificada em uma destas categorias:
 
 ### Hierarquia de evidências
 
-Quando documentos divergirem, use esta ordem:
+Quando documentos divergirem:
 
-1. migrations e políticas SQL aplicadas;
-2. `src/integrations/supabase/types.ts` para o schema gerado;
-3. edge functions e código que executa a regra;
+1. migrations e policies aplicadas;
+2. `src/integrations/supabase/types.ts`;
+3. edge functions e código executável;
 4. ADR aceito;
-5. documentação de domínio e arquitetura;
-6. comentários, issues e conversas.
+5. documentação de domínio/arquitetura;
+6. issues, comentários e conversas.
 
 A divergência deve ser corrigida na mesma tarefa. Não adapte silenciosamente o
-código para satisfazer uma documentação desatualizada.
+código para satisfazer documentação antiga.
 
 ---
 
@@ -40,48 +37,45 @@ código para satisfazer uma documentação desatualizada.
 
 **[ATUAL]** O Chagas Digital Care é uma aplicação multi-instituição para
 coordenar comunicação, acompanhamento e ações humanas ao redor da jornada de
-cuidado de pacientes. O produto combina:
+cuidado. Combina:
 
-- cadastro e visão longitudinal de pacientes e contatos de sua rede de cuidado;
-- mensageria, com implementação principal em WhatsApp;
-- caixa de conversas para atendimento humano;
-- jornadas automatizadas representadas por grafos;
-- tarefas operacionais associadas a pacientes e execuções de jornada;
-- audiências dinâmicas e envios em lote;
-- biblioteca de conteúdo e modelos de mensagem;
+- pacientes e contatos da rede de cuidado;
+- mensageria, principalmente WhatsApp;
+- caixa de conversas;
+- jornadas automatizadas em grafo;
+- tarefas humanas;
+- audiências e envios em lote;
+- biblioteca e modelos de mensagem;
 - administração de instituições, usuários, canais e integrações;
-- dados clínicos limitados usados no contexto de cuidado e adesão.
+- dados clínicos limitados para contexto e adesão.
 
-**[ALVO]** A proposta de valor é reduzir perdas de acompanhamento, tornar a
-comunicação mais segura e oportuna e ajudar a equipe a perceber qual ação
-precisa acontecer a seguir.
+**[ALVO]** Reduzir perdas de acompanhamento, tornar a comunicação mais segura e
+oportuna e orientar a equipe sobre a próxima ação operacional necessária.
 
 ### Domínio central
 
 O domínio central é a **coordenação da jornada de cuidado**: transformar estado,
-contexto, consentimento, eventos e respostas em comunicações e ações humanas
+contexto, autorização, eventos e respostas em comunicações e ações humanas
 rastreáveis.
 
-Mensageria, templates, audiências e integrações são capacidades de suporte. A
-interface com dados clínicos é necessária para o cuidado, mas seu limite
-estratégico ainda precisa de decisão formal; ver ADR `0006` e
-`docs/domain/open-questions.md`.
+Mensageria, templates, audiências e integrações são capacidades de suporte. O
+limite dos dados clínicos ainda requer decisão final; ver ADR `0006`.
 
 ---
 
-## 3. Atores e objetivos
+## 3. Atores
 
-| Ator | Objetivo no sistema |
+| Ator | Objetivo |
 | --- | --- |
-| **Paciente** | Receber orientação, lembretes e acompanhamento adequados ao seu contexto. |
-| **Contato da rede de cuidado** | Apoiar o paciente dentro das autorizações e finalidades permitidas. |
-| **Equipe** | Executar rotinas, responder conversas, concluir tarefas e acompanhar pacientes da instituição. |
-| **Admin institucional** | Configurar equipe, identidade institucional, canais, conteúdo e operação da instituição. |
-| **Superadmin** | Operar a plataforma, instituições e integrações com visão ampliada e auditável. |
-| **Sistema externo** | Trocar eventos e mensagens por contratos explícitos, como a Meta WhatsApp Cloud API. |
+| **Paciente** | Receber orientação, lembretes e acompanhamento adequados. |
+| **Contato da rede de cuidado** | Apoiar o paciente dentro da autorização permitida. |
+| **Equipe** | Responder, acompanhar, executar tarefas e operar jornadas. |
+| **Admin institucional** | Configurar equipe, instituição, conteúdo e canais. |
+| **Superadmin** | Operar plataforma, instituições e integrações com auditoria. |
+| **Sistema externo** | Trocar mensagens/eventos por contratos explícitos. |
 
 Usuário autenticado é quem opera a aplicação. Paciente e contato não são
-"usuários" do sistema, ainda que interajam por WhatsApp ou formulário público.
+“usuários” do sistema, mesmo quando interagem por WhatsApp/formulário.
 
 ---
 
@@ -89,186 +83,212 @@ Usuário autenticado é quem opera a aplicação. Paciente e contato não são
 
 | Capacidade | Estado | Observação |
 | --- | --- | --- |
-| WhatsApp bidirecional | **[ATUAL]** | Envio, webhook, identidade, conversa, janela de atendimento, mídia e templates. |
-| SMS | **[ATUAL parcial]** | Existe no enum `message_channel`; a completude operacional deve ser validada por fluxo. |
-| E-mail | **[ALVO]** | Não consta no enum atual; não tratar como capacidade disponível. |
-| Jornadas automatizadas | **[ATUAL]** | `journeys`, `journey_runs`, `journey_run_steps` e `journey_tasks`. |
+| WhatsApp bidirecional | **[ATUAL]** | Envio, webhook, identidade, conversa, janela, mídia e templates. |
+| SMS | **[ATUAL parcial]** | Presente no enum; cobertura ponta a ponta ainda deve ser validada. |
+| E-mail | **[ALVO]** | Não consta no enum atual. |
+| Jornadas | **[ATUAL]** | `journeys`, `journey_runs`, `journey_run_steps`, `journey_tasks`. |
 | Audiências | **[ATUAL]** | Nome técnico: `audience_segments`. |
-| Campanhas/envios em lote | **[ATUAL]** | Nome técnico principal: `message_batches`; conceito distinto de jornada. |
-| Biblioteca de conteúdo | **[ATUAL]** | `content_library` e `content_folders`, com assimetrias de tenancy documentadas. |
-| Dados clínicos limitados | **[ATUAL]** | `patients`, `medications` e `adherence_events`. |
-| Prontuário eletrônico completo | **[FORA DO ESCOPO ATUAL]** | O sistema não deve ser descrito como substituto de PEP sem nova decisão. |
-| Faturamento/TISS/convênios | **[FORA DO ESCOPO]** | Não pertence ao domínio atual. |
-| Telemedicina síncrona | **[FORA DO ESCOPO]** | Sem vídeo ou sala de consulta como capacidade central. |
+| Envios em lote | **[ATUAL]** | Nome técnico: `message_batches`; distinto de jornada. |
+| Biblioteca | **[ATUAL]** | `content_library` e `content_folders`, com tenancy a decidir. |
+| Dados clínicos limitados | **[ATUAL]** | `patients`, `medications`, `adherence_events`. |
+| CI/CD e testes por funcionalidade | **[ATUAL]** | GitHub Actions, Vitest, cobertura, Playwright e Quality gate. |
+| Prontuário completo | **[FORA DO ESCOPO ATUAL]** | Não descrever o sistema como PEP completo. |
+| Faturamento/TISS | **[FORA DO ESCOPO]** | Não pertence ao domínio atual. |
+| Telemedicina síncrona | **[FORA DO ESCOPO]** | Sem vídeo/consulta como capacidade central. |
 
 ---
 
 ## 5. Fronteiras do domínio
 
-### O que o produto é
+### O produto é
 
-- Uma plataforma de coordenação e comunicação em saúde.
-- Um sistema operacional para jornadas, mensagens, tarefas e resposta humana.
-- Um repositório de dados necessários para segmentação, acompanhamento e
-  contexto de comunicação.
+- plataforma de coordenação e comunicação em saúde;
+- sistema operacional para jornadas, mensagens, tarefas e resposta humana;
+- repositório do contexto necessário para segmentação e acompanhamento.
 
-### O que o produto não deve afirmar ser
+### O produto não deve afirmar ser
 
-- Um prontuário eletrônico completo.
-- Uma ferramenta de diagnóstico ou prescrição autônoma.
-- Um ERP hospitalar ou sistema de faturamento.
-- Uma plataforma de teleconsulta síncrona.
-- Um CRM comercial genérico.
+- prontuário eletrônico completo;
+- ferramenta de diagnóstico ou prescrição autônoma;
+- ERP hospitalar/faturamento;
+- plataforma de teleconsulta síncrona;
+- CRM comercial genérico.
 
 ### Fronteira clínica real
 
-O produto **já armazena dados clínicos estruturados ou semiestruturados**, como
-forma clínica, fase, comorbidades, alergias, medicamentos, medidas e eventos de
-adesão. Portanto, a fronteira correta não é "não guardamos dados clínicos".
+O produto já armazena dados clínicos estruturados e semiestruturados, como forma
+clínica, fase, comorbidades, alergias, medicamentos, medidas e adesão.
 
-A fronteira provisória é:
+Fronteira provisória:
 
 > Armazenamos apenas os dados clínicos necessários para coordenação,
-> comunicação e acompanhamento do cuidado; não pretendemos substituir o
-> prontuário longitudinal oficial nem suportar, sem nova decisão, prescrição,
-> laudos, resultados de exames ou evolução clínica completa.
+> comunicação e acompanhamento; não substituímos o prontuário longitudinal
+> oficial nem suportamos, sem nova decisão, prescrição, laudos, exames ou
+> evolução clínica completa.
 
-Essa fronteira é uma proposta sujeita a validação clínica, jurídica e de
-produto. Ver ADR `0006`.
+Essa fronteira é proposta e depende de validação clínica, jurídica e de produto.
 
 ---
 
 ## 6. Linguagem ubíqua
 
-O glossário completo está em [`docs/domain/glossary.md`](docs/domain/glossary.md).
-Regras essenciais:
+Glossário completo: `docs/domain/glossary.md`.
 
-- **Paciente**: pessoa sob cuidado, persistida em `patients`.
-- **Pessoa**: rótulo de UI mais amplo; não corresponde a uma tabela `people`.
-- **Contato da rede de cuidado**: persistido em `contacts` e vinculado a um
-  paciente. `care_network_contacts` não é o nome atual da tabela.
-- **Audiência**: conceito de domínio; nome técnico atual `audience_segments`.
-- **Modelo de mensagem**: conceito amplo; nome técnico `message_templates`.
-- **Template Meta**: modelo submetido/sincronizado com a Meta, representado em
-  `message_templates` quando `template_kind` indica essa origem.
-- **Conversa WhatsApp**: contexto operacional persistido em
-  `whatsapp_conversations`; não é apenas o par abstrato paciente-canal.
-- **Identidade WhatsApp**: endereço de mensageria em
-  `whatsapp_identities`, separado de paciente e contato.
-- **Jornada**: automação durável e versionada.
-- **Campanha/envio em lote**: disparo delimitado por audiência, persistido em
-  `message_batches`; não usar como sinônimo de jornada.
-- **Instituição**: unidade de isolamento e operação. Em UI, evitar "tenant".
+- **Paciente:** `patients`.
+- **Pessoa:** rótulo de UI; não existe tabela `people`.
+- **Contato da rede de cuidado:** `contacts`, vinculado a paciente.
+- **Audiência:** `audience_segments`.
+- **Modelo de mensagem:** `message_templates`.
+- **Template Meta:** modelo sincronizado/submetido à Meta.
+- **Conversa WhatsApp:** `whatsapp_conversations`.
+- **Identidade WhatsApp:** `whatsapp_identities`.
+- **Jornada:** automação durável e versionada.
+- **Envio em lote:** `message_batches`; não é sinônimo de jornada.
+- **Instituição:** unidade de isolamento e operação.
 
-Termo novo que altera o entendimento do domínio exige atualização do glossário
-e, quando houver trade-off estrutural, ADR.
+Termo novo exige atualização do glossário, issue, ADR e testes quando altera o
+comportamento.
 
 ---
 
 ## 7. Invariantes essenciais
 
-1. Nenhuma operação deve permitir acesso cruzado entre instituições sem uma
-   autorização explícita de superadmin.
-2. RLS e validação no servidor são a barreira de segurança; ocultar elementos
-   na UI não constitui autorização.
-3. Um destinatário de WhatsApp deve ser resolvido por identidade e instituição,
-   evitando associação apenas por telefone sem escopo institucional.
-4. Mensagem enviada deve possuir instituição e destinatário resolvidos, canal
-   permitido e regra de autorização aplicável.
-5. Conteúdo de template Meta usado no envio deve corresponder à definição
-   aprovada/sincronizada, não a uma edição local divergente.
-6. Execuções de jornada precisam ser rastreáveis por versão, passos, tentativas,
-   estado e erro.
-7. Revogação de autorização não apaga necessariamente o histórico, mas impede
-   novos usos incompatíveis com a finalidade; retenção e base legal precisam ser
-   definidas por política.
-8. Dados clínicos não devem ser expostos em logs, URLs, notificações ou mensagens
-   além do mínimo necessário.
-9. Toda alteração de schema em `public` deve avaliar GRANT, RLS, políticas,
-   índices, auditoria, retenção e impacto multi-instituição.
-
-Detalhes em `docs/domain/model.md`, `docs/domain/consent-and-privacy.md` e
-`docs/architecture.md`.
+1. Nenhuma operação permite acesso cruzado entre instituições sem autorização
+   explícita e auditável.
+2. RLS/servidor são a barreira de segurança; UI não é autorização.
+3. Destinatário WhatsApp é resolvido por identidade e instituição.
+4. Mensagem outbound exige instituição, destinatário, canal e autorização.
+5. Template enviado corresponde à definição aprovada/sincronizada.
+6. Run de jornada é rastreável por versão, passos, tentativas, estado e erro.
+7. Revogação bloqueia novos usos incompatíveis; retenção segue política.
+8. Dados clínicos não aparecem em logs, URLs ou artifacts além do necessário.
+9. Alteração de schema avalia GRANT, RLS, policies, índices, auditoria,
+   idempotência, retenção e tenancy.
+10. **Nova funcionalidade começa com issue e ADR antes do código.**
+11. **Nova funcionalidade termina com unitário e E2E mapeados e Quality gate
+    verde.**
+12. Fixtures, traces, screenshots e vídeos usam apenas dados sintéticos.
 
 ---
 
 ## 8. Stack e fontes técnicas
 
-A arquitetura detalhada está em [`docs/architecture.md`](docs/architecture.md).
 Resumo **[ATUAL]**:
 
 - React 18, TypeScript 5 e Vite 5;
 - React Router 6;
 - Tailwind CSS 3 e shadcn/ui/Radix;
-- TanStack Query 5 para estado de servidor;
-- Vitest e Testing Library;
-- Supabase/Lovable Cloud: Postgres, Auth, Storage e Edge Functions em Deno;
-- Meta WhatsApp Cloud API, com versão configurável e fallback atual `v25.0`.
+- TanStack Query 5;
+- Supabase/Lovable Cloud: Postgres, Auth, Storage e Edge Functions Deno;
+- Meta WhatsApp Cloud API;
+- Vitest + Testing Library + cobertura V8;
+- Playwright Chromium para E2E;
+- GitHub Actions para governança, análise estática, testes, build e artifacts.
 
-### Fontes que não devem ser editadas manualmente
+### Não editar manualmente
 
 - `src/integrations/supabase/client.ts`;
 - `src/integrations/supabase/types.ts`;
 - `supabase/config.toml`;
-- variáveis `VITE_SUPABASE_*` gerenciadas pela plataforma.
+- `VITE_SUPABASE_*` gerenciadas pela plataforma.
 
-Os tipos gerados podem e devem ser **lidos** para validar documentação e código.
+Os tipos gerados devem ser lidos como evidência.
 
 ---
 
-## 9. Decisões vigentes
+## 9. Ciclo obrigatório de funcionalidade
 
-ADRs aceitos descrevem decisões já materializadas:
+### Antes do código
 
-- `0001` — Supabase/Lovable como backend gerenciado;
-- `0002` — isolamento multi-instituição com RLS;
+1. issue em `docs/issue-tracker/`;
+2. ADR aceito/proposto conforme decisão;
+3. entrada em `tests/test-matrix.json`;
+4. cenários unitários e E2E definidos.
+
+### Ao finalizar
+
+1. testes unitários das regras/estados;
+2. E2E do caminho de usuário/contrato de navegação;
+3. lint e TypeScript;
+4. cobertura;
+5. build;
+6. Playwright;
+7. Quality gate verde;
+8. issue, ADR e docs atualizados.
+
+A CI valida automaticamente a ordem e o mapeamento. Detalhes em
+`docs/testing-and-ci.md` e ADR `0008`.
+
+---
+
+## 10. CI/CD e qualidade
+
+Workflow: `.github/workflows/ci-cd.yml`.
+
+Executa em:
+
+- qualquer `pull_request`, sem filtro de branch;
+- qualquer `push` na `main`;
+- execução manual.
+
+Jobs:
+
+- governança de issue/ADR/test matrix;
+- ESLint e TypeScript;
+- unitários em matriz por funcionalidade;
+- cobertura e thresholds;
+- build de produção;
+- E2E público, institucional, superadmin e legado;
+- Quality gate;
+- artifact validado da `main`.
+
+O deploy efetivo continua gerenciado pelo Lovable; o Actions entrega bundle e
+manifesto aprovados.
+
+---
+
+## 11. Decisões vigentes
+
+- `0001` — Supabase/Lovable como backend;
+- `0002` — isolamento com RLS;
 - `0003` — papéis em `user_roles`;
-- `0004` — jornadas como grafos JSON versionados;
-- `0005` — separação entre identidade, conversa, paciente e contato no WhatsApp;
-- `0007` — issue tracker local em Markdown.
+- `0004` — jornadas como grafos versionados;
+- `0005` — identidade, conversa, pessoa e mensagem separadas;
+- `0007` — issue tracker local;
+- `0008` — CI/CD com unitário e E2E por funcionalidade.
 
 ADR proposto:
 
-- `0006` — limite dos dados clínicos armazenados.
+- `0006` — limite dos dados clínicos.
 
-Um ADR aceito descreve a decisão vigente, não garante que toda implementação
-esteja completa ou livre de dívida.
-
----
-
-## 10. Questões abertas prioritárias
-
-As perguntas completas e seus impactos estão em
-[`docs/domain/open-questions.md`](docs/domain/open-questions.md). As mais
-urgentes são:
-
-1. O produto é vertical de Chagas, plataforma genérica ou núcleo genérico com
-   módulo vertical?
-2. Qual é o conjunto máximo de dados clínicos sob responsabilidade do produto?
-3. Quais bases legais, finalidades, retenções e evidências de consentimento se
-   aplicam a paciente e contato?
-4. SMS é uma capacidade operacional completa ou apenas preparação de schema?
-5. `content_library` é global, legada ou deveria ser institucional?
-6. Quais estados são canônicos para jornadas, tarefas, mensagens, identidades e
-   contatos?
-7. Qual é a política para duplicidade de telefone e associação de identidades?
-8. Quais SLAs e responsabilidades governam handoff e tarefas humanas?
-
-Perguntas abertas não devem ser resolvidas silenciosamente por um agente.
+Um ADR aceito não garante implementação sem dívida; riscos permanecem em
+`docs/risks.md`.
 
 ---
 
-## 11. Mapa da documentação
+## 12. Questões abertas prioritárias
 
-- `AGENTS.md` — comportamento e fluxo de trabalho.
-- `docs/domain/README.md` — índice de domínio.
-- `docs/domain/glossary.md` — termos canônicos.
-- `docs/domain/model.md` — entidades, relações, invariantes, comandos e eventos.
-- `docs/domain/consent-and-privacy.md` — autorização, finalidade e proteção.
-- `docs/domain/state-machines.md` — estados atuais e lacunas.
-- `docs/domain/current-vs-target.md` — capacidade implementada versus desejada.
-- `docs/domain/open-questions.md` — grilling pendente.
-- `docs/architecture.md` — arquitetura executável e fluxos técnicos.
-- `docs/risks.md` — riscos, controles e dívidas.
+1. Vertical de Chagas, plataforma genérica ou núcleo + módulo vertical?
+2. Qual conjunto máximo de dados clínicos?
+3. Quais bases legais, finalidades e retenções?
+4. SMS é operacionalmente completo?
+5. `content_library` é global ou institucional?
+6. Quais estados são canônicos?
+7. Como tratar telefone/identidade duplicados?
+8. Quais SLAs governam handoff e tarefas?
+9. Quando criar suíte de contrato real com Supabase/Meta em staging?
+
+Perguntas abertas não devem ser resolvidas silenciosamente.
+
+---
+
+## 13. Mapa da documentação
+
+- `AGENTS.md` — comportamento e Definition of Done.
+- `docs/domain/` — glossário, modelo, estados, privacidade e perguntas.
+- `docs/architecture.md` — arquitetura e fluxos.
+- `docs/testing-and-ci.md` — pipeline, testes, matriz e branch protection.
+- `tests/test-matrix.json` — vínculo obrigatório entre fonte, unitário e E2E.
+- `docs/risks.md` — riscos e controles.
 - `docs/adr/` — decisões e alternativas.
 - `docs/issue-tracker/` — trabalho rastreável.
