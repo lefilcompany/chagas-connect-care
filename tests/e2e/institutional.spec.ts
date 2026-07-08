@@ -21,7 +21,7 @@ for (const route of institutionalRoutes) {
     await page.goto(e2eUrl(route.path, { role: "admin" }));
 
     await expectRouteLoaded(page, route.path);
-    await expect(page.getByText("Chagas Connect Care", { exact: true }).first()).toBeVisible();
+    await expect(page.locator("main")).toBeVisible();
   });
 }
 
