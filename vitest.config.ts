@@ -20,7 +20,6 @@ export default defineConfig({
         "src/lib/templates.ts",
         "src/lib/segments.ts",
         "src/lib/whatsapp.ts",
-        "src/lib/e2e.ts",
         "src/lib/auth.tsx",
         "src/lib/access.tsx",
         "src/components/auth/RequireSuperAdmin.tsx",
