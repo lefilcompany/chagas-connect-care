@@ -6,7 +6,7 @@ tipo: docs
 prioridade: baixa
 criado_em: 2026-07-08
 atualizado_em: 2026-07-08
-responsavel: null
+responsavel: equipe-do-projeto
 relacionados: []
 adr: null
 ---
