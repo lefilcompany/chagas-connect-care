@@ -35,8 +35,8 @@ describe("edge function contracts", () => {
   it("webhook resolve identidade e canal dentro do escopo institucional", () => {
     const source = read("supabase/functions/whatsapp-webhook/index.ts");
 
-    expect(source).toContain('admin.from("whatsapp_identities")');
-    expect(source).toContain('admin.from("whatsapp_channels")');
+    expect(source).toMatch(/admin\s*\.from\("whatsapp_identities"\)/);
+    expect(source).toMatch(/admin\s*\.from\("whatsapp_channels"\)/);
     expect(source).toContain('.eq("institution", institution)');
   });
 
