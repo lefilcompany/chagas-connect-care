@@ -1,9 +1,10 @@
 import { expect, test as base, type Page } from "@playwright/test";
 
 const pageErrors = new WeakMap<Page, string[]>();
+const SUPABASE_API_PATTERN = /^https?:\/\/[^/]+\/(?:rest|functions|auth|storage)\/v1(?:\/|$)/;
 
 async function installBackendMocks(page: Page) {
-  await page.route("http://127.0.0.1:54321/**", async (route) => {
+  await page.route(SUPABASE_API_PATTERN, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const headers = {
