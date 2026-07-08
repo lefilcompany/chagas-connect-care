@@ -28,7 +28,7 @@ function changedFiles() {
 }
 
 function escapeRegex(char) {
-  return /[\\^$+?.()|{}[\]]/.test(char) ? `\\${char}` : char;
+  return "\\^$.*+?()[]{}|".includes(char) ? `\\${char}` : char;
 }
 
 function globToRegex(glob) {
