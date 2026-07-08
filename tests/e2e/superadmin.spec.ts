@@ -1,4 +1,4 @@
-import { e2eUrl, expect, expectRouteLoaded, test } from "./fixtures";
+import { expect, expectRouteLoaded, institutions, test } from "./fixtures";
 
 const superadminRoutes = [
   { path: "/superadmin/dashboard", label: "Dashboard" },
@@ -11,16 +11,22 @@ const superadminRoutes = [
 ] as const;
 
 for (const route of superadminRoutes) {
-  test(`${route.label}: rota superadmin carrega sem exceções`, async ({ page }) => {
-    await page.goto(e2eUrl(route.path, { role: "superadmin" }));
-
+  test(`${route.label}: rota superadmin usa papel real do banco`, async ({ page }) => {
+    await page.goto(route.path);
     await expectRouteLoaded(page, route.path);
-    await expect(page.locator("body")).toContainText(/superadmin|institui|whatsapp|auditoria|canal/i);
+    await expect(page.locator("main")).toBeVisible();
   });
 }
 
-test("superadmin acessa também a aplicação institucional", async ({ page }) => {
-  await page.goto(e2eUrl("/app/hoje", { role: "superadmin" }));
+test("superadmin enxerga instituições persistidas", async ({ page }) => {
+  await page.goto("/superadmin/instituicoes");
 
+  await expect(page.getByText(institutions.a, { exact: true })).toBeVisible();
+  await expect(page.getByText(institutions.b, { exact: true })).toBeVisible();
+  await expect(page.getByText(institutions.platform, { exact: true })).toBeVisible();
+});
+
+test("superadmin acessa também a aplicação institucional", async ({ page }) => {
+  await page.goto("/app/hoje");
   await expectRouteLoaded(page, "/app/hoje");
 });
