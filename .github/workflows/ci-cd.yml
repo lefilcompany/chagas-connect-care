@@ -226,18 +226,10 @@ jobs:
           retention-days: 14
 
   e2e:
-    name: E2E funcional — ${{ matrix.project }}
+    name: E2E funcional — Supabase local
     needs: governance
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - public
-          - institutional
-          - superadmin
-          - legacy
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -253,14 +245,14 @@ jobs:
       - name: Instalar Chromium e dependências do sistema
         run: npx playwright install --with-deps chromium
 
-      - name: Executar Supabase local, migrations, seed e Playwright ${{ matrix.project }}
-        run: npm run test:e2e -- --project=${{ matrix.project }}
+      - name: Executar Supabase local, migrations, seed e todos os projetos Playwright
+        run: npm run test:e2e
 
       - name: Publicar relatório, traces, logs, screenshots e vídeos
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-functional-${{ matrix.project }}
+          name: playwright-functional
           path: |
             playwright-report/
             test-results/
