@@ -1,56 +1,94 @@
+import { mkdirSync } from "node:fs";
+import { resolve } from "node:path";
+import { createClient } from "@supabase/supabase-js";
 import { expect, test as base, type Page } from "@playwright/test";
+import type { Database } from "../../src/integrations/supabase/types";
 
 const pageErrors = new WeakMap<Page, string[]>();
-const SUPABASE_API_PATTERN = /^https?:\/\/[^/]+\/(?:rest|functions|auth|storage)\/v1(?:\/|$)/;
 
-async function installBackendMocks(page: Page) {
-  await page.route(SUPABASE_API_PATTERN, async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    const headers = {
-      "access-control-allow-origin": "*",
-      "access-control-allow-headers": "authorization, apikey, content-type, x-client-info",
-      "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS, HEAD",
-      "content-type": "application/json",
-    };
+export const accounts = {
+  adminA: {
+    email: "admin.a@e2e.local",
+    password: "E2eAdminA!2026",
+  },
+  adminB: {
+    email: "admin.b@e2e.local",
+    password: "E2eAdminB!2026",
+  },
+  superadmin: {
+    email: "superadmin@e2e.local",
+    password: "E2eSuperadmin!2026",
+  },
+} as const;
 
-    if (request.method() === "OPTIONS") {
-      await route.fulfill({ status: 204, headers });
-      return;
-    }
+export const institutions = {
+  a: "hospital-e2e-a",
+  b: "hospital-e2e-b",
+  platform: "plataforma-e2e",
+} as const;
 
-    if (url.pathname.includes("/rest/v1/")) {
-      if (request.method() === "HEAD") {
-        await route.fulfill({ status: 200, headers: { ...headers, "content-range": "*/0" } });
-        return;
-      }
+export const patients = {
+  a: { id: "11111111-1111-4111-8111-111111111111", name: "Paciente A E2E" },
+  b: { id: "22222222-2222-4222-8222-222222222222", name: "Paciente B E2E" },
+} as const;
 
-      const wantsSingle = (request.headers().accept ?? "").includes("application/vnd.pgrst.object+json");
-      await route.fulfill({
-        status: 200,
-        headers: { ...headers, "content-range": "0-0/0" },
-        body: wantsSingle ? "null" : "[]",
-      });
-      return;
-    }
+export const onboardingInviteToken = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
-    if (url.pathname.includes("/functions/v1/")) {
-      await route.fulfill({ status: 200, headers, body: JSON.stringify({ ok: true }) });
-      return;
-    }
+export const authStateDir = resolve(process.cwd(), ".playwright-auth");
+export const authStates = {
+  adminA: resolve(authStateDir, "admin-a.json"),
+  superadmin: resolve(authStateDir, "superadmin.json"),
+} as const;
 
-    if (url.pathname.includes("/auth/v1/")) {
-      await route.fulfill({ status: 200, headers, body: JSON.stringify({ user: null, session: null }) });
-      return;
-    }
+export function ensureAuthStateDir() {
+  mkdirSync(authStateDir, { recursive: true });
+}
 
-    if (url.pathname.includes("/storage/v1/")) {
-      await route.fulfill({ status: 200, headers, body: "[]" });
-      return;
-    }
+function requiredEnv(...names: string[]) {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  throw new Error(`Variável E2E ausente: ${names.join(" ou ")}`);
+}
 
-    await route.fulfill({ status: 200, headers, body: "{}" });
+export function backendConfig() {
+  return {
+    url: requiredEnv("E2E_SUPABASE_URL", "SUPABASE_URL", "VITE_SUPABASE_URL"),
+    anonKey: requiredEnv("E2E_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY"),
+    serviceRoleKey: process.env.E2E_SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? null,
+  };
+}
+
+export function createPublicClient() {
+  const { url, anonKey } = backendConfig();
+  return createClient<Database>(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+export function createServiceClient() {
+  const { url, serviceRoleKey } = backendConfig();
+  if (!serviceRoleKey) throw new Error("Service role local ausente para verificação funcional.");
+  return createClient<Database>(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+export async function createSignedInClient(account: { email: string; password: string }) {
+  const client = createPublicClient();
+  const { error } = await client.auth.signInWithPassword(account);
+  if (error) throw new Error(`Falha no login funcional de ${account.email}: ${error.message}`);
+  return client;
+}
+
+export async function loginThroughUi(page: Page, account: { email: string; password: string }) {
+  await page.goto("/auth");
+  await page.locator("#li-email").fill(account.email);
+  await page.locator("#li-pass").fill(account.password);
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page).toHaveURL(/\/app\/hoje$/);
+  await expect(page.locator("main")).toBeVisible();
 }
 
 export const test = base;
@@ -60,7 +98,6 @@ test.beforeEach(async ({ page }) => {
   const errors: string[] = [];
   pageErrors.set(page, errors);
   page.on("pageerror", (error) => errors.push(error.stack ?? error.message));
-  await installBackendMocks(page);
 });
 
 test.afterEach(async ({ page }, testInfo) => {
@@ -73,17 +110,6 @@ test.afterEach(async ({ page }, testInfo) => {
   }
   expect(errors, "A página não deve produzir exceções JavaScript").toEqual([]);
 });
-
-export function e2eUrl(
-  path: string,
-  options: { role?: "superadmin" | "admin" | "equipe"; authenticated?: boolean; institution?: string } = {},
-) {
-  const url = new URL(path, "http://127.0.0.1:4173");
-  url.searchParams.set("__e2e_role", options.role ?? "admin");
-  url.searchParams.set("__e2e_auth", options.authenticated === false ? "anonymous" : "authenticated");
-  url.searchParams.set("__e2e_institution", options.institution ?? "instituicao-e2e");
-  return `${url.pathname}${url.search}`;
-}
 
 export async function expectRouteLoaded(page: Page, path: string) {
   await expect(page).toHaveURL(new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
