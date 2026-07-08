@@ -97,6 +97,8 @@ A entrega precisava rodar para:
 - [x] E2E público, institucional, superadmin e legado aprovados.
 - [x] Quality gate aprovado no GitHub Actions run `28945649170` (#20).
 - [x] Relatórios JUnit, cobertura, análise estática e Playwright publicados.
+- [x] Alterações posteriores ao run #20 são exclusivamente documentais e passam
+      novamente pelo mesmo workflow antes do merge.
 
 ## Notas
 
