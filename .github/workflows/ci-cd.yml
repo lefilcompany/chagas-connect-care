@@ -53,7 +53,7 @@ jobs:
     name: Lint e TypeScript
     needs: governance
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -66,11 +66,56 @@ jobs:
       - name: Instalar dependências
         run: npm install --no-audit --no-fund --legacy-peer-deps
 
-      - name: Executar ESLint
-        run: npm run lint
+      - name: Executar ESLint e gerar relatórios
+        id: eslint
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p test-results
+          set +e
+          npx eslint . -f json -o test-results/eslint-report.json
+          ESLINT_CODE=$?
+          npx eslint . -f stylish > test-results/eslint-output.txt 2>&1
+          echo "exit_code=$ESLINT_CODE" >> "$GITHUB_OUTPUT"
+          exit "$ESLINT_CODE"
 
-      - name: Verificar tipos da aplicação, configurações e testes
-        run: npm run typecheck
+      - name: Verificar tipos e registrar saída
+        id: typecheck
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p test-results
+          set +e
+          npm run typecheck > test-results/typecheck-output.txt 2>&1
+          TYPECHECK_CODE=$?
+          cat test-results/typecheck-output.txt
+          echo "exit_code=$TYPECHECK_CODE" >> "$GITHUB_OUTPUT"
+          exit "$TYPECHECK_CODE"
+
+      - name: Publicar diagnósticos estáticos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-analysis-diagnostics
+          path: |
+            test-results/eslint-report.json
+            test-results/eslint-output.txt
+            test-results/typecheck-output.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Aplicar gate de análise estática
+        if: always()
+        env:
+          ESLINT_CODE: ${{ steps.eslint.outputs.exit_code }}
+          TYPECHECK_CODE: ${{ steps.typecheck.outputs.exit_code }}
+        run: |
+          echo "ESLint exit code: ${ESLINT_CODE:-missing}"
+          echo "TypeScript exit code: ${TYPECHECK_CODE:-missing}"
+          if [ "${ESLINT_CODE:-1}" != "0" ] || [ "${TYPECHECK_CODE:-1}" != "0" ]; then
+            echo "Análise estática bloqueada. Consulte o artifact static-analysis-diagnostics."
+            exit 1
+          fi
 
   unit-tests:
     name: Unitários — ${{ matrix.name }}
