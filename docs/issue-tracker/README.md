@@ -1,23 +1,36 @@
 # Issue tracker local
 
-O trabalho do repositório é registrado em arquivos Markdown para manter
-contexto, critérios e decisões junto ao código. A decisão e seus trade-offs
-estão no ADR `0007`.
+O trabalho é registrado em Markdown para manter contexto, critérios, decisões e
+validação junto ao código. A decisão está no ADR `0007`; a integração com CI no
+ADR `0008`.
 
 ---
 
-## Quando criar um issue
+## Quando criar
 
-Crie ou reutilize um issue antes de:
+Crie ou reutilize um issue **antes do primeiro commit funcional** para:
 
-- mudar código, schema, integração ou comportamento;
-- alterar domínio, arquitetura, segurança ou privacidade;
-- corrigir bug;
-- executar spike/investigação relevante;
-- produzir documentação estrutural.
+- nova funcionalidade, rota, tela, regra, integração ou edge function;
+- mudança de código, schema, comportamento ou contrato;
+- bug e regressão;
+- alteração de domínio, arquitetura, segurança ou privacidade;
+- spike/investigação relevante;
+- documentação estrutural.
 
-Correções puramente tipográficas podem usar um issue agregador de documentação,
-desde que não escondam mudança de significado.
+Correção puramente tipográfica pode usar issue agregador, desde que não altere
+significado.
+
+### Nova funcionalidade
+
+Antes do código, o issue deve:
+
+1. estar `em-andamento`;
+2. ter responsável;
+3. descrever evidências, critérios, riscos e fora de escopo;
+4. referenciar o ADR da funcionalidade;
+5. indicar unitários e E2E planejados em `tests/test-matrix.json`.
+
+A CI valida a existência e a ordem de issue/ADR antes da implementação.
 
 ---
 
@@ -25,19 +38,14 @@ desde que não escondam mudança de significado.
 
 `NNNN-slug-curto.md`
 
-- quatro dígitos com zero à esquerda;
-- incremento sequencial no branch base;
-- slug em kebab-case, pt-BR sem acentos, até seis palavras;
-- conflitos de ID entre branches devem ser resolvidos antes do merge.
-
-Exemplos:
-
-- `0002-completar-documentacao-dominio-arquitetura.md`;
-- `0017-corrigir-envio-template-midia.md`.
+- quatro dígitos;
+- incremento no branch base;
+- kebab-case, pt-BR sem acentos;
+- resolver conflitos de ID antes do merge.
 
 ---
 
-## Frontmatter obrigatório
+## Frontmatter
 
 ```yaml
 ---
@@ -50,31 +58,32 @@ criado_em: 2026-07-08
 atualizado_em: 2026-07-08
 responsavel: null        # obrigatório em andamento/concluído
 relacionados: []
-adr: null                # null, um id ou lista de ids
+adr: null                # obrigatório para feature; id ou lista
 ---
 ```
 
-### Regras
+Regras:
 
-- `id` corresponde ao nome do arquivo;
-- `atualizado_em` muda quando status, escopo ou decisão mudar;
-- `responsavel` não pode permanecer `null` em issue concluído;
-- `adr` referencia decisões, não substitui o contexto do issue;
-- prioridade crítica exige risco/impacto explícito;
-- `descartado` exige justificativa.
+- ID corresponde ao nome;
+- data muda com status/escopo/decisão;
+- responsável não fica `null` em andamento/concluído;
+- feature exige ADR;
+- prioridade crítica exige impacto explícito;
+- descartado exige justificativa.
 
 ---
 
 ## Seções obrigatórias
 
-1. **Contexto** — problema e por que importa.
-2. **O que fazer** — resultado esperado, não lista prematura de arquivos.
-3. **Evidências** — código, schema, reprodução, métricas ou pesquisa.
+1. **Contexto** — problema e usuário/risco afetado.
+2. **O que fazer** — resultado esperado.
+3. **Evidências** — código, schema, reprodução ou pesquisa.
 4. **Critérios de aceitação** — verificáveis.
-5. **Fora de escopo** — limitações conscientes.
-6. **Riscos/impactos** — domínio, segurança, privacidade, dados, operação.
-7. **Validação** — testes ou revisão executados.
-8. **Notas** — decisões e bloqueios durante o trabalho.
+5. **Fora de escopo** — limites conscientes.
+6. **Riscos e impactos** — domínio, segurança, dados, operação.
+7. **Plano de testes** — unitários, E2E e contratos.
+8. **Validação** — comandos e resultados executados.
+9. **Notas** — decisões, bloqueios e riscos residuais.
 
 Use `TEMPLATE.md`.
 
@@ -91,69 +100,67 @@ aberto ──► em-andamento ──► concluido
 
 ### Aberto
 
-Escopo inicial conhecido; ainda sem execução ativa.
+Escopo inicial conhecido, sem execução ativa.
 
 ### Em andamento
 
-Possui responsável e trabalho ativo. Registre decisões enquanto acontecem.
+Possui responsável, ADR quando aplicável e trabalho ativo.
 
 ### Bloqueado
 
-Existe dependência concreta. Notas devem explicar:
-
-- o que bloqueia;
-- quem decide/entrega;
-- o que pode avançar;
-- risco do atraso.
+Notas explicam dependência, responsável, parte que pode avançar e risco.
 
 ### Concluído
 
 Somente quando:
 
 - critérios estão marcados;
-- validação está registrada;
+- unitários e E2E foram atualizados e mapeados;
+- lint, typecheck, cobertura, build e Playwright passaram;
+- Quality gate está verde;
 - docs/ADRs foram atualizados;
 - riscos residuais estão explícitos;
-- mudança está no branch/PR correspondente.
-
-Deploy em produção pode ser um critério separado quando fizer parte do escopo.
+- mudança está no PR correspondente.
 
 ### Descartado
 
-Não será executado no escopo previsível. Preserve o arquivo e explique a razão.
+Preserve o arquivo e explique a razão.
 
 ---
 
 ## Fluxo para agentes
 
-1. procurar issue existente;
-2. criar o próximo ID no branch base;
-3. preencher contexto, evidências, critérios e riscos;
-4. marcar em andamento e assumir responsabilidade;
-5. atualizar notas durante a tarefa;
-6. criar/propor ADR quando necessário;
-7. validar;
-8. concluir e referenciar no PR.
+1. procurar/criar issue;
+2. preencher contexto, evidências, critérios e riscos;
+3. marcar em andamento e assumir responsabilidade;
+4. criar ADR antes da implementação de feature;
+5. mapear testes em `tests/test-matrix.json`;
+6. implementar com unitários;
+7. implementar/atualizar E2E;
+8. executar CI local/proporcional;
+9. atualizar notas e validação;
+10. concluir apenas após Quality gate verde.
 
 ---
 
-## Relação com GitHub Issues e PRs
+## Relação com GitHub
 
-- arquivo Markdown é a fonte canônica atual;
-- GitHub Issue, quando usado, deve apontar para o arquivo;
-- PR deve mencionar o ID e listar ADRs;
-- título do PR não precisa repetir o título do issue;
-- não exponha IDs internos de ferramentas ou segredos nas notas.
+- Markdown é a fonte canônica atual;
+- GitHub Issue, quando usado, aponta para o arquivo;
+- PR menciona issue e ADRs;
+- não expor segredo, token ou dado pessoal;
+- branch protection deve exigir **Quality gate**.
 
 ---
 
 ## Qualidade do issue
 
-Um bom issue permite a outro agente responder:
+Outro agente deve conseguir responder:
 
-- qual problema está sendo resolvido;
-- como sabemos que ele existe;
-- o que precisa ser verdadeiro ao final;
-- quais decisões já foram tomadas;
-- quais riscos não podem ser ignorados;
-- como validar a entrega.
+- qual problema existe;
+- qual evidência o comprova;
+- qual decisão foi tomada;
+- quais riscos importam;
+- quais testes demonstram o resultado;
+- como reproduzir a validação;
+- o que permanece pendente.
