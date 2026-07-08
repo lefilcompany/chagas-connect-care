@@ -1,16 +1,34 @@
 # ADRs — Architectural Decision Records
 
-ADRs registram decisões difíceis de reverter, surpreendentes sem contexto e
-resultantes de trade-off real. O objetivo não é documentar toda escolha, mas
-preservar o **porquê** das decisões estruturais.
+ADRs preservam o **porquê** de decisões, alternativas, consequências e
+restrições. Formato baseado em MADR, adaptado para pt-BR.
 
-Formato baseado em MADR, adaptado para pt-BR.
+---
+
+## Regra para novas funcionalidades
+
+Toda nova funcionalidade exige um ADR antes do primeiro commit funcional, mesmo
+quando parte da implementação parecer reversível. O ADR deve delimitar:
+
+- problema e usuário afetado;
+- decisão de produto/domínio/arquitetura;
+- alternativas consideradas;
+- riscos e guard-rails;
+- estratégia de dados, segurança e observabilidade;
+- testes unitários e E2E esperados;
+- critério de revisão ou retirada.
+
+Isso inclui nova rota, tela, fluxo, entidade, estado, edge function, integração,
+canal, nó de jornada, filtro ou operação administrativa.
+
+Para bugs, chores e refatorações sem ampliação funcional, use a regra dos três.
 
 ---
 
 ## Regra dos três
 
-Crie um ADR quando as três condições forem verdadeiras:
+Para mudanças que não são novas funcionalidades, crie ADR quando as três
+condições forem verdadeiras:
 
 1. **Difícil de reverter:** envolve dados, contrato, migração, lock-in ou
    retrabalho amplo.
@@ -18,8 +36,7 @@ Crie um ADR quando as três condições forem verdadeiras:
    assim.
 3. **Trade-off real:** havia alternativas legítimas com custos diferentes.
 
-Se a escolha for local, óbvia e reversível, registre no issue, teste ou código —
-não em ADR.
+Escolhas locais, óbvias e reversíveis podem ficar no issue, teste ou código.
 
 ---
 
@@ -46,13 +63,11 @@ decisão, crie outro ADR e estabeleça substituição.
 É permitido registrar decisão já materializada quando:
 
 - a implementação comprova uma escolha estrutural;
-- o contexto e as alternativas ainda podem ser reconstruídos honestamente;
-- o ADR deixa claro que descreve o estado vigente, sem fingir uma reunião que
-  não ocorreu;
+- contexto e alternativas podem ser reconstruídos honestamente;
+- o documento não inventa reunião ou aprovação;
 - dívidas e lacunas permanecem explícitas.
 
-Não use ADR retrospectivo para legitimar decisão insegura ou inventar aprovação.
-Quando a fronteira ainda depende de pessoas responsáveis, use `proposto`.
+Quando a fronteira ainda depende de responsáveis, use `proposto`.
 
 ---
 
@@ -68,13 +83,16 @@ Quando a fronteira ainda depende de pessoas responsáveis, use `proposto`.
 
 ## Como criar
 
-1. Copie `0000-template.md`.
-2. Use o próximo ID disponível.
-3. Preencha contexto, decisão, alternativas, consequências e guard-rails.
-4. Relacione issue e documentos afetados.
-5. Colete decisores para decisões novas.
-6. Marque como `proposto` até decisão explícita.
-7. Ao aceitar, atualize documentos e issues de implementação.
+1. Crie/abra o issue primeiro.
+2. Copie `0000-template.md`.
+3. Use o próximo ID disponível.
+4. Preencha contexto, evidências, decisão, alternativas, consequências,
+   guard-rails e testes.
+5. Relacione issue, documentos e matriz de testes.
+6. Colete decisores para decisões novas.
+7. Marque como `proposto` até decisão explícita.
+8. Aceite antes do primeiro commit funcional quando for nova funcionalidade.
+9. Atualize documentos e issues de implementação.
 
 ---
 
@@ -89,15 +107,17 @@ Quando a fronteira ainda depende de pessoas responsáveis, use `proposto`.
 | [0005](0005-separar-identidade-conversa-e-pessoa-no-whatsapp.md) | aceito | Separar identidade, conversa, mensagem e pessoa no WhatsApp. |
 | [0006](0006-limitar-dados-clinicos-ao-cuidado-coordenado.md) | proposto | Limitar dados clínicos ao necessário para coordenação. |
 | [0007](0007-manter-issue-tracker-local-em-markdown.md) | aceito | Manter issue tracker local em Markdown. |
+| [0008](0008-adotar-ci-cd-com-testes-por-funcionalidade.md) | aceito | Adotar CI/CD com testes unitários e E2E por funcionalidade. |
 
 ---
 
 ## Revisão
 
-Ao alterar domínio ou arquitetura:
+Ao alterar domínio, arquitetura ou funcionalidade:
 
 - procure ADR vigente;
 - não contradiga decisão aceita silenciosamente;
 - confira se nova evidência exige substituição;
 - atualize o índice;
-- registre risco residual e plano de migração.
+- atualize `tests/test-matrix.json`;
+- registre riscos, migração e estratégia de testes.
