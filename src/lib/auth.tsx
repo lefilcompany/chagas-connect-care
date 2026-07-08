@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { clearE2EMockSession, getE2EMockContext } from "@/lib/e2e";
 
 type AuthCtx = {
   user: User | null;
@@ -12,10 +13,17 @@ type AuthCtx = {
 const Ctx = createContext<AuthCtx>({ user: null, session: null, loading: true, signOut: async () => {} });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const e2e = getE2EMockContext();
+  const [session, setSession] = useState<Session | null>(() => (e2e.enabled ? e2e.session : null));
+  const [loading, setLoading] = useState(() => !e2e.enabled);
 
   useEffect(() => {
+    if (e2e.enabled) {
+      setSession(e2e.session);
+      setLoading(false);
+      return;
+    }
+
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
       setLoading(false);
@@ -25,7 +33,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [e2e.enabled, e2e.session]);
 
   return (
     <Ctx.Provider
@@ -34,6 +42,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         session,
         loading,
         signOut: async () => {
+          if (e2e.enabled) {
+            clearE2EMockSession();
+            setSession(null);
+            return;
+          }
           await supabase.auth.signOut();
         },
       }}
