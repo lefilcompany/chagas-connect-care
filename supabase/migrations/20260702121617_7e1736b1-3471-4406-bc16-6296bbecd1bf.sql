@@ -3,25 +3,35 @@
 -- Alguns ambientes históricos possuem whatsapp_template_events, enquanto a
 -- sequência completa de migrations do repositório não cria essa tabela em um
 -- banco vazio. A constraint só pode ser aplicada quando a relação e a coluna
--- realmente existem.
+-- realmente existem. Não use ::regclass aqui: esse cast resolve a relação antes
+-- da avaliação do IF e falha justamente quando a tabela é opcional.
 DO $$
 BEGIN
-  IF to_regclass('public.whatsapp_template_events') IS NOT NULL
-     AND EXISTS (
+  IF EXISTS (
        SELECT 1
-       FROM information_schema.columns
-       WHERE table_schema = 'public'
-         AND table_name = 'whatsapp_template_events'
-         AND column_name = 'payload_hash'
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       JOIN pg_attribute a ON a.attrelid = c.oid
+       WHERE n.nspname = 'public'
+         AND c.relname = 'whatsapp_template_events'
+         AND c.relkind IN ('r', 'p')
+         AND a.attname = 'payload_hash'
+         AND a.attnum > 0
+         AND NOT a.attisdropped
      )
      AND NOT EXISTS (
        SELECT 1
-       FROM pg_constraint
-       WHERE conname = 'whatsapp_template_events_hash_unique'
-         AND conrelid = 'public.whatsapp_template_events'::regclass
+       FROM pg_constraint con
+       JOIN pg_class c ON c.oid = con.conrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE con.conname = 'whatsapp_template_events_hash_unique'
+         AND n.nspname = 'public'
+         AND c.relname = 'whatsapp_template_events'
      ) THEN
-    ALTER TABLE public.whatsapp_template_events
-      ADD CONSTRAINT whatsapp_template_events_hash_unique UNIQUE (payload_hash);
+    EXECUTE '
+      ALTER TABLE public.whatsapp_template_events
+      ADD CONSTRAINT whatsapp_template_events_hash_unique UNIQUE (payload_hash)
+    ';
   END IF;
 END $$;
 
