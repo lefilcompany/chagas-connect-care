@@ -36,7 +36,7 @@ A entrega precisava rodar para:
 - Criados quatro projetos E2E: público, institucional, superadmin e legado.
 - Criada matriz de 16 funcionalidades em `tests/test-matrix.json`.
 - Criados validadores de issue/ADR e atualização de testes.
-- Atualizados `AGENTS.md`, `CONTEXT.md`, README e documentação dedicada.
+- Atualizados `AGENTS.md`, `CONTEXT.md`, README e `docs/testing-and-ci.md`.
 - Corrigidos dois erros reais de lint em componentes-base sem alterar contrato.
 - Documentada a dívida controlada de `no-explicit-any` no código legado.
 
@@ -107,5 +107,7 @@ A entrega precisava rodar para:
   equipe versionar um lockfile atualizado e migrar para instalação congelada.
 - A entrega contínua produz bundle e manifesto validados em `main`; a publicação
   continua sendo feita pelo Lovable.
+- A arquitetura de CI e a separação entre GitHub Actions e deploy Lovable estão
+  detalhadas em `docs/testing-and-ci.md` e ADR `0008`.
 - Ruleset recomendado: exigir PR, reviews, conversations resolvidas e o check
   **Quality gate** para a `main`.
