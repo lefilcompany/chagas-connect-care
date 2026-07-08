@@ -15,7 +15,7 @@ adr: null
 
 _Por que este issue existe. Referência ao pedido do usuário, bug
 reproduzido, insight de análise. Usar o vocabulário de
-`docs/CONTEXT.md`._
+`CONTEXT.md`._
 
 ## O que fazer
 

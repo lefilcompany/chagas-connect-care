@@ -1,7 +1,7 @@
 # Issue-tracker (markdown local)
 
 Todo trabalho neste repositório passa por um issue aqui. Sem exceção
-(ver `docs/AGENTS.md` §4 — Issue-first obrigatório).
+(ver `AGENTS.md` §4 — Issue-first obrigatório).
 
 ---
 
@@ -84,7 +84,7 @@ aberto ──► em-andamento ──► concluido
    acontecem (não deixar para o fim).
 4. **Ao terminar:** marcar critérios de aceitação, mudar `status` para
    `concluido`, atualizar `atualizado_em`.
-5. **Se afetou o domínio:** atualizar `docs/CONTEXT.md` na mesma
+5. **Se afetou o domínio:** atualizar `CONTEXT.md` na mesma
    entrega.
 6. **Se produziu decisão arquitetural:** propor ADR em `docs/adr/`.
 

@@ -9,7 +9,7 @@
 > precisará ser desfeita.
 
 Este documento vale para **qualquer** agente (humano ou LLM) que edite
-este repositório. Ele não substitui `docs/CONTEXT.md` (domínio) nem
+este repositório. Ele não substitui `CONTEXT.md` (domínio) nem
 `docs/architecture.md` (arquitetura) — ele orienta *o comportamento* do
 agente.
 
@@ -32,7 +32,7 @@ agente.
 
 Para toda tarefa, nesta ordem:
 
-1. **Ler `docs/CONTEXT.md`** — confirmar vocabulário e fronteiras.
+1. **Ler `CONTEXT.md`** — confirmar vocabulário e fronteiras.
 2. **Ler o issue correspondente** em `docs/issue-tracker/`. Se não
    existe, **criar antes** (ver seção 4 — issue-first).
 3. **Ler ADRs relevantes** em `docs/adr/`. Se a tarefa contradiz um
@@ -41,7 +41,7 @@ Para toda tarefa, nesta ordem:
 5. **Atualizar o issue** ao concluir: mudar `status`, `atualizado_em`,
    marcar critérios de aceitação, adicionar notas de decisões.
 6. **Se afetou o domínio** (termo novo, fronteira redesenhada,
-   entidade nova), **atualizar `docs/CONTEXT.md` na mesma tarefa**.
+   entidade nova), **atualizar `CONTEXT.md` na mesma tarefa**.
 7. **Se surgiu decisão arquitetural** difícil de reverter, surpreendente
    sem contexto e resultado de trade-off real → **propor um ADR novo**
    (ver `docs/adr/README.md`).
@@ -122,7 +122,7 @@ quase sempre a mudança correta é em outro lugar.
 
 ## 8. Glossário é lei
 
-- Usar **exatamente** os termos definidos em `docs/CONTEXT.md`
+- Usar **exatamente** os termos definidos em `CONTEXT.md`
   (nomes de entidades, estados, kinds de nó, papéis).
 - Encontrou um termo novo no discurso do usuário? Antes de codar:
   1. Verifique se ele mapeia para um termo existente.
