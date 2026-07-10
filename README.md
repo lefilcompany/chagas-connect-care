@@ -117,3 +117,20 @@ em `supabase/functions/` são versionadas no repositório e implantadas
 pela plataforma. Migrations em `supabase/migrations/` — cada
 `CREATE TABLE` em `public` **exige** `GRANT` + `ENABLE ROW LEVEL
 SECURITY` + `CREATE POLICY` na **mesma** migration.
+
+---
+
+## CI/CD
+
+`.github/workflows/ci.yml` roda em **todo PR (qualquer branch)** e em
+**todo push para `main`**, com 4 jobs paralelos:
+
+- **lint** — `bun run lint` (ESLint)
+- **unit** — `bun run test:unit` (Vitest)
+- **deno-test** — `deno test supabase/functions/` (edge functions)
+- **e2e** — `bunx playwright test` contra o preview publicado
+
+Ver `e2e/README.md` para instruções de execução local e configuração
+dos secrets `PLAYWRIGHT_BASE_URL`, `TEST_USER_EMAIL` e
+`TEST_USER_PASSWORD`. A regra de obrigatoriedade por funcionalidade
+está em [`AGENTS.md §14`](./AGENTS.md).
