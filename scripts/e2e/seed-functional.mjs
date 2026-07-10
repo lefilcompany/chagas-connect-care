@@ -1,3 +1,6 @@
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 function required(...names) {
@@ -9,14 +12,9 @@ function required(...names) {
 }
 
 const supabaseUrl = required("SUPABASE_URL", "API_URL");
-const anonKey = required("SUPABASE_ANON_KEY", "ANON_KEY");
 const serviceRoleKey = required("SUPABASE_SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY");
 
 const admin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
-
-const operator = createClient(supabaseUrl, anonKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
@@ -103,6 +101,50 @@ async function ensureNoError(label, result) {
   return result.data;
 }
 
+function sqlLiteral(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+function localDatabaseContainer() {
+  const config = readFileSync(resolve(process.cwd(), "supabase/config.toml"), "utf8");
+  const projectId = config.match(/^project_id\s*=\s*"([^"]+)"/m)?.[1];
+  if (!projectId) {
+    throw new Error("Não foi possível identificar project_id em supabase/config.toml.");
+  }
+  return `supabase_db_${projectId}`;
+}
+
+function runLocalSql(sql) {
+  const docker = process.platform === "win32" ? "docker.exe" : "docker";
+  const result = spawnSync(
+    docker,
+    [
+      "exec",
+      "-i",
+      localDatabaseContainer(),
+      "psql",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      input: sql,
+      timeout: 60_000,
+    },
+  );
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
+    throw new Error(`Falha ao preparar perfil no Postgres local: ${output}`);
+  }
+}
+
 async function createAuthAccount(account) {
   const created = await ensureNoError(
     `Criar usuário ${account.email}`,
@@ -122,9 +164,8 @@ async function createAuthAccount(account) {
   const roles = account.role === "superadmin"
     ? [
         { user_id: userId, role: "superadmin" },
-        // O trigger legado de alteração de instituição verifica explicitamente
-        // o papel admin. A fixture mantém também superadmin para validar ambos
-        // os contratos reais de autorização sem desativar a proteção.
+        // O trigger legado verifica explicitamente o papel admin. A fixture
+        // mantém também superadmin para validar os dois contratos reais.
         { user_id: userId, role: "admin" },
       ]
     : [{ user_id: userId, role: account.role }];
@@ -137,43 +178,52 @@ async function createAuthAccount(account) {
   return userId;
 }
 
-async function completeProfile(userId, account) {
+function completeProfile(actorId, userId, account) {
   const roleLabel = account.role === "superadmin" ? "Superadmin" : "Administrador";
-  const profile = await ensureNoError(
-    `Completar perfil ${account.email}`,
-    await operator
-      .from("profiles")
-      .update({
-        full_name: account.fullName,
-        role_label: roleLabel,
-        professional_registry: "E2E-TEST",
-        institution: account.institution,
-      })
-      .eq("id", userId)
-      .select("institution")
-      .single(),
-  );
 
-  if (profile.institution !== account.institution) {
-    throw new Error(`Perfil ${account.email} não recebeu a instituição esperada.`);
-  }
+  // O banco local é efêmero e executado pelo owner apenas para preparar fixtures.
+  // RLS é bypassada pelo owner, mas o trigger permanece ativo. Os claims do ator
+  // são definidos para que a própria regra de autorização do trigger seja
+  // exercitada, sem desativar policy ou trigger.
+  runLocalSql(`
+BEGIN;
+SELECT set_config(
+  'request.jwt.claims',
+  json_build_object('sub', ${sqlLiteral(actorId)}, 'role', 'authenticated')::text,
+  true
+);
+
+UPDATE public.profiles
+SET full_name = ${sqlLiteral(account.fullName)},
+    role_label = ${sqlLiteral(roleLabel)},
+    professional_registry = 'E2E-TEST',
+    institution = ${sqlLiteral(account.institution)}
+WHERE id = ${sqlLiteral(userId)}::uuid;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.profiles
+    WHERE id = ${sqlLiteral(userId)}::uuid
+      AND institution = ${sqlLiteral(account.institution)}
+  ) THEN
+    RAISE EXCEPTION 'Perfil E2E não recebeu a instituição esperada';
+  END IF;
+END $$;
+
+COMMIT;
+`);
 }
 
 const superadminId = await createAuthAccount(fixtures.accounts.superadmin);
-await ensureNoError(
-  "Autenticar superadmin de bootstrap",
-  await operator.auth.signInWithPassword({
-    email: fixtures.accounts.superadmin.email,
-    password: fixtures.accounts.superadmin.password,
-  }),
-);
-await completeProfile(superadminId, fixtures.accounts.superadmin);
+completeProfile(superadminId, superadminId, fixtures.accounts.superadmin);
 
 const adminAId = await createAuthAccount(fixtures.accounts.adminA);
-await completeProfile(adminAId, fixtures.accounts.adminA);
+completeProfile(superadminId, adminAId, fixtures.accounts.adminA);
 
 const adminBId = await createAuthAccount(fixtures.accounts.adminB);
-await completeProfile(adminBId, fixtures.accounts.adminB);
+completeProfile(superadminId, adminBId, fixtures.accounts.adminB);
 
 await ensureNoError(
   "Criar pacientes funcionais",
