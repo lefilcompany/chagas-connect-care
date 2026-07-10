@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -25,6 +25,11 @@ const loginSchema = z.object({
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  const [search] = useSearchParams();
+  const rawNext = search.get("next");
+  // Only allow same-origin relative paths.
+  const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
+  const goAfterAuth = () => (next ? (window.location.href = next) : navigate("/app"));
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("login");
 
@@ -40,7 +45,7 @@ export default function AuthPage() {
     });
     setLoading(false);
     if (error) return toast.error(error.message);
-    navigate("/app");
+    goAfterAuth();
   };
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -64,7 +69,7 @@ export default function AuthPage() {
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success("Conta criada! Você já está logado.");
-    navigate("/app");
+    goAfterAuth();
   };
 
 
