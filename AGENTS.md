@@ -154,6 +154,7 @@ escopo**.
 | Novo teste / ADR / issue | QA/Docs | — |
 | Mudança no bucket `whatsapp-media` | RLS/DB Guardian | Edge Function (uploader) |
 | Mudança em `src/lib/mcp/tools/*` | Frontend Slice Engineer (dono do MCP) | QA/Docs (re-extrair manifesto) |
+| Novo slice em `src/features/*` (E2E) | Frontend Slice Engineer | **QA/Docs (spec Playwright em `e2e/<slice>/`)** |
 
 ---
 
@@ -279,3 +280,36 @@ Se precisar mudar um deles, **pare e pergunte**.
 - Termo novo? Domain Steward atualiza `CONTEXT.md` **na mesma tarefa**.
 - "Sinônimo proibido" listado no glossário não aparece em código, UI ou
   docs novas.
+
+---
+
+## 14. Definition of Done por funcionalidade
+
+Uma funcionalidade só é considerada **concluída** quando entrega, na
+**mesma tarefa/PR**, os três itens abaixo. Nenhum deles é opcional.
+
+1. **Testes unitários** cobrindo o caminho feliz + pelo menos 1 borda
+   relevante da lógica de negócio nova.
+   - Frontend/libs: Vitest em `src/**/*.test.ts(x)`.
+   - Edge functions: `Deno.test` em
+     `supabase/functions/**/*.test.ts`.
+2. **Teste E2E** cobrindo o fluxo de usuário exposto pela
+   funcionalidade, em `e2e/<slice>/<fluxo>.spec.ts` (Playwright).
+   Toda rota nova e toda ação crítica (envio, aprovação, exclusão,
+   inscrição em jornada) exige spec. O helper de login está em
+   `e2e/fixtures/auth.ts`. Convenções em `e2e/README.md`.
+3. **Lint limpo**: `bun run lint` sem erros e sem novos warnings
+   introduzidos pela mudança.
+
+**QA/Docs (§3.6) tem poder de veto:** PR que quebre qualquer um dos
+três critérios volta para o autor.
+
+**Automação:** o workflow `.github/workflows/ci.yml` roda os 4 jobs
+(`lint`, `unit`, `deno-test`, `e2e`) em **todo PR (qualquer branch →
+qualquer branch)** e em **todo push para `main`**. Merge só deve
+acontecer com os 4 verdes.
+
+**Secrets exigidos no GitHub Actions** (configuração manual do
+admin do repo): `PLAYWRIGHT_BASE_URL`, `TEST_USER_EMAIL`,
+`TEST_USER_PASSWORD`. Sem eles, o job E2E falha explicitamente com
+mensagem instrutiva; os outros 3 seguem operando.
