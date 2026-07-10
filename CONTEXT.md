@@ -28,8 +28,8 @@ até a alta clínica — combinando:
   instituição opera isoladamente via RLS).
 
 **Núcleo do domínio:** a **jornada de cuidado do paciente**. Tudo o mais
-(canais, mensagens, biblioteca, tarefas, audiências) existe para
-viabilizar essa jornada.
+(canais, mensagens, biblioteca, tarefas, audiências, adesão a
+medicação) existe para viabilizar essa jornada.
 
 ---
 
@@ -45,11 +45,14 @@ em código, UI, docs ou issues.
   cadastral (lista, edição), e "Paciente" quando é clínico (jornada,
   mensagens).
 - **Sinônimos proibidos:** "usuário" (usuário = quem opera o sistema),
-  "cliente", "contato" (contato = rede de cuidado).
+  "cliente". O termo "contato" é reservado para membro da rede de
+  cuidado (ver abaixo) — nunca use "contato" para se referir ao
+  paciente.
 
 ### Rede de cuidado / Contato
 - **Definição:** pessoas ao redor do paciente (cuidador principal,
-  familiar, responsável legal). Tabela: `care_network_contacts`.
+  familiar, responsável legal). Tabela: **`contacts`** (uma linha por
+  contato, sempre vinculada a um `patient_id`).
 - Um paciente pode ter zero, um ou vários contatos. Cada contato tem
   `relation`, `channel_pref` e `authorization_status` próprios.
 - **Sinônimos proibidos:** "acompanhante", "responsável" isolado
@@ -58,7 +61,8 @@ em código, UI, docs ou issues.
 ### Consentimento / Autorização
 - **Definição:** permissão explícita da pessoa (paciente ou contato de
   rede de cuidado) para receber comunicações por um canal. Coluna:
-  `authorization_status`.
+  `authorization_status` (+ `authorization_scope`, `authorized_at`,
+  `authorized_by`, `revoked_at`).
 - **Sinônimos proibidos:** "opt-in" (só em código técnico interno).
 
 ### Canal
@@ -105,24 +109,54 @@ em código, UI, docs ou issues.
 
 ### Template Meta / WhatsApp
 - **Definição:** mensagem pré-aprovada pelo Meta Business para envio via
-  WhatsApp Cloud API. Ciclo: rascunho → submissão → `APPROVED` /
-  `REJECTED` / `PAUSED`.
+  WhatsApp Cloud API. Tabela local: **`message_templates`** (espelha o
+  Meta). Submissões auditadas em `whatsapp_template_submissions`;
+  eventos em `whatsapp_template_events`; mídia de header em
+  `whatsapp_template_header_media`. Ciclo: rascunho → submissão →
+  `APPROVED` / `REJECTED` / `PAUSED`.
 - **Sinônimos proibidos:** "modelo" (ambíguo com modelos de dados).
+
+### Lote de mensagens
+- **Definição:** disparo agendado/pontual para uma coorte. Tabela:
+  **`message_batches`**. Processado pela edge `process-message-batch`,
+  que produz uma linha em `messages` por destinatário.
+- **Sinônimos proibidos:** "campanha" solto (usar "lote de mensagens"
+  em contextos técnicos; "campanha" só como rótulo de UI).
 
 ### Audiência / Segmento
 - **Definição:** coorte dinâmica de pacientes definida por filtros
-  (`TargetingMode`). Reutilizável em jornadas e campanhas.
+  (`TargetingMode`). Tabela: **`audience_segments`**. Reutilizável em
+  jornadas, lotes de mensagens e conteúdo da biblioteca.
 
 ### Biblioteca de conteúdo
 - **Definição:** cápsulas de conteúdo clínico reutilizáveis. Tabela:
-  `content_library`. Status derivados: `rascunho`,
+  `content_library`, organizada em `content_folders` (por instituição).
+  Status derivados: `rascunho`,
   `revisao-clinica`, `revisao-privacidade`, `aprovado`, `expirando`,
   `arquivado`.
 
 ### Inbox / Conversa
 - **Definição:** thread bidirecional entre a equipe e uma pessoa. Uma
   conversa é o par (paciente, canal). Mensagens: `messages` com
-  `direction ∈ {inbound, outbound}`.
+  `direction ∈ {in, out}`. Estado da janela de 24 h WhatsApp em
+  `whatsapp_conversations` (verificada por `whatsapp_window_open`).
+
+### Medicação
+- **Definição:** medicamento prescrito ou de uso contínuo associado a
+  um paciente. Tabela: **`medications`** (nome, dose, frequência,
+  período).
+- Não substitui prontuário: guardamos o suficiente para lembrar,
+  registrar adesão e encaminhar — não para prescrever.
+
+### Adesão / Evento de adesão
+- **Definição:** ocorrência registrada quando o paciente confirma,
+  recusa ou omite uma dose/lembrete. Tabela: **`adherence_events`**
+  (`event_type`, `occurred_at`, `source`).
+- Alimentada por respostas a mensagens de jornada, ações manuais da
+  equipe e integrações externas. É insumo para pendências e para a
+  próxima melhor ação — não é diagnóstico clínico.
+- **Sinônimos proibidos:** "compliance" (jargão farmacêutico),
+  "aderência" (ortografia incorreta em pt-BR médico usual).
 
 ### Instituição
 - **Definição:** tenant do sistema. Cada linha das tabelas operacionais
@@ -145,12 +179,23 @@ Armazenados em `user_roles` (nunca em `profiles`). Checagem via
 - **Próxima melhor ação** é a sugestão priorizada por paciente derivada
   das pendências (`nextActionKey` em `PersonDerived`).
 
+### MCP (Model Context Protocol)
+- **Definição:** superfície pela qual assistentes externos consomem o
+  produto como ferramenta. Servidor implementado em
+  `supabase/functions/mcp/` (auto-gerado a partir de
+  `src/lib/mcp/tools/*`). Autenticação por OAuth 2.1; tools atuais:
+  `whoami`, `get-patient`, `list-patients`, `list-conversations`,
+  `list-journeys`.
+
 ---
 
 ## 3. Fronteiras do domínio (o que NÃO somos)
 
-- **Não somos prontuário eletrônico.** Não guardamos evolução clínica,
-  prescrições, exames ou diagnóstico estruturado.
+- **Não somos prontuário clínico.** Não guardamos evolução clínica,
+  prescrição médica, exames ou diagnóstico estruturado. Registramos
+  **medicações** e **eventos de adesão** apenas na medida necessária
+  para operar a jornada de cuidado (lembretes e sinalização de
+  pendências) — não como fonte primária de prescrição.
 - **Não somos ERP/faturamento.** Nenhuma cobrança, TISS, convênio.
 - **Não somos telemedicina síncrona.** Sem vídeo, sem sala virtual.
 - **Não somos CRM genérico.** Somos verticais em cuidado; pipeline
@@ -213,6 +258,7 @@ Lista canônica (fonte: `supabase/functions/`):
 | `public-onboarding` | Endpoint público de onboarding de paciente. |
 | `create-onboarding-invite` | Gerar link de convite de onboarding. |
 | `delete-account` | Remoção de conta conforme LGPD. |
+| `mcp` | Servidor MCP (OAuth 2.1) exposto a assistentes externos. |
 
 ### 4.6 Build / deploy
 - **Lovable** hospeda preview e versão publicada. Não há CI/CD próprio.
