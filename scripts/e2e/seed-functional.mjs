@@ -119,13 +119,19 @@ async function createAuthAccount(account) {
   );
 
   const userId = created.user.id;
+  const roles = account.role === "superadmin"
+    ? [
+        { user_id: userId, role: "superadmin" },
+        // O trigger legado de alteração de instituição verifica explicitamente
+        // o papel admin. A fixture mantém também superadmin para validar ambos
+        // os contratos reais de autorização sem desativar a proteção.
+        { user_id: userId, role: "admin" },
+      ]
+    : [{ user_id: userId, role: account.role }];
 
   await ensureNoError(
     `Criar papel ${account.email}`,
-    await admin.from("user_roles").upsert(
-      { user_id: userId, role: account.role },
-      { onConflict: "user_id,role" },
-    ),
+    await admin.from("user_roles").upsert(roles, { onConflict: "user_id,role" }),
   );
 
   return userId;
