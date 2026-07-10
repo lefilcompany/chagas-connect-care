@@ -154,6 +154,7 @@ escopo**.
 | Novo teste / ADR / issue | QA/Docs | — |
 | Mudança no bucket `whatsapp-media` | RLS/DB Guardian | Edge Function (uploader) |
 | Mudança em `src/lib/mcp/tools/*` | Frontend Slice Engineer (dono do MCP) | QA/Docs (re-extrair manifesto) |
+| Novo slice em `src/features/*` (E2E) | Frontend Slice Engineer | **QA/Docs (spec Playwright em `e2e/<slice>/`)** |
 
 ---
 
