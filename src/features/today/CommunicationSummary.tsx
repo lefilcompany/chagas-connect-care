@@ -19,7 +19,7 @@ export function CommunicationSummary() {
   const { data } = useTodayStats();
   const s = data?.summary;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3">
       <Stat icon={Send} label="Enviadas hoje" value={s?.allToday ?? 0} />
       <Stat icon={CheckCheck} label="Entregues" value={s?.delivered ?? 0} />
       <Stat icon={MessageCircleReply} label="Respostas recebidas" value={s?.replied ?? 0} />
