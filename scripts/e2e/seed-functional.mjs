@@ -9,9 +9,14 @@ function required(...names) {
 }
 
 const supabaseUrl = required("SUPABASE_URL", "API_URL");
+const anonKey = required("SUPABASE_ANON_KEY", "ANON_KEY");
 const serviceRoleKey = required("SUPABASE_SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY");
 
 const admin = createClient(supabaseUrl, serviceRoleKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+const operator = createClient(supabaseUrl, anonKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
@@ -98,7 +103,7 @@ async function ensureNoError(label, result) {
   return result.data;
 }
 
-async function createAccount(account) {
+async function createAuthAccount(account) {
   const created = await ensureNoError(
     `Criar usuário ${account.email}`,
     await admin.auth.admin.createUser({
@@ -109,7 +114,6 @@ async function createAccount(account) {
         full_name: account.fullName,
         role_label: account.role === "superadmin" ? "Superadmin" : "Administrador",
         professional_registry: "E2E-TEST",
-        institution: account.institution,
       },
     }),
   );
@@ -124,40 +128,52 @@ async function createAccount(account) {
     ),
   );
 
-  await ensureNoError(
-    `Completar perfil ${account.email}`,
-    await admin.from("profiles").upsert({
-      id: userId,
-      full_name: account.fullName,
-      role_label: account.role === "superadmin" ? "Superadmin" : "Administrador",
-      professional_registry: "E2E-TEST",
-    }),
-  );
-
-  const profile = await ensureNoError(
-    `Validar instituição do perfil ${account.email}`,
-    await admin.from("profiles").select("institution").eq("id", userId).single(),
-  );
-
-  if (profile.institution !== account.institution) {
-    throw new Error(
-      `Perfil ${account.email} criado sem a instituição esperada. ` +
-      "O trigger de criação de perfil deve copiar user_metadata.institution.",
-    );
-  }
-
   return userId;
 }
 
-const adminAId = await createAccount(fixtures.accounts.adminA);
-await createAccount(fixtures.accounts.adminB);
-await createAccount(fixtures.accounts.superadmin);
+async function completeProfile(userId, account) {
+  const roleLabel = account.role === "superadmin" ? "Superadmin" : "Administrador";
+  const profile = await ensureNoError(
+    `Completar perfil ${account.email}`,
+    await operator
+      .from("profiles")
+      .update({
+        full_name: account.fullName,
+        role_label: roleLabel,
+        professional_registry: "E2E-TEST",
+        institution: account.institution,
+      })
+      .eq("id", userId)
+      .select("institution")
+      .single(),
+  );
+
+  if (profile.institution !== account.institution) {
+    throw new Error(`Perfil ${account.email} não recebeu a instituição esperada.`);
+  }
+}
+
+const superadminId = await createAuthAccount(fixtures.accounts.superadmin);
+await ensureNoError(
+  "Autenticar superadmin de bootstrap",
+  await operator.auth.signInWithPassword({
+    email: fixtures.accounts.superadmin.email,
+    password: fixtures.accounts.superadmin.password,
+  }),
+);
+await completeProfile(superadminId, fixtures.accounts.superadmin);
+
+const adminAId = await createAuthAccount(fixtures.accounts.adminA);
+await completeProfile(adminAId, fixtures.accounts.adminA);
+
+const adminBId = await createAuthAccount(fixtures.accounts.adminB);
+await completeProfile(adminBId, fixtures.accounts.adminB);
 
 await ensureNoError(
   "Criar pacientes funcionais",
   await admin.from("patients").insert([
     { ...fixtures.patients.a, owner_id: adminAId },
-    fixtures.patients.b,
+    { ...fixtures.patients.b, owner_id: adminBId },
   ]),
 );
 
