@@ -4,7 +4,13 @@ import { resolve } from "node:path";
 
 const root = resolve(process.cwd());
 const matrixPath = resolve(root, "tests/test-matrix.json");
+const databaseMatrixPath = resolve(root, "tests/test-matrix.database.json");
 const matrix = JSON.parse(readFileSync(matrixPath, "utf8"));
+const databaseMatrix = JSON.parse(readFileSync(databaseMatrixPath, "utf8"));
+const functionalities = [
+  ...(matrix.functionalities ?? []),
+  ...(databaseMatrix.functionalities ?? []),
+];
 const baseSha = process.env.BASE_SHA || "";
 const headSha = process.env.HEAD_SHA || "HEAD";
 
@@ -59,7 +65,7 @@ function isFunctionalSource(file) {
 
 const errors = [];
 const ids = new Set();
-const matchers = matrix.functionalities.map((functionality) => {
+const matchers = functionalities.map((functionality) => {
   if (ids.has(functionality.id)) errors.push(`ID de funcionalidade duplicado: ${functionality.id}`);
   ids.add(functionality.id);
 
@@ -116,4 +122,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Mapa válido: ${matrix.functionalities.length} funcionalidades, ${functionalFiles.length} arquivo(s) funcional(is) alterado(s), ${affected.size} domínio(s) afetado(s).`);
+console.log(`Mapa válido: ${functionalities.length} funcionalidades, ${functionalFiles.length} arquivo(s) funcional(is) alterado(s), ${affected.size} domínio(s) afetado(s).`);
