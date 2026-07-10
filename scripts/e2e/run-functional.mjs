@@ -101,6 +101,7 @@ async function waitForFunctions(url, anonKey, processRef) {
 }
 
 let functionsProcess = null;
+let functionsLogStream = null;
 let exitCode = 1;
 
 try {
@@ -137,11 +138,17 @@ try {
   run(process.execPath, ["scripts/e2e/seed-functional.mjs"], { env: functionalEnv });
 
   log("[e2e] Servindo Edge Functions locais...");
-  const logStream = createWriteStream(functionsLogPath, { flags: "w" });
+  functionsLogStream = createWriteStream(functionsLogPath, { flags: "w" });
   functionsProcess = spawn(npx, [...supabaseArgs, "functions", "serve"], {
     cwd: root,
     env: functionalEnv,
-    stdio: ["ignore", logStream, logStream],
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  functionsProcess.stdout?.pipe(functionsLogStream, { end: false });
+  functionsProcess.stderr?.pipe(functionsLogStream, { end: false });
+  functionsProcess.on("error", (error) => {
+    functionsLogStream?.write(`${sanitize(error.message)}\n`);
   });
 
   await waitForFunctions(apiUrl, anonKey, functionsProcess);
@@ -164,6 +171,7 @@ try {
   if (functionsProcess && functionsProcess.exitCode == null) {
     functionsProcess.kill("SIGTERM");
   }
+  functionsLogStream?.end();
   log("[e2e] Encerrando Supabase local...");
   runSupabase(["stop", "--no-backup"], { allowFailure: true, timeout: 5 * 60_000 });
 }
