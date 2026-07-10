@@ -1,17 +1,17 @@
 # ADRs — Architectural Decision Records
 
 ADRs preservam o **porquê** de decisões, alternativas, consequências e
-restrições. Formato baseado em MADR, adaptado para pt-BR.
+restrições. O formato é baseado em MADR e adaptado para pt-BR.
 
 ---
 
 ## Regra para novas funcionalidades
 
-Toda nova funcionalidade exige um ADR antes do primeiro commit funcional, mesmo
-quando parte da implementação parecer reversível. O ADR deve delimitar:
+Toda nova funcionalidade exige um ADR antes do primeiro commit funcional. O ADR
+deve delimitar:
 
 - problema e usuário afetado;
-- decisão de produto/domínio/arquitetura;
+- decisão de produto, domínio ou arquitetura;
 - alternativas consideradas;
 - riscos e guard-rails;
 - estratégia de dados, segurança e observabilidade;
@@ -36,7 +36,7 @@ condições forem verdadeiras:
    assim.
 3. **Trade-off real:** havia alternativas legítimas com custos diferentes.
 
-Escolhas locais, óbvias e reversíveis podem ficar no issue, teste ou código.
+Escolhas locais, óbvias e reversíveis podem permanecer no issue, teste ou código.
 
 ---
 
@@ -48,13 +48,14 @@ proposto ──► aceito ──► substituido-por(NNNN)
     └──────► descartado
 ```
 
-- **proposto:** precisa de decisão; não é regra vigente.
-- **aceito:** decisão vigente.
-- **substituido-por:** preservado como histórico, mas não vigente.
+- **proposto:** precisa de decisão; não é regra vigente;
+- **aceito:** decisão vigente;
+- **substituido-por:** preservado como histórico, mas não vigente;
 - **descartado:** alternativa formalmente rejeitada.
 
-ADRs não são apagados. Corrija erro factual pequeno no próprio ADR; para mudar a
-decisão, crie outro ADR e estabeleça substituição.
+ADRs não são apagados. Para mudar uma decisão, crie outro ADR e estabeleça a
+relação de substituição. Quando um ADR altera somente parte de outro, use uma
+relação de complemento e descreva explicitamente qual trecho foi superado.
 
 ---
 
@@ -83,7 +84,7 @@ Quando a fronteira ainda depende de responsáveis, use `proposto`.
 
 ## Como criar
 
-1. Crie/abra o issue primeiro.
+1. Crie ou abra o issue primeiro.
 2. Copie `0000-template.md`.
 3. Use o próximo ID disponível.
 4. Preencha contexto, evidências, decisão, alternativas, consequências,
@@ -108,6 +109,7 @@ Quando a fronteira ainda depende de responsáveis, use `proposto`.
 | [0006](0006-limitar-dados-clinicos-ao-cuidado-coordenado.md) | proposto | Limitar dados clínicos ao necessário para coordenação. |
 | [0007](0007-manter-issue-tracker-local-em-markdown.md) | aceito | Manter issue tracker local em Markdown. |
 | [0008](0008-adotar-ci-cd-com-testes-por-funcionalidade.md) | aceito | Adotar CI/CD com testes unitários e E2E por funcionalidade. |
+| [0009](0009-adotar-e2e-funcional-com-supabase-local.md) | aceito | Executar E2E funcional com Supabase local efêmero. |
 
 ---
 
@@ -117,7 +119,7 @@ Ao alterar domínio, arquitetura ou funcionalidade:
 
 - procure ADR vigente;
 - não contradiga decisão aceita silenciosamente;
-- confira se nova evidência exige substituição;
-- atualize o índice;
-- atualize `tests/test-matrix.json`;
+- confira se nova evidência exige substituição ou complemento;
+- atualize este índice;
+- atualize a matriz de testes aplicável;
 - registre riscos, migração e estratégia de testes.
