@@ -78,7 +78,7 @@ export default function AuthPage() {
       <div className="w-full max-w-md">
         <h1 className="sr-only">Acessar Chagas Cuidado Digital</h1>
         <Link to="/" className="mb-8 flex items-center justify-center" aria-label="ELO2 — Início">
-          <img src={elo2Logo.url} alt="ELO2" className="h-12 w-auto" />
+          <img src={elo2Logo.url} alt="ELO2" className="h-14 w-auto" />
         </Link>
         <div className="rounded-2xl border border-border bg-card p-8 shadow-card">
           <Tabs value={tab} onValueChange={setTab}>
