@@ -1,156 +1,87 @@
+# Plano — Reescrita de CONTEXT.md, architecture.md e AGENTS.md
 
-# Documentação do Chagas Digital Care
+## Decisões fixadas (respostas 1–6)
 
-Criar a estrutura de documentação do projeto seguindo o entendimento consolidado:
+- **Escopo:** reescrever os 3 documentos (não patch incremental).
+- **AGENTS.md:** orquestrador + 6 papéis executáveis em paralelo, com contratos entre slices.
+- **architecture.md:** contrato formal por edge function; ficha por tabela nuclear; sem Mermaid.
+- **Classificação de tabelas aprovada** (ver seção "Modelo de dados" abaixo).
+- **`adherence_events` / `medications`:** feature ativa → entram no glossário como termos de primeira classe e viram tabelas nucleares.
+- **Divergências de nomenclatura:** docs se alinham ao banco (não o contrário).
 
-- **Domínio central:** Jornada de cuidado do paciente
-- **Issue-tracker:** markdown local, um arquivo por issue
-- **ADRs:** só template + README agora (sem retroativos)
-- **AGENTS.md:** "nunca decidir sozinho" + pacote base (pt-BR, leitura prévia, atualização pós-tarefa) + guard-rails técnicos (design, segurança, auto-gen) + issue-first
-- **Arquitetura:** documento único e denso, servindo como onboarding
+## Tabelas a "mover" para alinhar frontend ↔ banco
 
-Toda a documentação em **pt-BR**.
+O frontend já usa os nomes reais do banco (via `src/integrations/supabase/types.ts`, auto-gerado). O desalinhamento está **só nas docs**. Portanto, nenhuma migration de rename; o trabalho é reescrever as docs e o glossário.
 
-## Estrutura de arquivos a criar
+Correções no glossário do `CONTEXT.md`:
 
-```text
-docs/
-├── CONTEXT.md
-├── AGENTS.md
-├── architecture.md
-├── issue-tracker/
-│   ├── README.md              # convenções: nomenclatura, frontmatter, ciclo de vida
-│   ├── TEMPLATE.md            # template de novo issue
-│   └── 0001-exemplo-issue.md  # 1 issue-exemplo preenchido
-└── adr/
-    ├── README.md              # o que é ADR, quando criar, ciclo de vida
-    └── 0000-template.md       # template MADR
-```
+| Termo antigo (doc) | Termo canônico (banco) | Ação |
+| --- | --- | --- |
+| `care_network_contacts` | **`contacts`** | Renomear entrada "Rede de cuidado / Contato" para apontar a `contacts`. Manter "contato" como rótulo de domínio, mas remover a proibição de "contato" no glossário de Pessoa (deixar de sinônimo proibido). |
+| `templates` | **`message_templates`** | Atualizar seção "Template Meta / WhatsApp" para citar `message_templates`. |
+| `audiences` | **`audience_segments`** | Atualizar seção "Audiência / Segmento" para citar `audience_segments`. |
+| (ausente) | **`adherence_events`** | Adicionar entrada "Adesão / Evento de adesão" no glossário. |
+| (ausente) | **`medications`** | Adicionar entrada "Medicação". |
+| Fronteira "não somos prontuário" | — | Refinar: não somos prontuário **clínico** (evolução, prescrição, diagnóstico), mas registramos **adesão a medicação** como parte da jornada de cuidado. |
 
-## Conteúdo de cada arquivo
+Correções no `architecture.md` (seção 4 — Modelo de dados): substituir `care_network_contacts` → `contacts`, `templates` → `message_templates`, `audiences` → `audience_segments`; adicionar `adherence_events` e `medications` como nucleares.
 
-### `docs/CONTEXT.md` (glossário + stack, 100% detalhado)
+## Estrutura final dos 3 documentos
 
-Estrutura:
+### CONTEXT.md (reescrito)
 
-1. **Visão do produto** — plataforma para instituições de saúde acompanharem a jornada de cuidado do paciente (entrada → engajamento → alta), com comunicação multicanal (WhatsApp/SMS/e-mail), automações (jornadas), biblioteca de conteúdo clínico e privacidade LGPD.
-2. **Glossário de domínio** (núcleo: jornada do paciente) — cada termo com definição canônica e sinônimos proibidos:
-   - Paciente / Pessoa (`patients`, `people`)
-   - Rede de cuidado / Contato (`care_network_contacts`) — cuidador, familiar, responsável
-   - Consentimento / Autorização — `authorization_status`
-   - Canal / Preferência de canal — WhatsApp, SMS, e-mail
-   - Pendência — o que falta para o paciente ficar "em dia" (canal válido, cuidador, consentimento)
-   - Jornada (`journeys`) — grafo de nós representando fluxo automatizado
-   - Nó / Coluna — unidades do grafo (`entrada`, `whatsapp`, `aguardar`, `condicao`, `encerrar`, etc.)
-   - Run (`journey_runs`) — instância de execução de uma jornada para um paciente
-   - Tarefa da jornada (`journey_tasks`)
-   - Template Meta / WhatsApp — mensagem aprovada pelo Meta Business
-   - Audiência / Segmento — coorte dinâmica de pacientes
-   - Biblioteca de conteúdo (`content_library`) — cápsulas clínicas reutilizáveis
-   - Inbox / Conversa — thread bidirecional
-   - Instituição — tenant (isolamento por `institution` + RLS)
-   - Papéis: `superadmin`, `admin` (institucional), `equipe`
-   - Today / Próxima melhor ação
-3. **Fronteiras do domínio** — o que NÃO é responsabilidade do produto (prontuário eletrônico, faturamento, telemedicina síncrona).
-4. **Stack técnica 100% detalhada**:
-   - Frontend: React 18, Vite 5, TypeScript 5, Tailwind CSS v3, shadcn/ui (Radix), TanStack Query v5, React Router, Zustand ausente (server-state é TanStack), design tokens semânticos em `src/index.css`.
-   - Backend: Lovable Cloud (Supabase gerenciado) — Postgres, Auth, Storage (`whatsapp-media`), Edge Functions Deno.
-   - Autorização: `user_roles` + `has_role()` SECURITY DEFINER, isolamento por `institution` via `get_user_institution()`.
-   - Integrações externas: Meta WhatsApp Cloud API (Graph v25.0), CEP (endereço).
-   - Edge functions ativas (lista completa a partir de `supabase/functions/`): `send-whatsapp`, `whatsapp-webhook`, `whatsapp-diagnostics`, `journey-runner`, `journey-enroll`, `process-message-batch`, `create/sync/upload-whatsapp-template`, `upload-whatsapp-media`, `repair-whatsapp-channel`, `public-onboarding`, `create-onboarding-invite`, `delete-account`.
-   - Testes: Vitest + Testing Library.
-   - Build/deploy: Lovable (preview + published).
-5. **Convenções de código** — pt-BR nos comentários, tokens semânticos obrigatórios, sem cores hardcoded, sem edição de arquivos auto-gerados.
+1. Visão do produto
+2. Glossário (termos alinhados ao banco + `adherence_events`/`medications` adicionados + `contacts` correto)
+3. Fronteiras (refinada: adesão faz parte; evolução clínica não)
+4. Stack técnica (mantida, com edge functions atualizadas incluindo `mcp`)
+5. Convenções de código
 
-### `docs/AGENTS.md`
+### architecture.md (reescrito, denso)
 
-Regra-mãe destacada no topo:
+1. Visão C4 nível 1
+2. Módulos frontend (por slice)
+3. **Edge functions — contrato formal por função** (15 funções):
+   - Para cada uma: método, path, autenticação, request schema, response schema, side-effects (tabelas escritas, chamadas externas), invariantes, códigos de erro.
+   - Inclui a nova `mcp` (OAuth + tools).
+4. **Modelo de dados — buckets**:
+   - **Nucleares (15) — ficha completa:** `institutions`, `profiles`, `user_roles`, `patients`, `contacts`, `messages`, `message_templates`, `message_batches`, `content_library`, `content_folders`, `audience_segments`, `journeys`, `journey_runs`, `journey_run_steps`, `journey_tasks`.
+     Cada ficha: colunas nucleares, FKs, invariantes, RLS (SELECT/INSERT/UPDATE/DELETE por papel), GRANTs, helpers `SECURITY DEFINER` que a tocam.
+   - **Nucleares adicionadas (2 — feature ativa):** `adherence_events`, `medications` — ficha completa.
+   - **Semi-nucleares WhatsApp (7) — ficha resumida:** `whatsapp_channels`, `whatsapp_identities`, `whatsapp_conversations`, `whatsapp_media_assets`, `whatsapp_template_submissions`, `whatsapp_template_header_media`, `institution_whatsapp_settings`.
+   - **Auxiliares (8) — tabela-resumo:** `onboarding_invites`, `quick_replies`, `crm_sync_log`, `whatsapp_admin_audit_log`, `whatsapp_integration_health`, `whatsapp_otp_codes`, `whatsapp_template_events`, `whatsapp_unmatched_events`, `whatsapp_webhook_activity`.
+5. **Catálogo de helpers `SECURITY DEFINER`** (`has_role`, `get_user_institution`, `is_superadmin`, `can_access_patient`, `whatsapp_window_open`, `mark_expired_whatsapp_media`, `handle_new_user`, `prevent_institution_self_change`, `set_updated_at`, `update_updated_at_column`) — assinatura, propósito, quem chama.
+6. Fluxos críticos em ASCII (envio WhatsApp + webhook; execução de jornada; onboarding público; OAuth do MCP).
+7. Matriz de permissões (mantida, expandida por tabela nuclear).
+8. Deploy / cron / bucket de storage.
+9. Riscos e dívidas (placeholder linkando `docs/issue-tracker/`).
 
-> **Nunca tomar decisões automaticamente.** Diante de qualquer ambiguidade — escopo, nomenclatura, UX, modelagem, migração, política RLS, escolha de biblioteca — pare e faça perguntas objetivas antes de escrever código.
+### AGENTS.md (reescrito — orquestrador + 6 papéis)
 
-Depois, seções:
+1. Regra-mãe (nunca decidir em silêncio) — mantida.
+2. **Papel do orquestrador**: recebe pedido, quebra em slices independentes, atribui a papéis, define contratos entre slices, valida integração.
+3. **6 papéis executáveis em paralelo**:
+   - **Domain Steward** — dono de `CONTEXT.md` e glossário.
+   - **Guardião de RLS / Banco** — dono de migrations, políticas, GRANTs, helpers `SECURITY DEFINER`.
+   - **Edge Function Engineer** — dono de `supabase/functions/*` e contratos.
+   - **Frontend Slice Engineer** — dono de um `src/features/<slice>/`.
+   - **Design System Guardian** — dono de tokens, shadcn, guard-rails visuais.
+   - **QA / Docs** — dono de testes, `docs/adr/`, `docs/issue-tracker/`, atualização final dos documentos.
+4. **Contratos entre papéis** (o que cada papel pode mudar sem coordenar, e o que exige handshake).
+5. **Regras de paralelização**: quais slices podem rodar juntos (ex.: `people/` + `library/` OK; qualquer coisa que mexa em `messages` serializa).
+6. Fluxo obrigatório de trabalho (issue-first, ADR quando aplicável).
+7. Guard-rails (design, segurança, arquivos intocáveis, glossário é lei) — mantidos.
+8. Protocolo de perguntas objetivas (1 por vez, 2–4 alternativas, recomendação com trade-off).
 
-1. **Como perguntar bem** — 1 pergunta por vez, com recomendação, alternativas concretas e trade-offs.
-2. **Fluxo obrigatório de trabalho:**
-   - a. Ler `docs/CONTEXT.md` e o issue correspondente em `docs/issue-tracker/` antes de tocar em código.
-   - b. Ler ADRs relacionados em `docs/adr/`.
-   - c. Executar a tarefa.
-   - d. Atualizar o issue (status, notas, decisões) e, se afetou o domínio, atualizar `CONTEXT.md`.
-   - e. Se surgiu decisão arquitetural difícil de reverter → propor ADR novo.
-3. **Idioma** — sempre pt-BR (respostas ao usuário, comentários novos, docs, issues, ADRs).
-4. **Issue-first obrigatório** — nenhuma mudança de código sem issue correspondente em `docs/issue-tracker/`. Se não existe, criar antes.
-5. **Guard-rails de design** — tokens semânticos de `src/index.css`, sem `text-white`/`bg-[#...]`, sem Inter/Poppins default, sem gradientes roxo→azul genéricos.
-6. **Guard-rails de segurança** — GRANT+RLS+policies na mesma migration para tabelas em `public`; roles nunca em `profiles`; segredos nunca em `VITE_*`; `has_role()` SECURITY DEFINER para checagens.
-7. **Arquivos intocáveis** — `src/integrations/supabase/client.ts`, `src/integrations/supabase/types.ts`, `supabase/config.toml`, chaves `VITE_SUPABASE_*` em `.env`.
-8. **Glossário é lei** — usar exatamente os termos do `CONTEXT.md`. Termo novo → atualizar glossário na mesma tarefa.
+## Ordem de execução (quando eu entrar em build mode)
 
-### `docs/architecture.md` (denso, onboarding)
+1. Reescrever `CONTEXT.md` (glossário alinhado ao banco + adesão/medicação).
+2. Reescrever `docs/architecture.md` (contratos + fichas + helpers).
+3. Reescrever `AGENTS.md` (orquestrador + 6 papéis + paralelização).
+4. Nenhuma mudança de código de aplicação nem migration nesta rodada — só documentação.
 
-Seções:
+## O que fica de fora explicitamente
 
-1. **Visão geral (C4 nível 1)** — atores (Equipe da instituição, Superadmin, Paciente/Rede de cuidado, Meta WhatsApp) × sistemas.
-2. **Módulos frontend** — mapa de `src/features/*` (people, journeys, inbox, library, today, insights, privacy, audiences, channels, meta-templates) e suas responsabilidades.
-3. **Edge functions** — tabela com nome, gatilho, responsabilidade, dependências externas.
-4. **Modelo de dados essencial** — tabelas nucleares (`patients`, `care_network_contacts`, `messages`, `templates`, `journeys`, `journey_runs`, `journey_run_steps`, `journey_tasks`, `content_library`, `audiences`, `user_roles`, `profiles`, `institutions`) com relações principais.
-5. **Fluxos críticos** (diagramas mermaid inline):
-   - Envio de WhatsApp (UI → `messages` → `send-whatsapp` → Meta → `whatsapp-webhook` → status).
-   - Execução de jornada (`journey-enroll` → `journey_runs` → cron `journey-runner` → nós).
-   - Onboarding público (link → `public-onboarding` → paciente + consentimento).
-6. **Matriz de permissões** — superadmin × admin × equipe × RLS por instituição.
-7. **Deploy e ambientes** — Lovable preview vs published, edge functions, storage bucket `whatsapp-media`, cron do journey-runner.
-8. **Riscos conhecidos e dívidas** — placeholders para o time preencher.
-
-### `docs/issue-tracker/README.md`
-
-Define:
-
-- **Nomenclatura:** `NNNN-slug-curto.md` (4 dígitos zero-padded, incremental).
-- **Frontmatter obrigatório:**
-
-  ```yaml
-  ---
-  id: 0042
-  titulo: Nome curto do issue
-  status: aberto | em-andamento | bloqueado | concluido | descartado
-  tipo: bug | feature | chore | spike | docs
-  prioridade: baixa | media | alta | critica
-  criado_em: 2026-07-08
-  atualizado_em: 2026-07-08
-  responsavel: null
-  relacionados: []
-  adr: null
-  ---
-  ```
-
-- **Corpo:** Contexto · O que fazer · Critérios de aceitação (checklist) · Fora de escopo · Notas.
-- **Ciclo de vida** e regra: agente atualiza o próprio issue ao concluir.
-
-### `docs/issue-tracker/TEMPLATE.md`
-
-Cópia limpa da estrutura acima, pronta para duplicar.
-
-### `docs/issue-tracker/0001-exemplo-issue.md`
-
-Um issue-exemplo preenchido (ex.: "Documentar coluna Pendências da tabela de pessoas") para servir de referência viva.
-
-### `docs/adr/README.md`
-
-- O que é ADR (formato MADR curto).
-- **Quando criar** (regra dos 3): decisão difícil de reverter · surpreendente sem contexto · resultado de trade-off real com alternativas descartadas. Se algum critério falha, não criar ADR.
-- Ciclo de vida: `proposto → aceito → substituído(por NNNN) | descartado`.
-- Numeração incremental `NNNN-titulo-kebab.md`.
-
-### `docs/adr/0000-template.md`
-
-Template MADR em pt-BR: Contexto · Decisão · Alternativas consideradas · Consequências (positivas/negativas) · Status.
-
-## Fora de escopo desta tarefa
-
-- Escrever ADRs retroativos (você optou por só template).
-- Preencher `docs/issue-tracker/` com o backlog real (só exemplo + template).
-- Criar `CONTEXT-MAP.md` (projeto é single-context).
-- Alterar código de aplicação ou migrations.
-
-## Verificação
-
-Após aplicar o plano: listar `docs/` recursivamente e conferir que todos os 9 arquivos existem e que nenhum contém placeholder tipo "TODO" fora das seções explicitamente marcadas como "a preencher pelo time" no `architecture.md`.
+- Nenhum rename de tabela no banco.
+- Nenhum diagrama Mermaid.
+- Nenhum ADR novo automático (só se surgir decisão que preencha os 3 critérios do `docs/adr/README.md`).
+- ERD visual (fica para uma rodada futura, se você pedir).
