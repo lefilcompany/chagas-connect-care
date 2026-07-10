@@ -52,7 +52,9 @@ function isFunctionalSource(file) {
   if (file.startsWith("src/integrations/supabase/")) return false;
   if (file.startsWith("src/assets/")) return false;
   if (file.endsWith(".d.ts")) return false;
-  return file.startsWith("src/") || file.startsWith("supabase/functions/");
+  return file.startsWith("src/")
+    || file.startsWith("supabase/functions/")
+    || file.startsWith("supabase/migrations/");
 }
 
 const errors = [];
