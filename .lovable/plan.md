@@ -1,87 +1,111 @@
-# Plano — Reescrita de CONTEXT.md, architecture.md e AGENTS.md
+# Plano — CI/CD com GitHub Actions + regra no AGENTS.md
 
-## Decisões fixadas (respostas 1–6)
+## Escopo
 
-- **Escopo:** reescrever os 3 documentos (não patch incremental).
-- **AGENTS.md:** orquestrador + 6 papéis executáveis em paralelo, com contratos entre slices.
-- **architecture.md:** contrato formal por edge function; ficha por tabela nuclear; sem Mermaid.
-- **Classificação de tabelas aprovada** (ver seção "Modelo de dados" abaixo).
-- **`adherence_events` / `medications`:** feature ativa → entram no glossário como termos de primeira classe e viram tabelas nucleares.
-- **Divergências de nomenclatura:** docs se alinham ao banco (não o contrário).
+Configurar CI que roda em **todo PR (qualquer branch → qualquer branch)** e em **todo push para `main`**, cobrindo:
 
-## Tabelas a "mover" para alinhar frontend ↔ banco
+1. **Lint** (ESLint, sem erros)
+2. **Testes unitários** (Vitest — já existente)
+3. **Testes Deno** das edge functions (job separado)
+4. **Testes E2E** (Playwright contra preview publicado Lovable)
 
-O frontend já usa os nomes reais do banco (via `src/integrations/supabase/types.ts`, auto-gerado). O desalinhamento está **só nas docs**. Portanto, nenhuma migration de rename; o trabalho é reescrever as docs e o glossário.
+E acrescentar no `AGENTS.md` a regra: toda funcionalidade nova entrega testes unitários + testes E2E + lint limpo, obrigatoriamente.
 
-Correções no glossário do `CONTEXT.md`:
+## Arquivos a criar
 
-| Termo antigo (doc) | Termo canônico (banco) | Ação |
-| --- | --- | --- |
-| `care_network_contacts` | **`contacts`** | Renomear entrada "Rede de cuidado / Contato" para apontar a `contacts`. Manter "contato" como rótulo de domínio, mas remover a proibição de "contato" no glossário de Pessoa (deixar de sinônimo proibido). |
-| `templates` | **`message_templates`** | Atualizar seção "Template Meta / WhatsApp" para citar `message_templates`. |
-| `audiences` | **`audience_segments`** | Atualizar seção "Audiência / Segmento" para citar `audience_segments`. |
-| (ausente) | **`adherence_events`** | Adicionar entrada "Adesão / Evento de adesão" no glossário. |
-| (ausente) | **`medications`** | Adicionar entrada "Medicação". |
-| Fronteira "não somos prontuário" | — | Refinar: não somos prontuário **clínico** (evolução, prescrição, diagnóstico), mas registramos **adesão a medicação** como parte da jornada de cuidado. |
+```text
+.github/workflows/ci.yml         # workflow único com 4 jobs paralelos
+playwright.config.ts             # config raiz do Playwright
+e2e/
+  fixtures/auth.ts               # helper de login usando TEST_USER_EMAIL/TEST_USER_PASSWORD
+  smoke.spec.ts                  # 1 spec inicial: login → /app/today carrega
+  README.md                      # como rodar local e no CI
+.github/PULL_REQUEST_TEMPLATE.md # checklist: lint OK, unit OK, e2e OK
+```
 
-Correções no `architecture.md` (seção 4 — Modelo de dados): substituir `care_network_contacts` → `contacts`, `templates` → `message_templates`, `audiences` → `audience_segments`; adicionar `adherence_events` e `medications` como nucleares.
+## Alterações em arquivos existentes
 
-## Estrutura final dos 3 documentos
+- `package.json` — novos scripts:
+  - `"test:unit": "vitest run"` (alias do atual `test`)
+  - `"test:e2e": "playwright test"`
+  - `"test:e2e:install": "playwright install --with-deps chromium"`
+- `package.json` devDependencies — `@playwright/test`
+- `.gitignore` — adicionar `playwright-report/`, `test-results/`, `e2e/.auth/`
+- `AGENTS.md` — nova seção **§14 Definition of Done por funcionalidade** (detalhe em "Regra no AGENTS.md" abaixo)
+- `README.md` — parágrafo curto apontando o novo workflow e como rodar E2E local
 
-### CONTEXT.md (reescrito)
+## Estrutura do workflow `.github/workflows/ci.yml`
 
-1. Visão do produto
-2. Glossário (termos alinhados ao banco + `adherence_events`/`medications` adicionados + `contacts` correto)
-3. Fronteiras (refinada: adesão faz parte; evolução clínica não)
-4. Stack técnica (mantida, com edge functions atualizadas incluindo `mcp`)
-5. Convenções de código
+```text
+name: CI
+on:
+  pull_request:            # qualquer branch → qualquer branch
+  push:
+    branches: [main]
 
-### architecture.md (reescrito, denso)
+jobs:
+  lint:            # bun install → bun run lint
+  unit:            # bun install → bun run test:unit
+  deno-test:       # setup deno → deno test supabase/functions/ -A
+  e2e:             # bun install → playwright install chromium
+                   # → playwright test (usa PLAYWRIGHT_BASE_URL do secret)
+```
 
-1. Visão C4 nível 1
-2. Módulos frontend (por slice)
-3. **Edge functions — contrato formal por função** (15 funções):
-   - Para cada uma: método, path, autenticação, request schema, response schema, side-effects (tabelas escritas, chamadas externas), invariantes, códigos de erro.
-   - Inclui a nova `mcp` (OAuth + tools).
-4. **Modelo de dados — buckets**:
-   - **Nucleares (15) — ficha completa:** `institutions`, `profiles`, `user_roles`, `patients`, `contacts`, `messages`, `message_templates`, `message_batches`, `content_library`, `content_folders`, `audience_segments`, `journeys`, `journey_runs`, `journey_run_steps`, `journey_tasks`.
-     Cada ficha: colunas nucleares, FKs, invariantes, RLS (SELECT/INSERT/UPDATE/DELETE por papel), GRANTs, helpers `SECURITY DEFINER` que a tocam.
-   - **Nucleares adicionadas (2 — feature ativa):** `adherence_events`, `medications` — ficha completa.
-   - **Semi-nucleares WhatsApp (7) — ficha resumida:** `whatsapp_channels`, `whatsapp_identities`, `whatsapp_conversations`, `whatsapp_media_assets`, `whatsapp_template_submissions`, `whatsapp_template_header_media`, `institution_whatsapp_settings`.
-   - **Auxiliares (8) — tabela-resumo:** `onboarding_invites`, `quick_replies`, `crm_sync_log`, `whatsapp_admin_audit_log`, `whatsapp_integration_health`, `whatsapp_otp_codes`, `whatsapp_template_events`, `whatsapp_unmatched_events`, `whatsapp_webhook_activity`.
-5. **Catálogo de helpers `SECURITY DEFINER`** (`has_role`, `get_user_institution`, `is_superadmin`, `can_access_patient`, `whatsapp_window_open`, `mark_expired_whatsapp_media`, `handle_new_user`, `prevent_institution_self_change`, `set_updated_at`, `update_updated_at_column`) — assinatura, propósito, quem chama.
-6. Fluxos críticos em ASCII (envio WhatsApp + webhook; execução de jornada; onboarding público; OAuth do MCP).
-7. Matriz de permissões (mantida, expandida por tabela nuclear).
-8. Deploy / cron / bucket de storage.
-9. Riscos e dívidas (placeholder linkando `docs/issue-tracker/`).
+- Todos os 4 jobs rodam em paralelo (economiza tempo; falha de um não bloqueia execução dos outros, mas bloqueia o merge).
+- `concurrency` por ref para cancelar runs obsoletos no mesmo PR.
+- Cache de `~/.bun/install/cache` por hash do `bun.lockb`.
+- Artefatos: `playwright-report/` publicado como artifact em falha do job E2E.
 
-### AGENTS.md (reescrito — orquestrador + 6 papéis)
+## Segredos necessários (GitHub → Settings → Secrets)
 
-1. Regra-mãe (nunca decidir em silêncio) — mantida.
-2. **Papel do orquestrador**: recebe pedido, quebra em slices independentes, atribui a papéis, define contratos entre slices, valida integração.
-3. **6 papéis executáveis em paralelo**:
-   - **Domain Steward** — dono de `CONTEXT.md` e glossário.
-   - **Guardião de RLS / Banco** — dono de migrations, políticas, GRANTs, helpers `SECURITY DEFINER`.
-   - **Edge Function Engineer** — dono de `supabase/functions/*` e contratos.
-   - **Frontend Slice Engineer** — dono de um `src/features/<slice>/`.
-   - **Design System Guardian** — dono de tokens, shadcn, guard-rails visuais.
-   - **QA / Docs** — dono de testes, `docs/adr/`, `docs/issue-tracker/`, atualização final dos documentos.
-4. **Contratos entre papéis** (o que cada papel pode mudar sem coordenar, e o que exige handshake).
-5. **Regras de paralelização**: quais slices podem rodar juntos (ex.: `people/` + `library/` OK; qualquer coisa que mexa em `messages` serializa).
-6. Fluxo obrigatório de trabalho (issue-first, ADR quando aplicável).
-7. Guard-rails (design, segurança, arquivos intocáveis, glossário é lei) — mantidos.
-8. Protocolo de perguntas objetivas (1 por vez, 2–4 alternativas, recomendação com trade-off).
+O usuário precisa configurar manualmente antes do primeiro run verde:
 
-## Ordem de execução (quando eu entrar em build mode)
+- `PLAYWRIGHT_BASE_URL` = `https://chagas-connect-care.lovable.app` (preview publicado)
+- `TEST_USER_EMAIL` = e-mail de um usuário de teste (criado por você no Lovable Cloud)
+- `TEST_USER_PASSWORD` = senha desse usuário
 
-1. Reescrever `CONTEXT.md` (glossário alinhado ao banco + adesão/medicação).
-2. Reescrever `docs/architecture.md` (contratos + fichas + helpers).
-3. Reescrever `AGENTS.md` (orquestrador + 6 papéis + paralelização).
-4. Nenhuma mudança de código de aplicação nem migration nesta rodada — só documentação.
+O plano cria a documentação em `e2e/README.md` explicando exatamente como obter/criar cada um. Sem esses secrets, o job E2E falha com mensagem clara — os outros 3 jobs continuam funcionando.
 
-## O que fica de fora explicitamente
+## Playwright — smoke test inicial
 
-- Nenhum rename de tabela no banco.
-- Nenhum diagrama Mermaid.
-- Nenhum ADR novo automático (só se surgir decisão que preencha os 3 critérios do `docs/adr/README.md`).
-- ERD visual (fica para uma rodada futura, se você pedir).
+Um único spec (`e2e/smoke.spec.ts`):
+
+1. Vai para `/auth`
+2. Faz login com `TEST_USER_EMAIL` / `TEST_USER_PASSWORD`
+3. Aguarda redirecionamento para `/app/today`
+4. Assere que o cabeçalho "Hoje" está visível
+
+Suficiente para validar o pipeline. Specs por feature entram conforme cada nova funcionalidade (regra do AGENTS.md abaixo).
+
+## Regra no `AGENTS.md` (nova §14)
+
+Texto que será adicionado (resumo):
+
+> **§14 Definition of Done por funcionalidade**
+>
+> Uma funcionalidade só é considerada concluída quando entrega, na mesma tarefa:
+>
+> 1. **Testes unitários** cobrindo o caminho feliz + pelo menos 1 borda relevante da lógica de negócio nova (Vitest em `src/**/*.test.ts(x)` ou Deno em `supabase/functions/**/*.test.ts`).
+> 2. **Teste E2E** cobrindo o fluxo do usuário exposto pela funcionalidade, em `e2e/<slice>/<fluxo>.spec.ts`. Toda rota nova ou ação crítica (envio, aprovação, exclusão) exige spec.
+> 3. **Lint limpo**: `bun run lint` sem erros nem novos warnings introduzidos pela mudança.
+>
+> QA/Docs (papel §3.6) tem poder de veto: PR que quebre qualquer um dos 3 critérios volta para o autor. O CI (`.github/workflows/ci.yml`) automatiza a verificação em todo PR e no push para `main`.
+
+Também atualiza a matriz §4 acrescentando "Teste E2E obrigatório" na linha de "Novo slice em src/features/*".
+
+## O que fica de fora (explicitamente)
+
+- **Deploy automatizado** — o Lovable já publica; CI só valida.
+- **Coverage report** — não pedido; podemos adicionar depois.
+- **Testes E2E multi-browser** (Firefox/Webkit) — só Chromium para manter CI rápido; adicionar depois se necessário.
+- **Verificação de tipos (`tsc --noEmit`)** — o `vite build` faz check implícito; se quiser job dedicado, é adição futura.
+- **Auto-merge / branch protection rules** — configuração manual no GitHub, fora do escopo do repositório.
+
+## Ordem de execução (quando aprovado)
+
+1. Criar `.github/workflows/ci.yml`
+2. Criar `playwright.config.ts` + `e2e/` + `e2e/README.md`
+3. Ajustar `package.json` (scripts + devDep) e `.gitignore`
+4. Atualizar `AGENTS.md` (§14 + linha na matriz §4) e `README.md`
+5. Criar issue `docs/issue-tracker/0003-ci-cd-github-actions.md` documentando a entrega
+6. Instruir usuário a configurar os 3 secrets no GitHub
