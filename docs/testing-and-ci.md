@@ -1,28 +1,27 @@
 # Testes e CI/CD
 
-Este documento descreve a estratégia executável de qualidade do repositório. A
-decisão está no ADR [`0008`](adr/0008-adotar-ci-cd-com-testes-por-funcionalidade.md) e o trabalho inicial no issue [`0003`](issue-tracker/0003-configurar-ci-cd-e-testes.md).
+Este documento descreve a estratégia executável de qualidade do repositório.
+As decisões principais estão nos ADRs [`0008`](adr/0008-adotar-ci-cd-com-testes-por-funcionalidade.md)
+e [`0009`](adr/0009-adotar-e2e-funcional-com-supabase-local.md).
 
 ---
 
-## 1. Regra obrigatória para novas funcionalidades
+## 1. Definition of Done para funcionalidades
 
 Toda nova funcionalidade segue esta ordem:
 
 1. criar ou atualizar o issue em `docs/issue-tracker/`;
-2. criar o ADR antes do primeiro commit funcional;
-3. registrar os arquivos em `tests/test-matrix.json`;
-4. definir cenários unitários, integração mockada e E2E;
-5. implementar;
-6. criar/atualizar testes unitários;
-7. criar/atualizar testes E2E;
-8. executar lint, typecheck, cobertura, build e E2E;
-9. concluir o issue somente depois do **Quality gate** verde.
+2. criar ou atualizar o ADR antes do primeiro commit funcional;
+3. registrar fontes, unitários e E2E na matriz de testes;
+4. implementar a menor mudança completa;
+5. adicionar ou atualizar testes unitários;
+6. adicionar ou atualizar E2E funcional;
+7. executar governança, lint, TypeScript, cobertura, build e E2E;
+8. concluir o issue somente depois do **Quality gate** verde.
 
-Para bugs/refatorações locais, issue é obrigatório; ADR é obrigatório quando a
+Para bugs e refatorações, issue continua obrigatório. ADR é exigido quando a
 mudança altera decisão, contrato, domínio, segurança ou satisfaz a regra dos
-três. A CI exige ADR em qualquer diff funcional para impedir introdução de
-feature sem decisão documentada.
+três.
 
 ---
 
@@ -37,71 +36,69 @@ push:
 workflow_dispatch: {}
 ```
 
-- qualquer PR roda, independentemente da branch de origem/destino;
-- push direto ou merge na `main` roda novamente;
-- execução manual permite diagnóstico;
-- execuções obsoletas do mesmo PR/ref são canceladas.
-
-O workflow usa `contents: read` e não acessa secrets de produção.
+- qualquer pull request executa a pipeline;
+- merge ou push na `main` executa novamente;
+- execução manual serve para diagnóstico;
+- runs obsoletos do mesmo PR ou ref são cancelados;
+- o workflow usa somente `contents: read`.
 
 ---
 
-## 3. Jobs da CI
+## 3. Jobs obrigatórios
 
-### 3.1 Governança e mapa de testes
-
-- valida IDs, status e responsável dos issues;
-- valida IDs/status dos ADRs;
-- exige issue e ADR no diff funcional;
-- verifica que issue/ADR precederam o código no histórico do PR;
-- valida feature roots e edge functions conhecidas;
-- exige mapeamento fonte → unitário → E2E;
-- exige atualização de unitário e E2E quando uma funcionalidade muda.
+### 3.1 Governança documental e mapa de testes
 
 ```bash
 npm run ci:governance
 npm run ci:test-map
 ```
 
-### 3.2 Lint e TypeScript
+A validação:
+
+- confere IDs, status e responsáveis de issues;
+- confere IDs e status dos ADRs;
+- exige issue e ADR para mudanças funcionais;
+- verifica a ordem issue/ADR antes da implementação no histórico do PR;
+- valida feature roots e edge functions conhecidas;
+- exige fonte, unitário e E2E mapeados;
+- inclui migrations, grants, triggers, constraints e RLS na governança.
+
+Matrizes:
+
+- `tests/test-matrix.json` — aplicação e Edge Functions;
+- `tests/test-matrix.database.json` — migrations e isolamento do banco.
+
+### 3.2 Análise estática
 
 ```bash
 npm run lint
 npm run typecheck
 ```
 
-O typecheck cobre aplicação, configurações Node e testes.
+O typecheck cobre aplicação, testes, Playwright e configurações TypeScript.
+Relatórios do ESLint e do typecheck são publicados como artifact mesmo em falha.
 
-#### Baseline de `no-explicit-any`
+`@typescript-eslint/no-explicit-any` permanece desativado no baseline por dívida
+legada. Código novo deve preferir tipos explícitos e `unknown`.
 
-O código existente possui uso amplo de `any`. Ativar
-`@typescript-eslint/no-explicit-any` como erro quebraria a CI por dívida anterior
-e transformaria este PR em uma refatoração transversal de alto risco. Por isso:
+### 3.3 Unitários
 
-- a regra permanece desativada no baseline;
-- TypeScript, `no-undef`, hooks, sintaxe e demais regras continuam ativos;
-- código novo deve evitar `any` e preferir `unknown`, tipos gerados, guards e
-  contratos explícitos;
-- a eliminação do legado deve ocorrer por issues incrementais;
-- a regra só poderá ser reativada quando o inventário estiver corrigido ou por
-  escopos/diretórios progressivos.
+As suítes cobrem:
 
-Isso é dívida controlada, não autorização para ampliar o uso.
+- templates e medicações;
+- audiências e destinatários;
+- WhatsApp e lotes;
+- sessão, acesso e guards;
+- jornadas e rotas;
+- contratos de Edge Functions;
+- contratos críticos das migrations.
 
-### 3.3 Unitários por funcionalidade
+Os testes de migrations validam, entre outros pontos:
 
-Matriz separada:
-
-- templates/medicações;
-- audiências/destinatários;
-- WhatsApp/lotes;
-- identidade E2E;
-- guards/papéis;
-- jornadas;
-- contratos de rotas;
-- contratos de edge functions.
-
-Cada item vira check independente e publica JUnit.
+- grants do `service_role`;
+- segurança de backfills em banco vazio;
+- proteção para tabelas históricas opcionais;
+- convenção e presença de migrations versionadas.
 
 ### 3.4 Cobertura
 
@@ -116,10 +113,7 @@ npm run test:coverage
 | Functions | 45% |
 | Lines | 45% |
 
-Os limites são piso e devem subir progressivamente. Redução exige issue, ADR e
-justificativa.
-
-Artefatos: HTML, LCOV, JSON summary e JUnit.
+Os limites são piso. Redução exige issue e justificativa explícita.
 
 ### 3.5 Build
 
@@ -127,209 +121,219 @@ Artefatos: HTML, LCOV, JSON summary e JUnit.
 npm run build
 ```
 
-Valida bundle Vite e publica `dist/` como `production-dist`.
+O bundle Vite é publicado como `production-dist` quando o job conclui.
 
-### 3.6 E2E Playwright
+### 3.6 E2E funcional
+
+```bash
+npm run test:e2e
+```
+
+O runner:
+
+1. inicia Supabase local em Docker;
+2. executa `supabase db reset` em banco limpo;
+3. aplica todas as migrations reais;
+4. cria usuários e fixtures exclusivamente sintéticas;
+5. autentica um superadmin real para preparar instituições sem desativar o
+   trigger de proteção;
+6. inicia Edge Functions locais;
+7. constrói e serve a aplicação apontando para o backend local;
+8. executa Playwright;
+9. encerra Supabase sem preservar o banco.
 
 Projetos Chromium:
 
 | Projeto | Escopo |
 | --- | --- |
-| `public` | landing, auth, legais, anônimo e 404 |
-| `institutional` | rotas/shell institucional |
-| `superadmin` | operação transversal e proteção |
+| `public` | landing, autenticação, páginas legais, onboarding e 404 |
+| `institutional` | shell e rotas da instituição |
+| `superadmin` | papel real e operação transversal |
 | `legacy` | redirects e bookmarks antigos |
+| `auth-setup` | login real e storage states |
 
-Cada projeto:
+Os E2E validam:
 
-- JUnit + HTML;
-- screenshot somente em falha;
-- vídeo retido em falha;
-- trace no primeiro retry;
-- retries na CI;
-- falha em exceção JavaScript da página.
+- login e sessão reais;
+- perfis e papéis persistidos;
+- leitura e mutation no Postgres;
+- RLS same-tenant e cross-tenant;
+- superadmin real;
+- onboarding por Edge Function local;
+- ausência de exceções JavaScript na página.
+
+O Playwright publica JUnit, HTML, screenshots, vídeos e traces de falha.
 
 ### 3.7 Quality gate
 
-Consolida governança, análise estática, unitários, cobertura, build e E2E. Se
-qualquer dependência não terminar com `success`, falha.
+O check **Quality gate** consolida:
+
+- governança;
+- análise estática;
+- unitários;
+- cobertura;
+- build;
+- E2E funcional.
+
+Qualquer resultado diferente de `success` bloqueia o gate.
 
 ### 3.8 Artefato validado da `main`
 
-Após push na `main` e Quality gate:
+Após push na `main` e Quality gate verde:
 
-- baixa o bundle aprovado;
-- cria `manifest.json` com SHA/run/timestamp;
-- publica `validated-main-<sha>` por 30 dias.
+- o bundle aprovado é baixado;
+- um `manifest.json` registra repositório, SHA, run e data;
+- `validated-main-<sha>` é publicado por 30 dias.
 
-É continuous delivery de artefato. A publicação efetiva continua no Lovable.
+Isso é **continuous delivery de artefato**. A publicação efetiva continua sob o
+fluxo do Lovable enquanto não existir mecanismo oficial de deploy automatizado
+adotado pelo projeto.
 
 ---
 
 ## 4. Comandos locais
+
+Pré-requisitos:
+
+- Node.js 22;
+- Docker Desktop ou Docker Engine;
+- Chromium do Playwright.
 
 ```bash
 npm install --no-audit --no-fund --legacy-peer-deps
 npx playwright install chromium
 ```
 
-O repositório possui `bun.lockb`, mas a alteração por conector não consegue
-regenerar o binário. A CI usa `npm install` até a equipe versionar lockfile
-atualizado; então deve migrar para instalação congelada.
+Validações isoladas:
 
 ```bash
+npm run ci:governance
+npm run ci:test-map
 npm run lint
 npm run typecheck
 npm run test:unit
 npm run test:coverage
 npm run build
 npm run test:e2e
+```
+
+Pipeline local completa:
+
+```bash
 npm run test:ci
 ```
 
-Executar uma suíte:
-
-```bash
-npm run test:unit -- src/test/unit/templates.test.ts
-npm run test:e2e -- --project=institutional
-```
+O comando `test:ci` inclui governança e mapa de testes, além dos gates técnicos.
 
 ---
 
-## 5. Ambiente E2E sintético
+## 5. Dados e segredos nos testes
 
-`.env.e2e` ativa exclusivamente:
+É proibido usar em fixtures ou artifacts:
 
-```env
-VITE_E2E_MOCK=true
-```
+- nomes ou documentos reais;
+- telefone de paciente real;
+- conteúdo clínico real;
+- URL de produção;
+- token Meta;
+- service role remota;
+- segredo de runner ou webhook.
 
-Parâmetros:
+As credenciais E2E são fixas, locais e reservadas às contas sintéticas criadas
+em cada execução efêmera.
 
-- `__e2e_role=admin|equipe|superadmin`;
-- `__e2e_auth=authenticated|anonymous`;
-- `__e2e_institution=<slug-sintetico>`.
-
-`src/lib/e2e.ts` cria sessão sintética. `AuthProvider` e `AccessProvider` só a
-usam em modo E2E.
-
-`tests/e2e/fixtures.ts` intercepta o host Supabase sintético e retorna REST,
-Functions, Auth e Storage mockados. Nenhum teste de PR lê/escreve banco real.
-
-É proibido usar nome, telefone, CPF, conteúdo clínico, token ou URL de produção
-em fixture, trace, screenshot, vídeo ou JUnit.
+O bootstrap nunca deve desativar trigger ou policy de produção para aprovar o
+E2E. A fixture deve atravessar a mesma autorização que protege o fluxo real.
 
 ---
 
-## 6. Matriz de funcionalidades
+## 6. Migrations e RLS
 
-Fonte: `tests/test-matrix.json`.
+Toda mudança em `supabase/migrations/**` é considerada funcional pela CI.
 
-```json
-{
-  "id": "nome-estavel",
-  "description": "...",
-  "sources": ["src/features/exemplo/**"],
-  "unitTests": ["src/test/unit/exemplo.test.ts"],
-  "e2eTests": ["tests/e2e/institutional.spec.ts"]
-}
-```
+Ela deve atualizar:
 
-Ao criar feature:
+- `src/test/unit/database-contracts.test.ts`, quando houver contrato estrutural;
+- `tests/e2e/data-access.spec.ts`, quando houver impacto de acesso, RLS ou
+  persistência;
+- matriz complementar `tests/test-matrix.database.json`;
+- issue e ADR aplicáveis.
 
-- cadastrar feature root/edge function;
-- criar entrada ou ampliar existente;
-- listar fontes;
-- listar ao menos um unitário e um E2E;
-- alterar esses testes no mesmo PR.
-
-Cobertura por tipo:
-
-- regra pura → unitário comportamental;
-- hook/componente → Testing Library;
-- rota/shell → contrato unitário + Playwright;
-- edge function → helpers testáveis + contrato + integração protegida futura;
-- RLS/migration → Supabase local/staging como alvo;
-- integração externa → mock no PR + contract test protegido.
+`supabase db reset` é obrigatório no E2E e falha de reconstrução bloqueia merge.
 
 ---
 
-## 7. Política de testes
+## 7. Integrações externas
 
-### Unitário
+A suíte obrigatória de PR não envia mensagens reais para a Meta.
 
-Não é aceito:
+Testes de contrato Meta devem usar workflow separado com:
 
-- `expect(true).toBe(true)`;
-- teste que só importa;
-- snapshot sem comportamento;
-- mock que replica literalmente a implementação.
+- environment protegido;
+- aprovação manual quando aplicável;
+- WABA e número exclusivos de staging;
+- templates e destinatários sintéticos;
+- secrets indisponíveis para código não confiável;
+- limpeza e auditoria.
 
-### E2E
-
-Verificar caminho do usuário/contrato, incluindo quando aplicável:
-
-- sucesso;
-- autorização/papel;
-- vazio/erro;
-- redirect/compatibilidade;
-- ausência de exceção JS.
-
-### Integração
-
-Mock não comprova contrato real. WhatsApp, Supabase, Storage e cron precisam de
-suíte separada em ambiente protegido para mudanças de alto risco.
+Um frontend ou banco verde não comprova a integração Meta.
 
 ---
 
 ## 8. Branch protection recomendada
 
-Em **Settings → Branches/Rulesets** para `main`:
+Na regra da `main`:
 
-- exigir PR;
+- exigir pull request;
 - exigir branch atualizada;
 - exigir aprovação;
-- exigir resolução de conversations;
-- bloquear force push/delete;
-- exigir **Quality gate**;
-- impedir bypass, exceto break-glass auditado.
+- exigir resolução das conversas;
+- exigir o check **Quality gate**;
+- bloquear force push e exclusão;
+- restringir bypass a break-glass auditado.
 
-O conector desta tarefa não oferece ação administrativa para rulesets; essa
-ativação deve ser feita na interface do GitHub.
-
----
-
-## 9. Secrets e ambiente futuro
-
-A CI de PR não precisa de secrets.
-
-Contract tests reais devem usar workflow separado, environment `staging`,
-aprovações, tenant/número de teste, dados sintéticos e limpeza posterior.
-Nunca usar `pull_request_target` para executar código não confiável com secrets.
+A configuração do ruleset é administrativa e não está contida no YAML do
+workflow.
 
 ---
 
-## 10. Flakiness
+## 9. Dependências e lockfile
 
-1. consultar JUnit/trace/screenshot/vídeo;
-2. reproduzir com o mesmo projeto;
-3. corrigir causa/seletor/sincronização;
+O repositório possui `package-lock.json`, mas ele precisa ser regenerado para
+incluir todas as dependências adicionadas pela pipeline. Enquanto essa
+atualização não for versionada, os jobs usam `npm install --legacy-peer-deps`.
+
+Após regenerar o lockfile em um ambiente Node 22:
+
+```bash
+npm install --package-lock-only --legacy-peer-deps
+```
+
+A mudança seguinte deve trocar os jobs para `npm ci`. Não declarar instalação
+congelada antes de o lockfile refletir `package.json`.
+
+---
+
+## 10. Flakiness e diagnóstico
+
+1. consultar JUnit, trace, screenshot, vídeo e logs do bootstrap;
+2. reproduzir com o mesmo projeto Playwright;
+3. corrigir causa, seletor ou sincronização;
 4. não usar timeout fixo como solução permanente;
 5. não aumentar retries para esconder falha;
-6. não usar skip/fixme sem issue, owner e prazo.
+6. não usar `.skip`, `.only` ou `.fixme` sem issue, responsável e prazo.
 
-Seletores: role/name, label, texto estável, `data-testid`; nunca classe Tailwind.
+Seletores devem priorizar role, nome, label e `data-testid`, nunca classes
+Tailwind.
 
 ---
 
 ## 11. Limitações conhecidas
 
-- E2E usa backend mockado;
-- RLS precisa de Supabase local/staging;
-- edge functions têm baseline estrutural, não todos os handlers Deno;
-- thresholds são moderados;
-- instalação ainda não é congelada;
+- a integração Meta real ainda exige staging protegido;
+- o lockfile ainda precisa ser atualizado antes da adoção de `npm ci`;
 - Chromium é o browser obrigatório inicial;
-- `no-explicit-any` permanece dívida controlada.
-
-A matriz cria obrigação e baseline; a profundidade cresce a cada alteração.
+- os thresholds de cobertura são moderados e devem crescer;
+- `no-explicit-any` permanece dívida controlada;
+- o GitHub Actions produz artifact validado, mas não publica automaticamente no
+  Lovable.
