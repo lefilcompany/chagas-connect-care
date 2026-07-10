@@ -1,0 +1,11 @@
+{
+  "functionalities": [
+    {
+      "id": "database-migrations-rls",
+      "description": "Migrations, grants, triggers, constraints e isolamento RLS do banco.",
+      "sources": ["supabase/migrations/**"],
+      "unitTests": ["src/test/unit/database-contracts.test.ts"],
+      "e2eTests": ["tests/e2e/data-access.spec.ts"]
+    }
+  ]
+}
