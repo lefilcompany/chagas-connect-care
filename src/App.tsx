@@ -47,6 +47,7 @@ import MessageTemplates from "./pages/app/MessageTemplates";
 import MessageTemplateNew from "./pages/app/MessageTemplateNew";
 import MessageTemplateEdit from "./pages/app/MessageTemplateEdit";
 import OnboardingForm from "./pages/public/OnboardingForm";
+import OAuthConsent from "./pages/OAuthConsent";
 import { InstitutionIdentityProvider } from "@/services/institutionIdentityProvider";
 
 function LegacyRedirect({ to }: { from: string; to: string }) {
@@ -81,6 +82,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
             <Route path="/termos-de-uso" element={<TermsOfUse />} />
             <Route path="/exclusao-de-dados" element={<DataDeletion />} />
