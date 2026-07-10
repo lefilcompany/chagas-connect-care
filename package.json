@@ -21,7 +21,7 @@
     "test:e2e:raw": "playwright test",
     "test:e2e:headed": "node scripts/e2e/run-functional.mjs --headed",
     "test:e2e:ui": "node scripts/e2e/run-functional.mjs --ui",
-    "test:ci": "npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run test:e2e",
+    "test:ci": "npm run ci:governance && npm run ci:test-map && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run test:e2e",
     "ci:governance": "node scripts/ci/validate-governance.mjs",
     "ci:test-map": "node scripts/ci/validate-test-mapping.mjs",
     "e2e:seed": "node scripts/e2e/seed-functional.mjs"
