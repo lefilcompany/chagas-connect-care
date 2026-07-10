@@ -26,6 +26,15 @@ describe("contratos das migrations", () => {
     expect(source).toContain("ALTER DEFAULT PRIVILEGES IN SCHEMA public");
   });
 
+  it("permite leitura e atualização de profiles sem remover a proteção RLS", () => {
+    const source = readMigration("20260710135500_grant_authenticated_profile_access.sql");
+
+    expect(source).toContain("GRANT SELECT, UPDATE ON TABLE public.profiles TO authenticated");
+    expect(source).toContain("GRANT SELECT ON TABLE public.user_roles TO authenticated");
+    expect(source).not.toMatch(/DISABLE\s+ROW\s+LEVEL\s+SECURITY/i);
+    expect(source).not.toMatch(/DISABLE\s+TRIGGER/i);
+  });
+
   it("não cria identidade de WhatsApp quando o paciente do backfill não existe", () => {
     const source = readMigration("20260626151744_773861fc-8ffb-4681-926b-9a17f5afec3a.sql");
 
