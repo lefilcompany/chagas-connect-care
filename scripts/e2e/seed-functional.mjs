@@ -109,22 +109,12 @@ async function createAccount(account) {
         full_name: account.fullName,
         role_label: account.role === "superadmin" ? "Superadmin" : "Administrador",
         professional_registry: "E2E-TEST",
+        institution: account.institution,
       },
     }),
   );
 
   const userId = created.user.id;
-
-  await ensureNoError(
-    `Criar perfil ${account.email}`,
-    await admin.from("profiles").upsert({
-      id: userId,
-      full_name: account.fullName,
-      role_label: account.role === "superadmin" ? "Superadmin" : "Administrador",
-      professional_registry: "E2E-TEST",
-      institution: account.institution,
-    }),
-  );
 
   await ensureNoError(
     `Criar papel ${account.email}`,
@@ -133,6 +123,28 @@ async function createAccount(account) {
       { onConflict: "user_id,role" },
     ),
   );
+
+  await ensureNoError(
+    `Completar perfil ${account.email}`,
+    await admin.from("profiles").upsert({
+      id: userId,
+      full_name: account.fullName,
+      role_label: account.role === "superadmin" ? "Superadmin" : "Administrador",
+      professional_registry: "E2E-TEST",
+    }),
+  );
+
+  const profile = await ensureNoError(
+    `Validar instituição do perfil ${account.email}`,
+    await admin.from("profiles").select("institution").eq("id", userId).single(),
+  );
+
+  if (profile.institution !== account.institution) {
+    throw new Error(
+      `Perfil ${account.email} criado sem a instituição esperada. ` +
+      "O trigger de criação de perfil deve copiar user_metadata.institution.",
+    );
+  }
 
   return userId;
 }
